@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Parkour Playground</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        
+        #ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            user-select: none;
+            pointer-events: none;
+            z-index: 10;
+            max-width: 300px;
+        }
+        
+        #ui h1 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #ffaa00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        #ui .controls {
+            font-size: 13px;
+            line-height: 1.8;
+            color: #ccc;
+        }
+        
+        #ui .controls span {
+            display: inline-block;
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 4px;
+            border: 1px solid rgba(255, 170, 0, 0.4);
+        }
+        
+        #ui .state {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 12px;
+            color: #888;
+        }
+        
+        #ui .state span {
+            color: #0f0;
+            font-weight: bold;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: white;
+            cursor: pointer;
+        }
+
+        #start-screen h1 {
+            font-size: 48px;
+            color: #ffaa00;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        #start-screen p {
+            font-size: 18px;
+            color: #aaa;
+            margin-bottom: 40px;
+        }
+
+        #start-screen .click-hint {
+            font-size: 14px;
+            color: #666;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* === Race UI === */
+        #race-ui {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            pointer-events: none;
+            z-index: 20;
+            display: none;
+        }
+
+        #race-ui #timer {
+            font-size: 48px;
+            font-weight: bold;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.5);
+            padding: 8px 24px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        #race-ui #checkpoint-counter {
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.5);
+            padding: 4px 16px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        #race-ui #best-time {
+            font-size: 16px;
+            color: #ffaa00;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.5);
+            padding: 4px 16px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        #countdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            font-weight: bold;
+            color: #ffaa00;
+            text-shadow: 0 4px 16px rgba(0,0,0,0.9);
+            z-index: 30;
+            display: none;
+            pointer-events: none;
+        }
+
+        #race-results {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            padding: 40px;
+            border-radius: 16px;
+            color: white;
+            text-align: center;
+            z-index: 40;
+            display: none;
+            min-width: 320px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #race-results h2 {
+            font-size: 36px;
+            margin-bottom: 16px;
+            color: #ffaa00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #race-results #final-time {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+        }
+
+        #race-results input {
+            padding: 8px 12px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background: #222;
+            color: white;
+            margin-bottom: 16px;
+            width: 100%;
+            text-align: center;
+            font-family: inherit;
+        }
+
+        #race-results #leaderboard {
+            margin-bottom: 24px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        #race-results #leaderboard .entry {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 15px;
+        }
+
+        #race-results #leaderboard .entry.best {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        #race-results button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 0 6px;
+            background: #ffaa00;
+            color: #111;
+            font-weight: bold;
+            transition: background 0.2s;
+            pointer-events: auto;
+        }
+
+        #race-results button:hover {
+            background: #ffcc00;
+        }
+
+        #celebration {
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            z-index: 35;
+            display: none;
+            pointer-events: none;
+            animation: celebratePulse 1s infinite;
+        }
+
+        @keyframes celebratePulse {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+            50% { transform: translateX(-50%) scale(1.1); opacity: 0.9; }
+        }
+
+        /* === Level Editor UI === */
+        #editor-ui {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+        }
+        #editor-ui.active { display: block; }
+
+        #editor-palette {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: rgba(20, 20, 30, 0.92);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            width: 180px;
+            pointer-events: auto;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        #editor-palette h3 {
+            color: #ffaa00;
+            font-size: 14px;
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #editor-palette .tool-btn {
+            display: block;
+            width: 100%;
+            padding: 6px 8px;
+            margin: 3px 0;
+            background: #2a2a35;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s;
+        }
+        #editor-palette .tool-btn:hover { background: #333340; }
+        #editor-palette .tool-btn.active {
+            background: #ffaa00;
+            color: #111;
+            border-color: #ffaa00;
+            font-weight: bold;
+        }
+        #editor-palette .cat-label {
+            color: #888;
+            font-size: 10px;
+            text-transform: uppercase;
+            margin: 10px 0 4px 0;
+            letter-spacing: 1px;
+        }
+
+        #editor-properties {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: rgba(20, 20, 30, 0.92);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            width: 200px;
+            pointer-events: auto;
+            display: none;
+        }
+        #editor-properties.active { display: block; }
+        #editor-properties h3 {
+            color: #ffaa00;
+            font-size: 14px;
+            margin: 0 0 8px 0;
+        }
+        #editor-properties .prop-row {
+            display: flex;
+            align-items: center;
+            margin: 4px 0;
+            font-size: 12px;
+        }
+        #editor-properties .prop-row label {
+            color: #aaa;
+            width: 70px;
+            flex-shrink: 0;
+        }
+        #editor-properties .prop-row input, #editor-properties .prop-row select {
+            flex: 1;
+            background: #1a1a22;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #ddd;
+            padding: 3px 6px;
+            font-size: 12px;
+        }
+        #editor-properties .prop-row input[type="color"] {
+            padding: 0;
+            height: 24px;
+        }
+
+        #editor-toolbar {
+            position: absolute;
+            bottom: 10px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 30, 0.92);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 8px 16px;
+            display: flex;
+            gap: 6px;
+            pointer-events: auto;
+        }
+        #editor-toolbar button {
+            padding: 6px 14px;
+            background: #2a2a35;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        #editor-toolbar button:hover { background: #333340; }
+        #editor-toolbar button.active { background: #ffaa00; color: #111; border-color: #ffaa00; }
+
+        #editor-hints {
+            position: absolute;
+            bottom: 60px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            padding: 6px 16px;
+            border-radius: 4px;
+            color: #aaa;
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        /* Boss Fight UI */
+        #boss-hud {
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 30;
+            display: none;
+            pointer-events: none;
+        }
+        #boss-name {
+            color: #ff3333;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        #boss-health-bar {
+            width: 300px;
+            height: 14px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #ff3333;
+            border-radius: 7px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        #boss-health-fill {
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6600);
+            transition: width 0.3s;
+        }
+        #boss-phase {
+            color: #ffaa00;
+            font-size: 12px;
+            margin-top: 4px;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+        }
+        #boss-victory {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 50px 60px;
+            border-radius: 16px;
+            text-align: center;
+            z-index: 40;
+            display: none;
+        }
+        #boss-victory h2 {
+            font-size: 42px;
+            color: #ffd700;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+        #boss-victory .stat {
+            color: #ccc;
+            font-size: 16px;
+            margin: 6px 0;
+        }
+        #boss-victory .grade {
+            font-size: 72px;
+            color: #ffd700;
+            font-weight: bold;
+            margin: 12px 0;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+        #boss-victory button {
+            padding: 12px 28px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 16px;
+            background: #ffaa00;
+            color: #111;
+            font-weight: bold;
+        }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="start-screen">
+        <h1>Warehouse Parkour</h1>
+        <p>Click anywhere to start</p>
+        <div class="click-hint">Mouse to look • WASD to move • Space to jump/climb</div>
+    </div>
+    
+    <div id="ui" style="display: none;">
+        <h1>Parkour Controls</h1>
+        <div class="controls">
+            <span>W A S D</span> Move<br>
+            <span>SHIFT</span> Sprint<br>
+            <span>SPACE</span> Jump / Climb / Hang<br>
+            <span>C</span> Slide / Crouch / Roll<br>
+            <span>Q</span> Air Dash<br>
+            <span>SHIFT+Q</span> Overclock<br>
+            <span>CTRL</span> Magnet Boots (ceiling run)<br>
+            <span>F</span> Drone Takedown (wall-run)<br>
+            <span>E</span> Drop / Interact<br>
+            <span>T</span> Time Trial<br>
+            <span>P</span> Rising Tide Mode<br>
+            <span>SHIFT+P</span> Assist Mode<br>
+            <span>N</span> Day/Night/Neon<br>
+            <span>F12</span> Photo Mode<br>
+            <span>V</span> Runner Vision<br>
+            <span>1-4</span> Speedrun ILs (Rooftop/Freezer/Server/Hangar)<br>
+            <span>F1</span> Level Editor<br>
+            <span>B</span> Boss Fight<br>
+            <span>MOUSE</span> Look around<br>
+            <br>
+            <div style="color:#ffaa00;font-size:12px;margin-bottom:4px;">CONTROLLER</div>
+            <span>L STICK</span> Move<br>
+            <span>R STICK</span> Look<br>
+            <span>A</span> Jump / Grab<br>
+            <span>B</span> Slide / Crouch<br>
+            <span>X</span> Air Dash<br>
+            <span>Y</span> Drop<br>
+            <span>LB</span> Sprint<br>
+            <span>RB</span> Takedown<br>
+            <span>LT</span> Grapple Aim<br>
+            <span>RT</span> Overclock<br>
+            <span>L3</span> Magnet Boots<br>
+            <span>R3</span> Day/Night
+        </div>
+        <div class="state">
+            State: <span id="state-display">IDLE</span><br>
+            Speed: <span id="speed-display">0</span> km/h
+        </div>
+    </div>
+    <div id="crosshair" style="display: none;"></div>
+
+    <div id="race-ui" style="display:none;">
+        <div id="timer">00:00.000</div>
+        <div id="checkpoint-counter">0 / 10</div>
+        <div id="best-time">Best: --:--.---</div>
+    </div>
+    <div id="countdown" style="display:none;">3</div>
+    <div id="race-results" style="display:none;">
+        <h2>Finish!</h2>
+        <div id="final-time">00:00.000</div>
+        <input id="run-name" type="text" placeholder="Enter your name" maxlength="20" />
+        <div id="leaderboard"></div>
+        <button id="race-restart">Race Again</button>
+        <button id="race-exit">Exit</button>
+    </div>
+    <div id="celebration" style="display:none;">New Best Time!</div>
+
+    <!-- Level Editor UI -->
+    <div id="editor-ui">
+        <div id="editor-palette">
+            <h3>Objects</h3>
+            <div class="cat-label">Geometry</div>
+            <button class="tool-btn active" data-type="platform">Platform</button>
+            <button class="tool-btn" data-type="wall">Wall</button>
+            <button class="tool-btn" data-type="ramp">Ramp</button>
+            <button class="tool-btn" data-type="movingPlatform">Moving Platform</button>
+            <div class="cat-label">Hazards</div>
+            <button class="tool-btn" data-type="hazard_laser">Laser</button>
+            <button class="tool-btn" data-type="hazard_spinner">Spinner</button>
+            <div class="cat-label">Gameplay</div>
+            <button class="tool-btn" data-type="drone">Drone</button>
+            <button class="tool-btn" data-type="collectible_chip">Data Chip</button>
+            <button class="tool-btn" data-type="grapplePoint">Grapple Point</button>
+            <button class="tool-btn" data-type="powerup">Power-Up</button>
+            <button class="tool-btn" data-type="vent">Breakable Vent</button>
+            <button class="tool-btn" data-type="mirror">Mirror</button>
+            <button class="tool-btn" data-type="checkpoint">Checkpoint</button>
+            <button class="tool-btn" data-type="spawnPoint">Spawn Point</button>
+        </div>
+        <div id="editor-properties">
+            <h3>Properties</h3>
+            <div id="prop-list"></div>
+        </div>
+        <div id="editor-toolbar">
+            <button id="tool-select" class="active">Select</button>
+            <button id="tool-place">Place</button>
+            <button id="tool-delete">Delete</button>
+            <button id="editor-export">Export</button>
+            <button id="editor-import">Import</button>
+            <button id="editor-playtest">Playtest</button>
+        </div>
+        <div id="editor-hints">
+            F1 = Toggle Editor &bull; Click = Place/Select &bull; Right-Click = Delete &bull; Drag = Move &bull; Wheel = Rotate &bull; Shift+Wheel = Scale &bull; G = Grid Snap &bull; H = Helpers &bull; Del = Delete Selected &bull; Ctrl+Z = Undo &bull; Ctrl+S = Export &bull; B = Boss Fight
+        </div>
+    </div>
+    <input type="file" id="editor-file-input" accept=".json" style="display:none" />
+
+    <!-- Boss Fight UI -->
+    <div id="boss-hud">
+        <div id="boss-name">The Overseer</div>
+        <div id="boss-health-bar"><div id="boss-health-fill"></div></div>
+        <div id="boss-phase">Phase 1: Ground Supremacy</div>
+    </div>
+    <div id="boss-victory">
+        <h2>Arena Cleared!</h2>
+        <div class="stat" id="boss-time">Time: 00:00</div>
+        <div class="stat" id="boss-hits">Hits Taken: 0</div>
+        <div class="grade" id="boss-grade">S</div>
+        <button id="boss-exit">Return to Warehouse</button>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

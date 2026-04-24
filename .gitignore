@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Python artifacts (if any scripts added later)
+__pycache__/
+*.pyc
+
+# Node (if npm ever used)
+node_modules/
+package-lock.json
