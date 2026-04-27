@@ -45,7 +45,17 @@ import { StickyBomb } from './weapons/StickyBomb.js';
 import { StaffOfEmbers } from './weapons/StaffOfEmbers.js';
 import { VoidWand } from './weapons/VoidWand.js';
 import { CryoGauntlet } from './weapons/CryoGauntlet.js';
+import { SniperRifle } from './weapons/SniperRifle.js';
+import { SubMachineGun } from './weapons/SubMachineGun.js';
+import { RocketLauncher } from './weapons/RocketLauncher.js';
+import { Flamethrower } from './weapons/Flamethrower.js';
+import { PlasmaRifle } from './weapons/PlasmaRifle.js';
+import { EnergySword } from './weapons/EnergySword.js';
+import { Crossbow } from './weapons/Crossbow.js';
+import { GrenadeLauncher } from './weapons/GrenadeLauncher.js';
 import { MagicSystem } from './MagicSystem.js';
+import { AccessorySystem, ACCESSORY_SLOTS } from './AccessorySystem.js';
+import { InventorySystem } from './InventorySystem.js';
 import { Gatekeeper } from './minibosses/Gatekeeper.js';
 import { RiftStalker } from './minibosses/RiftStalker.js';
 import { ForgeHound } from './minibosses/ForgeHound.js';
@@ -306,6 +316,28 @@ weaponSystem.equip(cryoGauntlet, WEAPON_SLOTS.MELEE);
 // Magic system
 const magicSystem = new MagicSystem(player, resourceSystem, scene);
 player.magicSystem = magicSystem;
+
+// Accessory system
+const accessorySystem = new AccessorySystem(player, characterSheet);
+
+// Inventory system
+const inventorySystem = new InventorySystem(player, 20);
+// Starter consumables
+inventorySystem.addItem('health_potion', 3);
+inventorySystem.addItem('smoke_bomb', 2);
+
+// Additional weapons (available for loot/shop, not all equipped)
+const sniperRifle = new SniperRifle(scene, player);
+const subMachineGun = new SubMachineGun(scene, player);
+const rocketLauncher = new RocketLauncher(scene, player);
+const flamethrower = new Flamethrower(scene, player);
+const plasmaRifle = new PlasmaRifle(scene, player);
+const energySword = new EnergySword(scene, player);
+const crossbow = new Crossbow(scene, player);
+const grenadeLauncher = new GrenadeLauncher(scene, player);
+weaponSystem.equip(sniperRifle, WEAPON_SLOTS.PRIMARY); // overrides staff for default
+weaponSystem.equip(energySword, WEAPON_SLOTS.MELEE);   // overrides cryo for default
+weaponSystem.switchSlot(WEAPON_SLOTS.MELEE);
 
 // Mini-bosses
 const miniBosses = [];
@@ -1758,6 +1790,12 @@ function animate() {
             bar.fill.style.width = pct + '%';
             bar.fill.style.background = mb.currentPhase === 2 ? '#ff3333' : '#ffaa00';
         });
+
+        // Inventory quick-use (keys 6-9)
+        if (activeInput.wasPressed('Digit6')) inventorySystem.useItem('health_potion');
+        if (activeInput.wasPressed('Digit7')) inventorySystem.useItem('mana_potion');
+        if (activeInput.wasPressed('Digit8')) inventorySystem.useItem('stamina_vial');
+        if (activeInput.wasPressed('Digit9')) inventorySystem.useItem('smoke_bomb');
         
         // Time freeze from power-up
         let renderDt = finalDt;

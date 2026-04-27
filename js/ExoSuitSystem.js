@@ -1,8 +1,12 @@
 export const SLOTS = {
   FRAME: 'frame',
-  BOOTS: 'boots',
+  HELMET: 'helmet',
+  CHESTPLATE: 'chestplate',
   GLOVES: 'gloves',
-  OPTICS: 'optics'
+  BOOTS: 'boots',
+  OPTICS: 'optics',
+  SHOULDERS: 'shoulders',
+  GREAVES: 'greaves'
 };
 
 export const MANUFACTURERS = {
@@ -122,9 +126,13 @@ export class ExoSuitSystem {
     this.characterSheet = characterSheet;
     this.equipped = {
       [SLOTS.FRAME]: null,
-      [SLOTS.BOOTS]: null,
+      [SLOTS.HELMET]: null,
+      [SLOTS.CHESTPLATE]: null,
       [SLOTS.GLOVES]: null,
-      [SLOTS.OPTICS]: null
+      [SLOTS.BOOTS]: null,
+      [SLOTS.OPTICS]: null,
+      [SLOTS.SHOULDERS]: null,
+      [SLOTS.GREAVES]: null
     };
   }
 
