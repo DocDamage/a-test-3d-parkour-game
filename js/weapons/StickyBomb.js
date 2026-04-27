@@ -131,7 +131,7 @@ export class StickyBomb {
         const exp = new THREE.Mesh(expGeo, expMat);
         exp.position.copy(bomb.mesh.position);
         this.scene.add(exp);
-        setTimeout(() => this.scene.remove(exp), 200);
+        setTimeout(() => { this.scene.remove(exp); expGeo.dispose(); expMat.dispose(); }, 200);
 
         // Damage query handled by caller (main.js / WeaponSystem)
         if (this.onExplode) {

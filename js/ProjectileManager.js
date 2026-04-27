@@ -160,7 +160,7 @@ export class ProjectileManager {
             // Check collidable bounce
             let bounced = false;
             for (const obj of collidables) {
-                const box = new THREE.Box3().setFromObject(obj);
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                 if (box.containsPoint(nextPos) || box.distanceToPoint(nextPos) < radius) {
                     if (remainingBounces > 0) {
                         // Simple reflection: reverse closest axis
@@ -283,7 +283,7 @@ export class ProjectileManager {
             // Check collidables
             if (!hit && !p.piercing) {
                 for (const obj of collidables) {
-                    const box = new THREE.Box3().setFromObject(obj);
+                    const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                     if (box.containsPoint(p.mesh.position) || box.distanceToPoint(p.mesh.position) < p.radius) {
                         hit = true;
                         break;
@@ -337,7 +337,7 @@ export class ProjectileManager {
                 for (const mirror of this._interactiveEnv.mirrors || []) {
                     const group = mirror.group;
                     if (!group) continue;
-                    const box = new THREE.Box3().setFromObject(group);
+                    const box = group.userData.bbox || new THREE.Box3().setFromObject(group);
                     if (box.containsPoint(p.mesh.position) || box.distanceToPoint(p.mesh.position) < p.radius) {
                         // Compute mirror normal (same formula as InteractiveEnvironment)
                         const normal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), mirror.rotationY + Math.PI / 4);

@@ -21,7 +21,7 @@ export class StructuralCollapse {
             const ballPos = wb.mesh.position.clone();
             for (const obj of this.structuralObjects) {
                 if (!obj.userData.structural) continue;
-                const box = new THREE.Box3().setFromObject(obj);
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                 const center = new THREE.Vector3();
                 box.getCenter(center);
                 const dist = center.distanceTo(ballPos);
@@ -37,7 +37,7 @@ export class StructuralCollapse {
             if (impactSpeed > 12) {
                 for (const obj of this.structuralObjects) {
                     if (!obj.userData.structural) continue;
-                    const box = new THREE.Box3().setFromObject(obj);
+                    const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                     const playerBox = new THREE.Box3(
                         new THREE.Vector3(player.position.x - player.RADIUS, player.position.y, player.position.z - player.RADIUS),
                         new THREE.Vector3(player.position.x + player.RADIUS, player.position.y + player.currentHeight, player.position.z + player.RADIUS)

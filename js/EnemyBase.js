@@ -168,7 +168,7 @@ export class EnemyBase {
         if (this.world && this.world.collidables) {
             const ray = new THREE.Ray(this.group.position, dir);
             for (const obj of this.world.collidables) {
-                const box = new THREE.Box3().setFromObject(obj);
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                 const hit = new THREE.Vector3();
                 if (ray.intersectBox(box, hit) !== null) {
                     const hitDist = this.group.position.distanceTo(hit);

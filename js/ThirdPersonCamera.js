@@ -104,7 +104,7 @@ export class ThirdPersonCamera {
         let closestHit = maxDist;
         
         for (const obj of world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hitPoint = new THREE.Vector3();
             const result = ray.intersectBox(box, hitPoint);
             

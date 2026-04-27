@@ -1063,6 +1063,7 @@ export default class BossFight {
     /* ---------------------------------------------------------------------- */
     update(dt) {
         if (!this.active) return;
+        this._now = performance.now();
 
         if (this.bossState === 'defeated') {
             this._updateDefeat(dt);
@@ -1167,7 +1168,7 @@ export default class BossFight {
         }
 
         // Hover bob
-        const t = performance.now() * 0.002;
+        const t = this._now * 0.002;
         this.bossGroup.position.y = this.bossHoverBaseY + Math.sin(t) * 0.3;
 
         // Arm spin
@@ -1486,7 +1487,7 @@ export default class BossFight {
         for (const td of this.timeDistortions) {
             if (!td.active) continue;
             td.timer -= dt;
-            td.mesh.material.opacity = 0.1 + Math.sin(performance.now() * 0.008) * 0.05;
+            td.mesh.material.opacity = 0.1 + Math.sin(this._now * 0.008) * 0.05;
             if (td.timer <= 0) {
                 td.active = false;
                 this.scene.remove(td.mesh);
@@ -1506,7 +1507,7 @@ export default class BossFight {
             if (!seg.active) continue;
             if (seg.warningTimer > 0) {
                 seg.warningTimer -= dt;
-                seg.mesh.material.opacity = 0.2 + Math.sin(performance.now() * 0.015) * 0.2;
+                seg.mesh.material.opacity = 0.2 + Math.sin(this._now * 0.015) * 0.2;
                 if (seg.warningTimer <= 0) {
                     seg.collapseTimer = 4;
                 }

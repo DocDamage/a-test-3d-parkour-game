@@ -8,6 +8,14 @@ export class UIManager {
     constructor(deps) {
         this.deps = deps;
         this.miniBossBars = [];
+        this._panelDirty = {
+            stash: false,
+            bounty: false,
+            safehouse: false,
+            codex: false,
+            mastery: false
+        };
+        this._lastStashHash = '';
     }
 
     /* ------------------------------------------------------------------ */
@@ -56,7 +64,11 @@ export class UIManager {
 
         if (activeInput.wasPressed('KeyI') && !activeInput.isPressed('ShiftLeft')) {
             const sp = document.getElementById('stash-panel');
-            if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
+            if (sp) {
+                const showing = sp.style.display === 'block';
+                sp.style.display = showing ? 'none' : 'block';
+                if (!showing) this._panelDirty.stash = true;
+            }
         }
         if (activeInput.wasPressed('KeyI') && activeInput.isPressed('ShiftLeft')) {
             const ki = document.getElementById('keyitem-panel');
@@ -94,30 +106,40 @@ export class UIManager {
             const comp = document.getElementById('companion-panel');
             if (comp) comp.style.display = (comp.style.display === 'block') ? 'none' : 'block';
         }
-        if (activeInput.wasPressed('KeyF') && !activeInput.isPressed('ShiftLeft')
-            && d.dialogueSystem && !d.dialogueSystem.isOpen
-            && d.shop && !d.shop.isOpen
-            && d.dungeonSystem && !d.dungeonSystem.nearbyDungeonId) {
-            const fp = document.getElementById('faction-panel');
-            if (fp) fp.style.display = (fp.style.display === 'block') ? 'none' : 'block';
-        }
+        // F key faction panel toggle is now handled by main.js unified KeyF dispatcher
         if (activeInput.wasPressed('KeyH')) {
             const sp = document.getElementById('safehouse-panel');
-            if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
+            if (sp) {
+                const showing = sp.style.display === 'block';
+                sp.style.display = showing ? 'none' : 'block';
+                if (!showing) this._panelDirty.safehouse = true;
+            }
         }
         if (activeInput.wasPressed('KeyJ')) {
             const bp = document.getElementById('bounty-panel');
-            if (bp) bp.style.display = (bp.style.display === 'block') ? 'none' : 'block';
+            if (bp) {
+                const showing = bp.style.display === 'block';
+                bp.style.display = showing ? 'none' : 'block';
+                if (!showing) this._panelDirty.bounty = true;
+            }
         }
         if (activeInput.wasPressed('KeyK')) {
             const cop = document.getElementById('codex-panel');
-            if (cop) cop.style.display = (cop.style.display === 'block') ? 'none' : 'block';
+            if (cop) {
+                const showing = cop.style.display === 'block';
+                cop.style.display = showing ? 'none' : 'block';
+                if (!showing) this._panelDirty.codex = true;
+            }
         }
         if (activeInput.wasPressed('KeyL')) {
             const mp = document.getElementById('mastery-panel');
-            if (mp) mp.style.display = (mp.style.display === 'block') ? 'none' : 'block';
+            if (mp) {
+                const showing = mp.style.display === 'block';
+                mp.style.display = showing ? 'none' : 'block';
+                if (!showing) this._panelDirty.mastery = true;
+            }
         }
-        if (activeInput.wasPressed('KeyN')) {
+        if (activeInput.wasPressed('KeyM')) {
             const ip = document.getElementById('implants-panel');
             if (ip) ip.style.display = (ip.style.display === 'block') ? 'none' : 'block';
         }
@@ -240,6 +262,10 @@ export class UIManager {
         if (countEl) countEl.textContent = `${d.inventoryStash.stash.length} / ${d.inventoryStash.maxSize}`;
         if (!list) return;
         const stash = d.inventoryStash.getStash();
+        const hash = stash.length + '|' + stash.map(i => `${i.name}:${i.rarity}:${i.slot}`).join(',');
+        if (!this._panelDirty.stash && hash === this._lastStashHash) return;
+        this._panelDirty.stash = false;
+        this._lastStashHash = hash;
         if (stash.length === 0) {
             list.innerHTML = '<div style="color:#666;font-size:12px;text-align:center;padding:12px 0;">Stash is empty</div>';
             return;
@@ -284,6 +310,8 @@ export class UIManager {
     _updateSafehousePanel(d) {
         const sp = document.getElementById('safehouse-panel');
         if (!sp || sp.style.display !== 'block' || !d.safehouse) return;
+        if (!this._panelDirty.safehouse) return;
+        this._panelDirty.safehouse = false;
         const upgContainer = document.getElementById('safehouse-upgrades');
         if (upgContainer && d.safehouse.getAllUpgrades) {
             upgContainer.innerHTML = d.safehouse.getAllUpgrades().map(u =>
@@ -295,6 +323,8 @@ export class UIManager {
     _updateBountyPanel(d) {
         const bp = document.getElementById('bounty-panel');
         if (!bp || bp.style.display !== 'block' || !d.bounty) return;
+        if (!this._panelDirty.bounty) return;
+        this._panelDirty.bounty = false;
         const rankEl = document.getElementById('bounty-rank');
         const contractsEl = document.getElementById('bounty-contracts');
         if (rankEl && d.bounty.getRunnerRank) rankEl.textContent = 'Rank: ' + d.bounty.getRunnerRank();
@@ -308,6 +338,8 @@ export class UIManager {
     _updateCodexPanel(d) {
         const cop = document.getElementById('codex-panel');
         if (!cop || cop.style.display !== 'block' || !d.codex) return;
+        if (!this._panelDirty.codex) return;
+        this._panelDirty.codex = false;
         const entriesEl = document.getElementById('codex-entries');
         if (entriesEl && d.codex.getAllEntries) {
             entriesEl.innerHTML = d.codex.getAllEntries().map(e => {
@@ -320,6 +352,8 @@ export class UIManager {
     _updateMasteryPanel(d) {
         const mp = document.getElementById('mastery-panel');
         if (!mp || mp.style.display !== 'block' || !d.mastery) return;
+        if (!this._panelDirty.mastery) return;
+        this._panelDirty.mastery = false;
         const movesEl = document.getElementById('mastery-moves');
         if (movesEl && d.mastery.getMasteryOverview) {
             movesEl.innerHTML = d.mastery.getMasteryOverview().map(m =>

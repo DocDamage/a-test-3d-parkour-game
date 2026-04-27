@@ -480,6 +480,7 @@ export class AudioManager {
     }
 
     stopAmbience() {
+        if (!this.initialized) return;
         const t = this.ctx.currentTime;
         this.ambienceNodes.forEach(node => {
             if (node.gain) {
@@ -512,5 +513,21 @@ export class AudioManager {
         gain.connect(dest);
         osc.start(t);
         osc.stop(t + 0.08);
+    }
+
+    playTone(freq, duration, type = 'sine') {
+        this.ensureInit();
+        const t = this.ctx.currentTime;
+        const dest = this._makeDestination();
+        const osc = this.ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.18, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + duration + 0.02);
     }
 }

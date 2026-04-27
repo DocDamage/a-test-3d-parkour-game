@@ -48,7 +48,6 @@ export class BossArchitect {
         this.health = this.maxHealth;
         this.duplicates = [];
         this._spawnDuplicates();
-        console.log('[Boss] Architect activated — Phase 1');
     }
 
     stop() {
@@ -165,7 +164,6 @@ export class BossArchitect {
 
     _transitionToPhase(phase) {
         this.currentPhase = phase;
-        console.log(`[Boss] Architect entering Phase ${phase}`);
     }
 
     takeDamage(amount, type, source) {
@@ -187,7 +185,6 @@ export class BossArchitect {
         this.isActive = false;
         this._clearDuplicates();
         this._clearWalls();
-        console.log('[Boss] Architect DEFEATED');
         setTimeout(() => { if (this.group) this.group.visible = false; }, 3000);
     }
 

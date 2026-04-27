@@ -44,11 +44,9 @@ export class GamepadController {
         };
         
         window.addEventListener('gamepadconnected', (e) => {
-            console.log('Gamepad connected:', e.gamepad.id);
             this.gamepad = e.gamepad;
         });
         window.addEventListener('gamepaddisconnected', (e) => {
-            console.log('Gamepad disconnected');
             this.gamepad = null;
         });
     }
@@ -83,8 +81,9 @@ export class GamepadController {
             if (code === 'Mouse2') {
                 this.mouse2Down = pressed;
             } else if (code === 'ShiftQ') {
-                // R2 as overclock when shift is also held
+                // R2 as Shift+Q (Overclock / Decoy)
                 this.keys['KeyQ'] = pressed;
+                this.keys['ShiftLeft'] = pressed;
             } else {
                 this.keys[code] = pressed;
             }

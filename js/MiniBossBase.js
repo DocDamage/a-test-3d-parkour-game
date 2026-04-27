@@ -54,7 +54,6 @@ export class MiniBossBase {
         this.group.visible = true;
         this.group.position.copy(this._spawnPosition);
         this.position.copy(this._spawnPosition);
-        console.log(`[MiniBoss] ${this.type} spawned`);
     }
 
     stop() {
@@ -114,7 +113,6 @@ export class MiniBossBase {
 
     _transitionToPhase(phase) {
         this.currentPhase = phase;
-        console.log(`[MiniBoss] ${this.type} enraged (Phase ${phase})`);
         // Visual indicator
         if (this._enrageMesh) {
             this._enrageMesh.visible = true;
@@ -130,7 +128,6 @@ export class MiniBossBase {
         this.group.position.copy(this._spawnPosition);
         this.group.visible = true;
         if (this._enrageMesh) this._enrageMesh.visible = false;
-        console.log(`[MiniBoss] ${this.type} respawned`);
     }
 
     takeDamage(amount, type, source) {
@@ -148,7 +145,6 @@ export class MiniBossBase {
     die(source) {
         this.isDead = true;
         this._respawnTimer = 60;
-        console.log(`[MiniBoss] ${this.type} defeated`);
         if (this.onDeath) this.onDeath(this, source);
         // Hide after brief delay
         setTimeout(() => { if (this.isDead) this.group.visible = false; }, 2000);

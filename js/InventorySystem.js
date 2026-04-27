@@ -93,7 +93,6 @@ export class InventorySystem {
         return true;
       case 'teleport':
         // Placeholder — would teleport to safehouse
-        console.log('[Inventory] Teleport scroll used');
         return true;
       default:
         return false;

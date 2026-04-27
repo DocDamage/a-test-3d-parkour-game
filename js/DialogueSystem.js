@@ -157,7 +157,7 @@ export class DialogueSystem {
         }
 
         if (this._open) {
-            if (activeInput.wasPressed('KeyF')) this._advance();
+            // F handling is now centralized in main.js unified dispatcher
             return;
         }
 
@@ -174,9 +174,7 @@ export class DialogueSystem {
         if (this._nearNpcId) {
             this._prompt.textContent = `[F] Talk to ${NPC_NAMES[this._nearNpcId] || this._nearNpcId}`;
             this._prompt.style.display = 'block';
-            if (activeInput.wasPressed('KeyF')) {
-                this.openDialogue(this._nearNpcId);
-            }
+            // F handling is now centralized in main.js unified dispatcher
         } else {
             this._prompt.style.display = 'none';
         }

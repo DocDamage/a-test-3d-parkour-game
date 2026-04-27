@@ -63,7 +63,7 @@ export class GrenadeLauncher {
     detonateAll() { for (const g of this.activeGrenades) g.detonateNow = true; }
     _explode(g) {
         const exp = new THREE.Mesh(new THREE.SphereGeometry(this.blastRadius, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.5 }));
-        exp.position.copy(g.mesh.position); this.scene.add(exp); setTimeout(() => this.scene.remove(exp), 200);
+        exp.position.copy(g.mesh.position); this.scene.add(exp); setTimeout(() => { this.scene.remove(exp); exp.geometry.dispose(); exp.material.dispose(); }, 200);
         if (this.onExplode) this.onExplode({ position: g.mesh.position.clone(), radius: this.blastRadius, damage: this.damage, type: 'explosive' });
     }
     reload() { if (this.isReloading || this.ammo === this.clipSize) return false; this.isReloading = true; this.reloadTimer = this.reloadTime; return true; }

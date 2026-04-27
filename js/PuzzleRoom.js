@@ -320,22 +320,7 @@ export class PuzzleRoom {
             sw.setPressed(sw.checkPlayer(playerPos));
         }
 
-        // Block pushing — player presses F (KeyF) while adjacent to block
-        if (activeInput && activeInput.wasPressed('KeyF') && this._pushCooldown <= 0) {
-            const facing = this.player.facing;
-            const pushDir = new THREE.Vector3(
-                Math.sin(facing),
-                0,
-                Math.cos(facing)
-            ).normalize();
-
-            for (const block of this._blocks) {
-                if (block.tryPush(pushDir, playerPos)) {
-                    this._pushCooldown = 0.35;
-                    break;
-                }
-            }
-        }
+        // Block pushing is now handled by main.js unified KeyF dispatcher
     }
 
     // ─── Internal ───────────────────────────────────────────────────────

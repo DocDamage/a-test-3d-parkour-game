@@ -155,7 +155,6 @@ export class NephalemGlory {
     };
 
     if (messages[tier]) {
-      console.log(`[Glory] ${messages[tier]}`);
       this._showToast(messages[tier]);
     }
 
@@ -205,9 +204,6 @@ export class NephalemGlory {
   }
 
   _breakStreak(reason) {
-    if (this.killStreak > 0) {
-      console.log(`[Glory] Streak broken (${this.killStreak} kills): ${reason}`);
-    }
     this.killStreak = 0;
     this.tier = 0;
     this.active = false;

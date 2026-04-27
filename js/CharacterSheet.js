@@ -117,8 +117,8 @@ export class CharacterSheet {
 
     _defaultStats() {
         return {
-            mobility: 0, reflex: 0, synthesis: 0,
-            fortitude: 0, tech: 0, guts: 0
+            mob: 10, ref: 10, syn: 10,
+            for: 10, tec: 10, gut: 10
         };
     }
 

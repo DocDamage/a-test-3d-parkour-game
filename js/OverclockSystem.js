@@ -73,10 +73,7 @@ export class OverclockSystem {
             else this.heat = Math.max(0, this.heat - dt * this.heatDecay);
         }
 
-        // Overclock trigger
-        if (this.heat >= this.maxHeat && input.wasPressed('KeyQ') && input.isPressed('ShiftLeft')) {
-            this._activateOverclock();
-        }
+        // Overclock activation is now handled by main.js unified KeyQ dispatcher
 
         // Overheat stumble
         if (this.heat >= this.maxHeat && !this.overclockActive && !input.isPressed('ShiftLeft')) {
@@ -86,6 +83,14 @@ export class OverclockSystem {
 
         this._updateUI();
         return 1.0;
+    }
+
+    tryActivate() {
+        if (this.heat >= this.maxHeat && !this.overclockActive) {
+            this._activateOverclock();
+            return true;
+        }
+        return false;
     }
 
     _activateOverclock() {

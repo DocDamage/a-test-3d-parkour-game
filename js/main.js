@@ -224,11 +224,6 @@ const archetype = new ArchetypeSystem(player, characterSheet);
 const origin = new OriginSystem(player, characterSheet);
 player.setCharacterSheet(characterSheet);
 
-progression.onLevelUp = (level, points) => {
-    console.log(`Level up! Now level ${level}. Attribute points: ${points}`);
-    if (passiveTree) passiveTree.addPoints(1);
-};
-
 // Apply stored character creation choices
 const savedOrigin = sessionStorage.getItem('rpg_origin');
 const savedArchetype = sessionStorage.getItem('rpg_archetype');
@@ -273,26 +268,7 @@ const collapse = new CollapseMode(world, player, characterSheet, exoSuit, archet
 const consequences = new ConsequenceSystem();
 // debt instantiated after enemyManager below
 
-// Skill system (Phase 2)
-const activeArchetypeId = savedArchetype || 'traceur';
-player._archetypeId = activeArchetypeId;
-const resourceSystem = new ResourceSystem(activeArchetypeId);
-if (activeArchetypeId === 'mage') {
-    resourceSystem.setMaxResource(120);
-}
-const skillSystem = new SkillSystem(player, resourceSystem, activeArchetypeId);
 
-// Assign default loadout for archetype
-const defaultLoadout = getDefaultLoadout(activeArchetypeId);
-for (const [slot, skillId] of Object.entries(defaultLoadout)) {
-    skillSystem.assignSkill(slot, skillId);
-}
-
-// Skill callbacks will be wired after all referenced systems are instantiated (see below)
-
-const skillBarUI = new SkillBarUI(skillSystem, resourceSystem);
-const passiveTree = new PassiveTree(activeArchetypeId, skillSystem);
-passiveTree._load();
 
 // Combat systems
 const damageSystem = new DamageSystem(characterSheet, statusEffectSystem);
@@ -411,10 +387,7 @@ saveSystem.register('safehouse',
     (data) => safehouse.deserialize(data)
 );
 
-saveSystem.register('passiveTree',
-    () => passiveTree.serialize(),
-    (data) => passiveTree.deserialize(data)
-);
+
 
 saveSystem.register('origin',
     () => ({ origin: origin.currentOrigin }),
@@ -423,10 +396,62 @@ saveSystem.register('origin',
     }
 );
 
+saveSystem.register('archetype',
+    () => ({
+        primary: archetype.primary,
+        secondary: archetype.secondary,
+        tertiary: archetype.tertiary
+    }),
+    (data) => {
+        if (!data) return;
+        if (data.primary) archetype.setPrimary(data.primary);
+        if (data.secondary) archetype.setSecondary(data.secondary);
+        if (data.tertiary) archetype.setTertiary(data.tertiary);
+    }
+);
+
 // Auto-load existing unified save (overrides piecemeal localStorage loads)
 if (saveSystem.hasSave()) {
     saveSystem.load();
 }
+
+// Skill system (Phase 2) — after save so loaded archetype is used
+const activeArchetypeId = (archetype && archetype.getPrimaryArchetype()) || savedArchetype || 'traceur';
+player._archetypeId = activeArchetypeId;
+const resourceSystem = new ResourceSystem(activeArchetypeId);
+if (activeArchetypeId === 'mage') {
+    resourceSystem.setMaxResource(120);
+}
+const skillSystem = new SkillSystem(player, resourceSystem, activeArchetypeId);
+
+// Assign default loadout for archetype
+const defaultLoadout = getDefaultLoadout(activeArchetypeId);
+for (const [slot, skillId] of Object.entries(defaultLoadout)) {
+    skillSystem.assignSkill(slot, skillId);
+}
+
+const skillBarUI = new SkillBarUI(skillSystem, resourceSystem);
+const passiveTree = new PassiveTree(activeArchetypeId, skillSystem);
+passiveTree._load();
+
+progression.onLevelUp = (level, points) => {
+    console.log(`Level up! Now level ${level}. Attribute points: ${points}`);
+    if (passiveTree) passiveTree.addPoints(1);
+};
+
+saveSystem.register('passiveTree',
+    () => passiveTree.serialize(),
+    (data) => passiveTree.deserialize(data)
+);
+
+// Manual load for passiveTree since it was registered after saveSystem.load()
+try {
+    const _rawSave = localStorage.getItem(saveSystem.key);
+    if (_rawSave) {
+        const _saveData = JSON.parse(_rawSave);
+        if (_saveData.passiveTree) passiveTree.deserialize(_saveData.passiveTree);
+    }
+} catch (e) { /* ignore */ }
 
 const pipeWrench = new PipeWrench(scene, player);
 const semiAutoPistol = new SemiAutoPistol(scene, player);
@@ -492,17 +517,6 @@ miniBosses.push(forgeHound);
 const crystalGolem = new CrystalGolem(scene, world, player, new THREE.Vector3(-20, 0, 10));
 crystalGolem.start();
 miniBosses.push(crystalGolem);
-
-// UIManager — centralized UI panel toggles, updates, and dynamic DOM creation
-const uiManager = new UIManager({
-    player, progression, archetype, origin, characterSheet,
-    heartSystem, dungeonSystem, exoSuit, companion, loyalty,
-    factions, safehouse, bounty, codex, mastery, implants,
-    resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide,
-    inventoryStash
-});
-uiManager.createMiniBossBars(miniBosses);
-uiManager.createManaBar();
 
 // Stash panel button wiring
 (function wireStashPanel() {
@@ -806,14 +820,16 @@ function showLootToast(item) {
     setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
-// Equip starter gear based on origin
-const startingGear = origin.getStartingGear ? origin.getStartingGear() : null;
-if (startingGear && exoSuit) {
-    const template = exoSuit.getItemTemplate ? exoSuit.getItemTemplate(startingGear) : null;
-    if (template && affixSystem) {
-        const item = affixSystem.generateItem(template);
-        exoSuit.equip(item);
-        showLootToast(item);
+// Equip starter gear based on origin (only on first play)
+if (!saveSystem.hasSave()) {
+    const startingGear = origin.getStartingGear ? origin.getStartingGear() : null;
+    if (startingGear && exoSuit) {
+        const template = exoSuit.getItemTemplate ? exoSuit.getItemTemplate(startingGear) : null;
+        if (template && affixSystem) {
+            const item = affixSystem.generateItem(template);
+            exoSuit.equip(item);
+            showLootToast(item);
+        }
     }
 }
 
@@ -956,7 +972,6 @@ const demoPuzzle = new PuzzleRoom(scene, world, player);
 demoPuzzle.addSwitchPuzzle(
     [new THREE.Vector3(4, 0, 6), new THREE.Vector3(6, 0, 6)],
     () => {
-        console.log('[PuzzleRoom] Demo switches solved!');
         dungeonSystem._spawnPickupText && dungeonSystem._spawnPickupText('Puzzle Solved!', '#ffff44');
     }
 );
@@ -964,7 +979,6 @@ demoPuzzle.addBlockPuzzle(
     new THREE.Vector3(-5, 0, 8),
     new THREE.Vector3(-5, 0, 5),
     () => {
-        console.log('[PuzzleRoom] Demo block puzzle solved!');
     }
 );
 
@@ -975,6 +989,17 @@ const shop = new ShopSystem(scene, player, heartSystem);
 const bottleSystem = new BottleSystem(player, heartSystem, resourceSystem);
 shop.setBottleSystem(bottleSystem);
 const overworldMap = new OverworldMap(player, dungeonSystem, keyItems);
+
+// UIManager — centralized UI panel toggles, updates, and dynamic DOM creation
+const uiManager = new UIManager({
+    player, progression, archetype, origin, characterSheet,
+    heartSystem, dungeonSystem, exoSuit, companion, loyalty,
+    factions, safehouse, bounty, codex, mastery, implants,
+    resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide,
+    inventoryStash
+});
+uiManager.createMiniBossBars(miniBosses);
+uiManager.createManaBar();
 
 // Apply difficulty scaling to existing world drones
 if (world.drones && world.drones.drones && difficultyTier) {
@@ -1041,6 +1066,42 @@ const bossPhaseLabel = document.getElementById('boss-phase');
 const bossVictory = document.getElementById('boss-victory');
 
 let gameStarted = false;
+let paused = false;
+
+// Pause menu wiring
+const pauseMenu = document.getElementById('pause-menu');
+const btnResume = document.getElementById('pause-resume');
+const btnSettings = document.getElementById('pause-settings');
+const btnQuit = document.getElementById('pause-quit');
+
+if (btnResume) {
+    btnResume.addEventListener('click', () => {
+        paused = false;
+        if (pauseMenu) pauseMenu.style.display = 'none';
+        document.body.requestPointerLock();
+    });
+}
+if (btnSettings) {
+    btnSettings.addEventListener('click', () => {
+        const sp = document.getElementById('settings-panel');
+        if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
+    });
+}
+if (btnQuit) {
+    btnQuit.addEventListener('click', () => {
+        paused = false;
+        if (pauseMenu) pauseMenu.style.display = 'none';
+        gameStarted = false;
+        startScreen.style.display = 'flex';
+        ui.style.display = 'none';
+        crosshair.style.display = 'none';
+        const hcr = document.getElementById('heart-container-row');
+        if (hcr) hcr.style.display = 'none';
+        const skb = document.getElementById('sector-key-bar');
+        if (skb) skb.style.display = 'none';
+        if (skillBarUI) skillBarUI.hide();
+    });
+}
 
 startScreen.addEventListener('click', () => {
     audio.playUIClick();
@@ -1049,8 +1110,12 @@ startScreen.addEventListener('click', () => {
 
 document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement) {
-        gameStarted = true;
+        if (!gameStarted) gameStarted = true;
         startScreen.style.display = 'none';
+        if (paused) {
+            paused = false;
+            if (pauseMenu) pauseMenu.style.display = 'none';
+        }
         if (!levelEditor.isActive()) {
             ui.style.display = 'block';
             crosshair.style.display = 'block';
@@ -1062,16 +1127,11 @@ document.addEventListener('pointerlockchange', () => {
         }
         audio.playAmbience();
     } else {
-        gameStarted = false;
-        startScreen.style.display = 'flex';
-        ui.style.display = 'none';
-        crosshair.style.display = 'none';
-        const hcr = document.getElementById('heart-container-row');
-        if (hcr) hcr.style.display = 'none';
-        const skb = document.getElementById('sector-key-bar');
-        if (skb) skb.style.display = 'none';
-        if (skillBarUI) skillBarUI.hide();
-        editorUI.classList.remove('active');
+        // Do NOT conflate pointer lock loss with pause or game stop
+        if (paused) {
+            paused = false;
+            if (pauseMenu) pauseMenu.style.display = 'none';
+        }
     }
 });
 
@@ -1088,6 +1148,13 @@ document.getElementById('boss-exit').addEventListener('click', () => {
     bossVictory.style.display = 'none';
     bossHUD.style.display = 'none';
     ui.style.display = 'block';
+    document.body.requestPointerLock();
+});
+
+// Death screen respawn button
+document.getElementById('death-respawn').addEventListener('click', () => {
+    if (player) player.respawn();
+    document.getElementById('death-screen').style.display = 'none';
     document.body.requestPointerLock();
 });
 
@@ -1122,9 +1189,124 @@ wireSkillCallbacks({
 
 // Settings panel wiring
 (function wireSettings() {
+    const SETTINGS_KEY = 'apex_settings';
+
+    function getSettingsValues() {
+        const vals = {};
+        const fovSlider = document.getElementById('set-fov');
+        if (fovSlider) vals.fov = parseFloat(fovSlider.value);
+        const effects = [
+            ['set-filmgrain', 'filmGrain'],
+            ['set-motionblur', 'motionBlur'],
+            ['set-sao', 'sao'],
+            ['set-bloom', 'bloom'],
+            ['set-chromatic', 'chromaticAberration'],
+            ['set-vignette', 'vignette']
+        ];
+        for (const [id, name] of effects) {
+            const cb = document.getElementById(id);
+            if (cb) vals[name] = cb.checked;
+        }
+        const volMaster = document.getElementById('set-vol-master');
+        if (volMaster) vals.masterVolume = parseFloat(volMaster.value);
+        const volSFX = document.getElementById('set-vol-sfx');
+        if (volSFX) vals.sfxVolume = parseFloat(volSFX.value);
+        const volMusic = document.getElementById('set-vol-music');
+        if (volMusic) vals.musicVolume = parseFloat(volMusic.value);
+        const assistJump = document.getElementById('set-assist-jump');
+        if (assistJump) vals.assistJump = assistJump.checked;
+        const assistGrapple = document.getElementById('set-assist-grapple');
+        if (assistGrapple) vals.assistGrapple = assistGrapple.checked;
+        const assistAim = document.getElementById('set-assist-aim');
+        if (assistAim) vals.assistAim = assistAim.checked;
+        return vals;
+    }
+
+    function saveSettings() {
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(getSettingsValues()));
+        } catch (e) { /* ignore */ }
+    }
+
+    function applySettings(data) {
+        if (!data) return;
+        const fovSlider = document.getElementById('set-fov');
+        if (fovSlider && data.fov !== undefined) {
+            fovSlider.value = data.fov;
+            if (postProcessing) postProcessing.setFOV(data.fov);
+        }
+        const effects = [
+            ['set-filmgrain', 'filmGrain'],
+            ['set-motionblur', 'motionBlur'],
+            ['set-sao', 'sao'],
+            ['set-bloom', 'bloom'],
+            ['set-chromatic', 'chromaticAberration'],
+            ['set-vignette', 'vignette']
+        ];
+        for (const [id, name] of effects) {
+            const cb = document.getElementById(id);
+            if (cb && data[name] !== undefined) {
+                cb.checked = data[name];
+                if (postProcessing) postProcessing.setEffectEnabled(name, data[name]);
+            }
+        }
+        const volMaster = document.getElementById('set-vol-master');
+        if (volMaster && data.masterVolume !== undefined) {
+            volMaster.value = data.masterVolume;
+            if (audio) audio.setMasterVolume(data.masterVolume / 100);
+        }
+        const volSFX = document.getElementById('set-vol-sfx');
+        if (volSFX && data.sfxVolume !== undefined) {
+            volSFX.value = data.sfxVolume;
+            if (audio) audio.setSFXVolume(data.sfxVolume / 100);
+        }
+        const volMusic = document.getElementById('set-vol-music');
+        if (volMusic && data.musicVolume !== undefined) {
+            volMusic.value = data.musicVolume;
+            if (audio) audio.setMusicVolume(data.musicVolume / 100);
+        }
+        const assistJump = document.getElementById('set-assist-jump');
+        if (assistJump && data.assistJump !== undefined) {
+            assistJump.checked = data.assistJump;
+            if (assistMode) {
+                assistMode.setJumpAssist(data.assistJump);
+                if (data.assistJump) assistMode.modifyPlayer(player);
+                else assistMode.restorePlayer(player);
+            }
+        }
+        const assistGrapple = document.getElementById('set-assist-grapple');
+        if (assistGrapple && data.assistGrapple !== undefined) {
+            assistGrapple.checked = data.assistGrapple;
+            if (assistMode) {
+                assistMode.setGrappleAssist(data.assistGrapple);
+                if (data.assistGrapple) assistMode.modifyPlayer(player);
+                else assistMode.restorePlayer(player);
+            }
+        }
+        const assistAim = document.getElementById('set-assist-aim');
+        if (assistAim && data.assistAim !== undefined) {
+            assistAim.checked = data.assistAim;
+            if (assistMode) {
+                assistMode.setAimAssist(data.assistAim);
+                if (data.assistAim) assistMode.modifyPlayer(player);
+                else assistMode.restorePlayer(player);
+            }
+        }
+    }
+
+    // Load on startup
+    try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) applySettings(JSON.parse(raw));
+    } catch (e) { /* ignore */ }
+
+    // Wire listeners that also save
     const fovSlider = document.getElementById('set-fov');
     if (fovSlider && postProcessing) {
-        fovSlider.addEventListener('input', (e) => postProcessing.setFOV(parseFloat(e.target.value)));
+        fovSlider.addEventListener('input', (e) => {
+            postProcessing.setFOV(parseFloat(e.target.value));
+            saveSettings();
+        });
     }
     const effects = [
         ['set-filmgrain', 'filmGrain'],
@@ -1137,22 +1319,40 @@ wireSkillCallbacks({
     for (const [id, name] of effects) {
         const cb = document.getElementById(id);
         if (cb && postProcessing) {
-            cb.addEventListener('change', (e) => postProcessing.setEffectEnabled(name, e.target.checked));
+            cb.addEventListener('change', (e) => {
+                postProcessing.setEffectEnabled(name, e.target.checked);
+                saveSettings();
+            });
         }
     }
     const volMaster = document.getElementById('set-vol-master');
-    if (volMaster && audio) volMaster.addEventListener('input', (e) => audio.setMasterVolume(parseFloat(e.target.value) / 100));
+    if (volMaster && audio) {
+        volMaster.addEventListener('input', (e) => {
+            audio.setMasterVolume(parseFloat(e.target.value) / 100);
+            saveSettings();
+        });
+    }
     const volSFX = document.getElementById('set-vol-sfx');
-    if (volSFX && audio) volSFX.addEventListener('input', (e) => audio.setSFXVolume(parseFloat(e.target.value) / 100));
+    if (volSFX && audio) {
+        volSFX.addEventListener('input', (e) => {
+            audio.setSFXVolume(parseFloat(e.target.value) / 100);
+            saveSettings();
+        });
+    }
     const volMusic = document.getElementById('set-vol-music');
-    if (volMusic && audio) volMusic.addEventListener('input', (e) => audio.setMusicVolume(parseFloat(e.target.value) / 100));
-    // Assist mode toggles (granular flags)
+    if (volMusic && audio) {
+        volMusic.addEventListener('input', (e) => {
+            audio.setMusicVolume(parseFloat(e.target.value) / 100);
+            saveSettings();
+        });
+    }
     const assistJump = document.getElementById('set-assist-jump');
     if (assistJump && assistMode) {
         assistJump.addEventListener('change', (e) => {
             assistMode.setJumpAssist(e.target.checked);
             if (e.target.checked) assistMode.modifyPlayer(player);
             else assistMode.restorePlayer(player);
+            saveSettings();
         });
     }
     const assistGrapple = document.getElementById('set-assist-grapple');
@@ -1161,6 +1361,7 @@ wireSkillCallbacks({
             assistMode.setGrappleAssist(e.target.checked);
             if (e.target.checked) assistMode.modifyPlayer(player);
             else assistMode.restorePlayer(player);
+            saveSettings();
         });
     }
     const assistAim = document.getElementById('set-assist-aim');
@@ -1169,6 +1370,7 @@ wireSkillCallbacks({
             assistMode.setAimAssist(e.target.checked);
             if (e.target.checked) assistMode.modifyPlayer(player);
             else assistMode.restorePlayer(player);
+            saveSettings();
         });
     }
     const saveBtn = document.getElementById('btn-save-game');
@@ -1176,6 +1378,10 @@ wireSkillCallbacks({
     const loadBtn = document.getElementById('btn-load-game');
     if (loadBtn) loadBtn.addEventListener('click', () => saveSystem.load());
 })();
+
+// Hide loading overlay once init completes
+const loadingOverlay = document.getElementById('loading-overlay');
+if (loadingOverlay) loadingOverlay.style.display = 'none';
 
 // Game loop
 const clock = new THREE.Clock();
@@ -1190,8 +1396,26 @@ function animate() {
     if (gameStarted) {
         // Use gamepad if connected, otherwise keyboard/mouse
         const activeInput = (gamepad.gamepad) ? gamepad : input;
-        const mouseDelta = activeInput.consumeMouse();
         activeInput.preUpdate();
+        const mouseDelta = activeInput.consumeMouse();
+        
+        // === PAUSE TOGGLE ===
+        if (activeInput.wasPressed('Escape')) {
+            paused = !paused;
+            if (paused) {
+                if (pauseMenu) pauseMenu.style.display = 'flex';
+                document.exitPointerLock();
+            } else {
+                if (pauseMenu) pauseMenu.style.display = 'none';
+                document.body.requestPointerLock();
+            }
+        }
+        
+        if (paused) {
+            dt = 0;
+            postProcessing.render(dt, 0);
+            return;
+        }
         
         // === EDITOR MODE TOGGLE (F1) ===
         if (activeInput.wasPressed('F1')) {
@@ -1210,20 +1434,116 @@ function animate() {
             }
         }
         
-        // === SKILL BAR INPUTS (LMB / RMB / Q / E / R) ===
+        // Death screen
+        if (player && player.isDead) {
+            const deathScreen = document.getElementById('death-screen');
+            if (deathScreen && deathScreen.style.display !== 'flex') {
+                deathScreen.style.display = 'flex';
+                if (document.pointerLockElement) document.exitPointerLock();
+            }
+        } else {
+            const deathScreen = document.getElementById('death-screen');
+            if (deathScreen && deathScreen.style.display === 'flex') deathScreen.style.display = 'none';
+        }
+
+        // === SKILL BAR INPUTS (RMB / E / R) ===
         if (skillSystem && player && !player.isDead) {
-            if (activeInput.wasPressed('Mouse1')) skillSystem.useSkill('LMB');
             if (activeInput.wasPressed('Mouse2')) skillSystem.useSkill('RMB');
-            if (activeInput.wasPressed('KeyQ')) skillSystem.useSkill('Q');
             if (activeInput.wasPressed('KeyE') && player.state !== 'CLIMB' && player.state !== 'HANG') skillSystem.useSkill('E');
             if (activeInput.wasPressed('KeyR')) skillSystem.useSkill('R');
         }
 
-        // Parry input (Shift+F while grounded)
-        if (activeInput.wasPressed('KeyF') && activeInput.isPressed('ShiftLeft') && player.grounded
-            && !dialogueSystem.isOpen && !shop.isOpen && !dungeonSystem.nearbyDungeonId) {
-            const didParry = player.triggerParry();
-            if (didParry && audio) audio.playTone(880, 0.05, 'sine');
+        // === UNIFIED INPUT DISPATCHERS ===
+        function _consumeKeyPress(activeInput, code) {
+            if (activeInput === input) {
+                input.prevKeys[code] = true;
+            } else if (activeInput === gamepad) {
+                gamepad.prevKeys[code] = true;
+            }
+        }
+
+        // --- Mouse1 (LMB) dispatcher ---
+        if (activeInput.wasPressed('Mouse1')) {
+            if (player.grapplingHook && player.grapplingHook.isAiming()) {
+                ziplineGun.fire(player.facingDirection || new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)));
+                _consumeKeyPress(activeInput, 'Mouse1');
+            } else if (skillSystem && skillSystem.canUse('LMB')) {
+                skillSystem.useSkill('LMB');
+                _consumeKeyPress(activeInput, 'Mouse1');
+            }
+            // Else: let CombatSystem fire weapon
+        }
+
+        // --- KeyQ dispatcher ---
+        if (activeInput.wasPressed('KeyQ')) {
+            if (player.grapplingHook && player.grapplingHook.isAiming()) {
+                const pulled = player.grapplingHook.pullEnemy();
+                if (pulled && spawnDamageNumber) {
+                    const pPos = pulled.position || (pulled.mesh && pulled.mesh.position);
+                    if (pPos) spawnDamageNumber(pPos.clone().add(new THREE.Vector3(0, 1, 0)), 'YANKED', false, 'kinetic');
+                }
+                _consumeKeyPress(activeInput, 'KeyQ');
+            } else if (activeInput.isPressed('ShiftLeft')) {
+                if (player.comboSystem && player.comboSystem.flowMeter >= 100) {
+                    player.comboSystem.flowMeter = 0;
+                    if (skillSystem) skillSystem.useSkill('decoy');
+                    player.isInvisible = true;
+                    setTimeout(() => { player.isInvisible = false; }, 3000);
+                } else if (overclock.tryActivate()) {
+                    // Overclock triggered
+                }
+                _consumeKeyPress(activeInput, 'KeyQ');
+            } else {
+                if (skillSystem) skillSystem.useSkill('Q');
+                _consumeKeyPress(activeInput, 'KeyQ');
+            }
+        }
+
+        // --- KeyF dispatcher ---
+        if (activeInput.wasPressed('KeyF')) {
+            let handled = false;
+            // 1. Shift+F → Parry (only if grounded, not in UI)
+            if (activeInput.isPressed('ShiftLeft') && player.grounded && !dialogueSystem.isOpen && !shop.isOpen) {
+                const didParry = player.triggerParry();
+                if (didParry && audio) audio.playTone(880, 0.05, 'sine');
+                handled = true;
+            // 2. If dialogue open → advance/close
+            } else if (dialogueSystem.isOpen) {
+                dialogueSystem._advance();
+                handled = true;
+            // 3. If shop open → close
+            } else if (shop.isOpen) {
+                shop.close();
+                handled = true;
+            // 4. If near NPC → dialogue
+            } else if (dialogueSystem._nearNpcId) {
+                dialogueSystem.openDialogue(dialogueSystem._nearNpcId);
+                handled = true;
+            // 5. If near shop → open shop
+            } else if (shop.checkProximity(player.position)) {
+                shop.open();
+                handled = true;
+            // 6. If near dungeon → enter
+            } else if (!dungeonSystem.activeDungeon && dungeonSystem.nearbyDungeonId) {
+                dungeonSystem.enterDungeon(dungeonSystem.nearbyDungeonId);
+                handled = true;
+            // 7. If near puzzle block → push
+            } else if (demoPuzzle && demoPuzzle._pushCooldown <= 0) {
+                const pushDir = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).normalize();
+                for (const block of demoPuzzle._blocks) {
+                    if (block.tryPush(pushDir, player.position)) {
+                        demoPuzzle._pushCooldown = 0.35;
+                        handled = true;
+                        break;
+                    }
+                }
+            }
+            // 8. Else → Faction Panel toggle
+            if (!handled) {
+                const fp = document.getElementById('faction-panel');
+                if (fp) fp.style.display = (fp.style.display === 'block') ? 'none' : 'block';
+            }
+            if (handled) _consumeKeyPress(activeInput, 'KeyF');
         }
         
         // === BOSS FIGHT TOGGLE (B) ===
@@ -1249,7 +1569,6 @@ function animate() {
             const currentIdx = tiers.indexOf(difficultyTier.currentTier);
             const nextIdx = (currentIdx + 1) % tiers.length;
             if (difficultyTier.setTier(tiers[nextIdx])) {
-                console.log(`[Difficulty] Set to: ${difficultyTier.getDisplayString()}`);
             }
         }
         
@@ -1410,19 +1729,7 @@ function animate() {
         interEnv.update(finalDt, activeInput);
         ziplineGun.update(finalDt);
 
-        // Zipline Gun: Mouse2 aim + Mouse1 fire at enemy
-        if (player.grapplingHook && player.grapplingHook.isAiming() && activeInput.wasPressed('Mouse1')) {
-            ziplineGun.fire(player.facingDirection || new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)));
-        }
-
-        // Grapple Pull: Q while grappling aims at enemy
-        if (player.grapplingHook && player.grapplingHook.isAiming() && activeInput.wasPressed('KeyQ')) {
-            const pulled = player.grapplingHook.pullEnemy();
-            if (pulled && spawnDamageNumber) {
-                const pPos = pulled.position || (pulled.mesh && pulled.mesh.position);
-                if (pPos) spawnDamageNumber(pPos.clone().add(new THREE.Vector3(0, 1, 0)), 'YANKED', false, 'kinetic');
-            }
-        }
+        // Zipline Gun and Grapple Pull are now handled by unified input dispatchers above
 
         // Drone Meat Shield: hold E near a hacked/friendly drone = absorb 50 dmg
         if (activeInput.isPressed('KeyE') && !player.isDead) {
@@ -1449,16 +1756,7 @@ function animate() {
             player._meatShield = 0;
         }
 
-        // Decoy Afterimage: Shift+Q at max flow = hologram clone
-        if (activeInput.wasPressed('KeyQ') && activeInput.isPressed('ShiftLeft') &&
-            player.comboSystem && player.comboSystem.flowMeter >= 100) {
-            player.comboSystem.flowMeter = 0;
-            // Spawn decoy clone using existing decoy system
-            if (skillSystem) skillSystem.useSkill('decoy');
-            // Player becomes briefly invisible
-            player.isInvisible = true;
-            setTimeout(() => { player.isInvisible = false; }, 3000);
-        }
+        // Decoy Afterimage is now handled by unified KeyQ dispatcher above
 
         // Disk Throw: G key fires a ricocheting disk projectile
         if (activeInput.wasPressed('KeyG') && projectileManager) {
@@ -1611,11 +1909,7 @@ function animate() {
         dungeonSystem.update(finalDt, activeInput);
         demoPuzzle.update(finalDt, activeInput);
 
-        // Dungeon enter via F (only in overworld, not when dialogue/shop is active)
-        if (!dialogueSystem.isOpen && !shop.isOpen &&
-            !dungeonSystem.activeDungeon && activeInput.wasPressed('KeyF') && dungeonSystem.nearbyDungeonId) {
-            dungeonSystem.enterDungeon(dungeonSystem.nearbyDungeonId);
-        }
+        // Dungeon enter is now handled by unified KeyF dispatcher above
         // Dungeon exit via Tab
         if (dungeonSystem.activeDungeon && activeInput.wasPressed('Tab')) {
             dungeonSystem.exitDungeon();

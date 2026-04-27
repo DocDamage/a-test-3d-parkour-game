@@ -50,7 +50,6 @@ export class BossSwarmQueen {
         this.health = this.maxHealth;
         this.eggs = [];
         this.sacSwell = false;
-        console.log('[Boss] Swarm Queen activated — Phase 1');
     }
 
     stop() {
@@ -150,7 +149,6 @@ export class BossSwarmQueen {
 
     _transitionToPhase(phase) {
         this.currentPhase = phase;
-        console.log(`[Boss] Swarm Queen entering Phase ${phase}`);
     }
 
     takeDamage(amount, type, source) {
@@ -166,7 +164,6 @@ export class BossSwarmQueen {
     die() {
         this.isDead = true;
         this.isActive = false;
-        console.log('[Boss] Swarm Queen DEFEATED');
         setTimeout(() => { if (this.group) this.group.visible = false; }, 3000);
     }
 

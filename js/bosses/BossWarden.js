@@ -51,7 +51,6 @@ export class BossWarden {
         this.prisonersReleased = false;
         this.shieldActive = true;
         this.parryCount = 0;
-        console.log('[Boss] Warden activated — Phase 1');
     }
 
     stop() {
@@ -89,14 +88,12 @@ export class BossWarden {
         if (index >= 0 && index < this.towers.length) {
             this.towers[index].alive = false;
             this.health -= 400;
-            console.log(`[Boss] Tower ${index} destroyed!`);
         }
     }
 
     _updatePhase2(dt) {
         if (!this.prisonersReleased) {
             this.prisonersReleased = true;
-            console.log('[Boss] Warden releasing prisoners!');
             if (this.enemyManager) {
                 for (let i = 0; i < 4; i++) {
                     const angle = Math.random() * Math.PI * 2;
@@ -134,7 +131,6 @@ export class BossWarden {
 
     _transitionToPhase(phase) {
         this.currentPhase = phase;
-        console.log(`[Boss] Warden entering Phase ${phase}`);
     }
 
     takeDamage(amount, type, source) {
@@ -156,7 +152,6 @@ export class BossWarden {
             this.parryCount++;
             if (this.parryCount >= 3) {
                 this.shieldActive = false;
-                console.log('[Boss] Warden shield BROKEN!');
             }
         }
     }
@@ -164,7 +159,6 @@ export class BossWarden {
     die() {
         this.isDead = true;
         this.isActive = false;
-        console.log('[Boss] Warden DEFEATED');
         setTimeout(() => { if (this.group) this.group.visible = false; }, 3000);
     }
 

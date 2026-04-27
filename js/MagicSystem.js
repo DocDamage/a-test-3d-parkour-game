@@ -150,7 +150,7 @@ export class MagicSystem {
                 );
                 burst.position.copy(this.player.position);
                 this.scene.add(burst);
-                setTimeout(() => this.scene.remove(burst), 300);
+                setTimeout(() => { this.scene.remove(burst); burst.geometry.dispose(); burst.material.dispose(); }, 300);
             }
         }
         return amount - absorb;

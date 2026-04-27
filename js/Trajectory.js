@@ -62,7 +62,7 @@ export class Trajectory {
             }
             
             for (const obj of world.collidables) {
-                const box = new THREE.Box3().setFromObject(obj);
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                 if (pos.x >= box.min.x && pos.x <= box.max.x &&
                     pos.z >= box.min.z && pos.z <= box.max.z &&
                     pos.y >= box.min.y - 0.05 && pos.y <= box.max.y + 0.5) {

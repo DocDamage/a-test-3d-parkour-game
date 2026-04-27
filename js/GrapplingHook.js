@@ -93,7 +93,7 @@ export class GrapplingHook {
         
         // Check world collidables for ceiling beams / high walls
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = origin.distanceTo(hit);

@@ -123,6 +123,7 @@ export class CompanionDrone {
     update(dt, player, world, enemies) {
         if (!this.alive || !this.active) return;
 
+        const now = performance.now();
         this.attackCooldown = Math.max(0, this.attackCooldown - dt);
         this.healCooldown = Math.max(0, this.healCooldown - dt);
         this.distractTimer = Math.max(0, this.distractTimer - dt);
@@ -137,7 +138,7 @@ export class CompanionDrone {
         if (!player) return;
 
         // Follow player with smoothing
-        const offset = new THREE.Vector3(-2, 2 + Math.sin(performance.now() * 0.002) * 0.2, -2);
+        const offset = new THREE.Vector3(-2, 2 + Math.sin(now * 0.002) * 0.2, -2);
         offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.facing ?? 0);
         const targetPos = new THREE.Vector3().copy(player.position).add(offset);
         const followSpeed = 3 + this.upgrades.chassis * 0.8;
@@ -205,7 +206,7 @@ export class CompanionDrone {
             const approach = new THREE.Vector3().copy(tPos).add(new THREE.Vector3(0, 1, 0));
             this.group.position.lerp(approach, Math.min(1, dt * 4));
             // Flash light
-            this.light.intensity = 2 + Math.sin(performance.now() * 0.02) * 2;
+            this.light.intensity = 2 + Math.sin(now * 0.02) * 2;
         } else {
             this.light.intensity = 2;
         }

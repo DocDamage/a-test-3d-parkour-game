@@ -31,16 +31,20 @@ export class InputManager {
         document.addEventListener('mousedown', (e) => {
             if (e.button === 0) {
                 this.mouseDown = true;
+                this.keys['Mouse1'] = true;
             } else if (e.button === 2) {
                 this.mouse2Down = true;
+                this.keys['Mouse2'] = true;
             }
         });
         
         document.addEventListener('mouseup', (e) => {
             if (e.button === 0) {
                 this.mouseDown = false;
+                this.keys['Mouse1'] = false;
             } else if (e.button === 2) {
                 this.mouse2Down = false;
+                this.keys['Mouse2'] = false;
             }
         });
         

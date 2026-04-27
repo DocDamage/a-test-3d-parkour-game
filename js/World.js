@@ -89,6 +89,7 @@ export class World {
             mesh.receiveShadow = true;
             this.scene.add(mesh);
             this.collidables.push(mesh);
+            mesh.userData.bbox = new THREE.Box3().setFromObject(mesh);
             this.climbables.push(mesh);
         });
 
@@ -116,6 +117,7 @@ export class World {
                 col.receiveShadow = true;
                 this.scene.add(col);
                 this.collidables.push(col);
+                col.userData.bbox = new THREE.Box3().setFromObject(col);
             }
         }
     }
@@ -262,6 +264,7 @@ export class World {
         this.platforms.push(p1, p2, p3, p4);
         for (const p of this.platforms) {
             this.collidables.push(p.mesh);
+            p.mesh.userData.bbox = new THREE.Box3().setFromObject(p.mesh);
         }
     }
 
@@ -459,6 +462,7 @@ export class World {
 
         if (collidable) {
             this.collidables.push(mesh);
+            mesh.userData.bbox = new THREE.Box3().setFromObject(mesh);
             mesh.userData.size = { x: size[0], y: size[1], z: size[2] };
         }
         if (climbable) {
@@ -477,6 +481,7 @@ export class World {
         mesh.receiveShadow = true;
         this.scene.add(mesh);
         this.collidables.push(mesh);
+        mesh.userData.bbox = new THREE.Box3().setFromObject(mesh);
         mesh.userData.size = { x: size[0], y: size[1], z: size[2] };
         mesh.userData.isRamp = true;
         mesh.userData.angle = angle;
@@ -621,7 +626,7 @@ export class World {
             const sc = structuralCollapse;
             // Mark some pillars as structural
             for (const obj of this.collidables) {
-                const box = new THREE.Box3().setFromObject(obj);
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                 const size = new THREE.Vector3().subVectors(box.max, box.min);
                 if (size.y > 4 && size.x < 3 && size.z < 3) {
                     sc.markStructural(obj, 1);

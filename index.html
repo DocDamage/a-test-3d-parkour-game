@@ -61,6 +61,104 @@
             font-weight: bold;
         }
 
+        /* Panel close button */
+        .panel-close {
+            position: absolute;
+            right: 0;
+            top: 0;
+            font-size: 18px;
+            color: #888;
+            cursor: pointer;
+            pointer-events: auto;
+            line-height: 1;
+            padding: 2px 6px;
+        }
+        .panel-close:hover { color: #fff; }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,170,0,0.3);
+            border-top-color: #ffaa00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        .loading-text {
+            font-size: 18px;
+            color: #ffaa00;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Death Screen */
+        #death-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 250;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #death-screen h2 {
+            font-size: 64px;
+            color: #ff3333;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            text-shadow: 0 0 20px rgba(255,50,50,0.5);
+        }
+        #death-screen button {
+            padding: 12px 32px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #ffaa00;
+            color: #111;
+            font-weight: bold;
+        }
+        #death-screen button:hover { background: #ffcc00; }
+
+        /* Level-up Toast */
+        #levelup-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid rgba(0,255,127,0.5);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            max-width: 280px;
+            z-index: 18;
+            display: none;
+        }
+        #levelup-toast .levelup-title { font-weight: bold; margin-bottom: 4px; color: #00ff7f; }
+        #levelup-toast .levelup-msg { font-size: 11px; color: #ccc; }
+
         #crosshair {
             position: fixed;
             top: 50%;
@@ -1344,6 +1442,43 @@
         }
         .pt-node button:disabled { background: #222; color: #666; cursor: not-allowed; }
         .pt-node button:hover:not(:disabled) { background: #555; }
+        /* === Pause Menu === */
+        #pause-menu {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 150;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #pause-menu h1 {
+            font-size: 48px;
+            color: #ffaa00;
+            margin-bottom: 32px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+        #pause-menu button {
+            padding: 12px 32px;
+            font-size: 18px;
+            border: 1px solid #ffaa00;
+            border-radius: 8px;
+            cursor: pointer;
+            background: transparent;
+            color: #ffaa00;
+            font-weight: bold;
+            margin: 8px 0;
+            min-width: 220px;
+            transition: background 0.2s, color 0.2s;
+        }
+        #pause-menu button:hover {
+            background: #ffaa00;
+            color: #111;
+        }
     </style>
     <script type="importmap">
     {
@@ -1355,6 +1490,12 @@
     </script>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading...</div>
+    </div>
+
     <!-- Character Creation Overlay -->
     <div id="char-create">
         <h2>Create Your Runner</h2>
@@ -1378,7 +1519,7 @@
     </div>
     
     <div id="character-panel">
-        <h2>Character</h2>
+        <h2 style="position:relative;">Character <span class="panel-close" onclick="document.getElementById('character-panel').style.display='none'">×</span></h2>
         <div>Level <span id="char-level">1</span></div>
         <div class="xp-bar-wrap"><div class="xp-bar-fill" id="char-xp-fill"></div></div>
         <div class="stat-row">MOB <span id="char-mob">10</span></div>
@@ -1403,21 +1544,29 @@
             <span>Q</span> Air Dash<br>
             <span>SHIFT+Q</span> Overclock<br>
             <span>CTRL</span> Magnet Boots (ceiling run)<br>
-            <span>F</span> Drone Takedown (wall-run)<br>
+            <span>F</span> Context-sensitive (Talk/Shop/Enter Dungeon)<br>
+            <span>SHIFT+F</span> Parry<br>
             <span>E</span> Drop / Interact<br>
             <span>T</span> Time Trial<br>
-            <span>O</span> Rising Tide Mode<br>
-            <span>P</span> Character Panel<br>
-            <span>SHIFT+P</span> Assist Mode<br>
-            <span>N</span> Day/Night/Neon<br>
+            <span>O</span> Settings Panel<br>
+            <span>SHIFT+O</span> Rising Tide<br>
+            <span>P</span> Passive Tree<br>
+            <span>SHIFT+P</span> Character Panel<br>
+            <span>G</span> Gear<br>
+            <span>U</span> Companion<br>
+            <span>H</span> Safehouse<br>
+            <span>J</span> Bounty<br>
+            <span>K</span> Codex<br>
+            <span>L</span> Mastery<br>
+            <span>I</span> Stash<br>
+            <span>SHIFT+I</span> Key Items<br>
+            <span>M</span> Implants<br>
+            <span>N</span> Day/Night cycle<br>
             <span>F12</span> Photo Mode<br>
             <span>V</span> Runner Vision<br>
             <span>1-4</span> Speedrun ILs (Rooftop/Freezer/Server/Hangar)<br>
             <span>F1</span> Level Editor<br>
             <span>B</span> Boss Fight<br>
-            <span>I</span> Stash<br>
-            <span>SHIFT+I</span> Key Items<br>
-            <span>F</span> Enter Dungeon / Talk / Shop<br>
             <span>Z</span> Phase Mirror (needs item)<br>
             <span>`</span> Overworld Map<br>
             <span>6-9</span> Use Bottles<br>
@@ -1538,7 +1687,7 @@
 
     <!-- Key Item Inventory Panel (I key to toggle) -->
     <div id="keyitem-panel">
-        <h2>Key Items</h2>
+        <h2 style="position:relative;">Key Items <span class="panel-close" onclick="document.getElementById('keyitem-panel').style.display='none'">×</span></h2>
         <div class="keyitem-row" id="ki-grappling_hook">
             <span class="keyitem-icon">🪝</span>
             <div><div class="keyitem-name">Grappling Hook</div><div class="keyitem-dungeon">Underground Tunnel</div></div>
@@ -1648,7 +1797,7 @@
     </script>
     <!-- RPG Gear Panel -->
     <div id="gear-panel">
-        <h2>Exo-Suit</h2>
+        <h2 style="position:relative;">Exo-Suit <span class="panel-close" onclick="document.getElementById('gear-panel').style.display='none'">×</span></h2>
         <div class="gear-slot">
             <span class="slot-name">Frame</span>
             <span class="item-name empty" id="gear-frame">Empty</span>
@@ -1689,7 +1838,7 @@
 
     <!-- RPG Companion Panel -->
     <div id="companion-panel">
-        <h2>Buddy</h2>
+        <h2 style="position:relative;">Buddy <span class="panel-close" onclick="document.getElementById('companion-panel').style.display='none'">×</span></h2>
         <div class="companion-row">Mode: <strong id="companion-mode">-</strong></div>
         <div class="companion-row">Trust: <strong id="companion-trust">-</strong></div>
         <div class="companion-row">Tier: <strong id="companion-tier">-</strong></div>
@@ -1697,7 +1846,7 @@
 
     <!-- RPG Faction Panel -->
     <div id="faction-panel">
-        <h2>Factions</h2>
+        <h2 style="position:relative;">Factions <span class="panel-close" onclick="document.getElementById('faction-panel').style.display='none'">×</span></h2>
         <div class="faction-row">
             <span style="width:60px; text-align:right;">Vanguard</span>
             <div class="faction-bar"><div class="faction-fill" id="faction-vanguard-fill" style="width:50%; background:#f44;"></div></div>
@@ -1717,39 +1866,39 @@
 
     <!-- RPG Stash Panel -->
     <div id="stash-panel">
-        <h2>Stash</h2>
+        <h2 style="position:relative;">Stash <span class="panel-close" onclick="document.getElementById('stash-panel').style.display='none'">×</span></h2>
         <div id="stash-count">0 / 20</div>
         <div id="stash-list"></div>
     </div>
 
     <!-- RPG Safehouse Panel -->
     <div id="safehouse-panel">
-        <h2>Safehouse</h2>
+        <h2 style="position:relative;">Safehouse <span class="panel-close" onclick="document.getElementById('safehouse-panel').style.display='none'">×</span></h2>
         <div id="safehouse-upgrades"></div>
     </div>
 
     <!-- RPG Bounty Panel -->
     <div id="bounty-panel">
-        <h2>Bounties</h2>
+        <h2 style="position:relative;">Bounties <span class="panel-close" onclick="document.getElementById('bounty-panel').style.display='none'">×</span></h2>
         <div id="bounty-rank">Rank: Street</div>
         <div id="bounty-contracts"></div>
     </div>
 
     <!-- RPG Codex Panel -->
     <div id="codex-panel">
-        <h2>Codex</h2>
+        <h2 style="position:relative;">Codex <span class="panel-close" onclick="document.getElementById('codex-panel').style.display='none'">×</span></h2>
         <div id="codex-entries"></div>
     </div>
 
     <!-- RPG Mastery Panel -->
     <div id="mastery-panel">
-        <h2>Mastery</h2>
+        <h2 style="position:relative;">Mastery <span class="panel-close" onclick="document.getElementById('mastery-panel').style.display='none'">×</span></h2>
         <div id="mastery-moves"></div>
     </div>
 
     <!-- RPG Implants Panel -->
     <div id="implants-panel">
-        <h2>Implants</h2>
+        <h2 style="position:relative;">Implants <span class="panel-close" onclick="document.getElementById('implants-panel').style.display='none'">×</span></h2>
         <div class="implant-slot">
             <span class="slot-name">Neural</span>
             <span id="implant-neural">Empty</span>
@@ -1801,9 +1950,21 @@
         <div class="loot-affix" id="loot-toast-affix"></div>
     </div>
 
+    <!-- Level-up Toast -->
+    <div id="levelup-toast">
+        <div class="levelup-title">Level Up!</div>
+        <div class="levelup-msg" id="levelup-msg">You grew stronger.</div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen">
+        <h2>YOU DIED</h2>
+        <button id="death-respawn">Respawn</button>
+    </div>
+
     <!-- Settings Panel -->
     <div id="settings-panel">
-        <h2>Settings</h2>
+        <h2 style="position:relative;">Settings <span class="panel-close" onclick="document.getElementById('settings-panel').style.display='none'">×</span></h2>
         <div class="settings-section">
             <h3>Graphics</h3>
             <div class="settings-row">
@@ -1849,9 +2010,17 @@
 
     <!-- Passive Tree Panel -->
     <div id="passive-tree">
-        <h2>Passive Tree</h2>
+        <h2 style="position:relative;">Passive Tree <span class="panel-close" onclick="document.getElementById('passive-tree').style.display='none'">×</span></h2>
         <div class="pt-points" id="pt-points">Available Points: 0</div>
         <div class="pt-grid" id="pt-grid"></div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu">
+        <h1>Paused</h1>
+        <button id="pause-resume">Resume</button>
+        <button id="pause-settings">Settings</button>
+        <button id="pause-quit">Quit to Main Menu</button>
     </div>
 
     <script type="module" src="js/main.js"></script>

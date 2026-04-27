@@ -98,8 +98,9 @@ export class SniperDrone {
             return;
         }
 
+        const now = Date.now();
         // Hover
-        const hover = Math.sin(Date.now() * 0.002) * 0.15;
+        const hover = Math.sin(now * 0.002) * 0.15;
         this.group.position.y = this.position.y + hover;
         this.group.lookAt(this.player.position.x, this.position.y + hover, this.player.position.z);
 
@@ -139,7 +140,7 @@ export class SniperDrone {
         if (inBeam && this.cooldownTimer <= 0) {
             this.timeInBeam += dt;
             // Visual warning: ring pulses faster as charge builds
-            this.ringMat.opacity = 0.35 + (this.timeInBeam / 1.0) * 0.45 + Math.sin(Date.now() * 0.02) * 0.1;
+            this.ringMat.opacity = 0.35 + (this.timeInBeam / 1.0) * 0.45 + Math.sin(now * 0.02) * 0.1;
             this.ringMat.opacity = Math.min(this.ringMat.opacity, 0.9);
         } else {
             this.timeInBeam = Math.max(0, this.timeInBeam - dt);
@@ -313,6 +314,7 @@ export class SwarmDrone {
     update(dt) {
         if (!this.isAlive) return;
 
+        const now = Date.now();
         this.formationAngle += this.orbitSpeed * dt;
 
         // Update individual drone positions
@@ -328,7 +330,7 @@ export class SwarmDrone {
             const angle = this.formationAngle + (i / 3) * Math.PI * 2;
             d.mesh.position.x = this.center.x + Math.cos(angle) * this.orbitRadius;
             d.mesh.position.z = this.center.z + Math.sin(angle) * this.orbitRadius;
-            d.mesh.position.y = this.center.y + Math.sin(Date.now() * 0.003 + d.hoverOffset) * 0.25;
+            d.mesh.position.y = this.center.y + Math.sin(now * 0.003 + d.hoverOffset) * 0.25;
 
             // Face player
             d.mesh.lookAt(this.player.position);
@@ -510,6 +512,7 @@ export class HunterDrone {
     update(dt) {
         if (!this.isAlive) return;
 
+        const now = Date.now();
         if (!this.spawned) {
             this.spawnTimer -= dt;
             if (this.spawnTimer <= 0) {
@@ -542,7 +545,7 @@ export class HunterDrone {
         this.mesh.lookAt(this.player.position);
 
         // Pulsating emissive / light
-        const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.003);
+        const pulse = 0.5 + 0.5 * Math.sin(now * 0.003);
         this.mesh.material.emissiveIntensity = 0.3 + pulse * 0.9;
         this.core.material.emissiveIntensity = 1.0 + pulse * 2.0;
         this.light.intensity = 5 + pulse * 15;

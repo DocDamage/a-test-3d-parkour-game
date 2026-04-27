@@ -53,17 +53,11 @@ export class ShopSystem {
     update(dt, activeInput) {
         // Pulse emissive glow
         if (this._mesh) {
-            const t = performance.now() * 0.002;
+            const now = performance.now();
+            const t = now * 0.002;
             this._mesh.material.emissiveIntensity = 0.35 + Math.sin(t) * 0.2;
         }
-        // F key toggle
-        if (activeInput && activeInput.wasPressed('KeyF')) {
-            if (this._open) {
-                this.close();
-            } else if (this.checkProximity(this._player.position)) {
-                this.open();
-            }
-        }
+        // F key handling is now centralized in main.js unified dispatcher
     }
 
     dispose() {

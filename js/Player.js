@@ -1188,7 +1188,7 @@ export class Player {
         let bestBox = null;
 
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = hit.y - origin.y;
@@ -1290,7 +1290,7 @@ export class Player {
         ];
 
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             // Player must be near the edge of this box
             const nearX = Math.abs(this.position.x - box.min.x) < 0.8 || Math.abs(this.position.x - box.max.x) < 0.8;
             const nearZ = Math.abs(this.position.z - box.min.z) < 0.8 || Math.abs(this.position.z - box.max.z) < 0.8;
@@ -1356,7 +1356,7 @@ export class Player {
         const ray = new THREE.Ray(origin, forward);
 
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = origin.distanceTo(hit);
@@ -1388,7 +1388,7 @@ export class Player {
         for (const origin of origins) {
             const ray = new THREE.Ray(origin, forward);
             for (const obj of this.world.climbables) {
-                const box = new THREE.Box3().setFromObject(obj);
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
                 const hit = new THREE.Vector3();
                 if (ray.intersectBox(box, hit) !== null) {
                     const dist = origin.distanceTo(hit);
@@ -1427,7 +1427,7 @@ export class Player {
         const ray = new THREE.Ray(origin, forward);
 
         for (const obj of this.world.climbables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = origin.distanceTo(hit);
@@ -1461,7 +1461,7 @@ export class Player {
         const ray = new THREE.Ray(origin, forward);
 
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = origin.distanceTo(hit);
@@ -1493,7 +1493,7 @@ export class Player {
         ];
         for (const origin of origins) {
             const ray = new THREE.Ray(origin, forward);
-            const box = new THREE.Box3().setFromObject(this.climbData.obj);
+            const box = this.climbData.obj.userData.bbox || new THREE.Box3().setFromObject(this.climbData.obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 if (origin.distanceTo(hit) < 0.6) return true;
@@ -1507,7 +1507,7 @@ export class Player {
         const forward = this.hangData.normal.clone().negate();
         const origin = this.position.clone().add(new THREE.Vector3(0, 1.3, 0));
         const ray = new THREE.Ray(origin, forward);
-        const box = new THREE.Box3().setFromObject(this.hangData.obj);
+        const box = this.hangData.obj.userData.bbox || new THREE.Box3().setFromObject(this.hangData.obj);
         const hit = new THREE.Vector3();
         if (ray.intersectBox(box, hit) !== null) {
             if (origin.distanceTo(hit) < 0.6) return true;
@@ -1534,7 +1534,7 @@ export class Player {
         );
 
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             if (!this.checkAABBCollision(playerMin, playerMax, box)) continue;
             this.resolveCollision(playerMin, playerMax, box);
         }
@@ -1614,7 +1614,7 @@ export class Player {
         let groundY = -Infinity;
 
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 if (hit.y > groundY && hit.y <= origin.y + 0.01) {
@@ -1642,7 +1642,7 @@ export class Player {
         const origin = this.position.clone().add(new THREE.Vector3(0, this.currentHeight + 0.05, 0));
         const ray = new THREE.Ray(origin, new THREE.Vector3(0, 1, 0));
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = hit.y - origin.y;
@@ -1658,7 +1658,7 @@ export class Player {
         const origin = new THREE.Vector3(this.position.x, y + this.HEIGHT_STAND + 0.05, this.position.z);
         const ray = new THREE.Ray(origin, new THREE.Vector3(0, 1, 0));
         for (const obj of this.world.collidables) {
-            const box = new THREE.Box3().setFromObject(obj);
+            const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             const hit = new THREE.Vector3();
             if (ray.intersectBox(box, hit) !== null) {
                 const dist = hit.y - origin.y;

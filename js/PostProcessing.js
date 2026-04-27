@@ -401,7 +401,7 @@ export class PostProcessing {
 		const envelope = Math.max(0, this.shakeDuration / Math.max(0.001, this.shakeMaxDuration));
 		const intensity = this.shakeIntensity * envelope;
 
-		const time = performance.now() * 0.02;
+		const time = (this._renderNow || performance.now()) * 0.02;
 		this.shakeOffset.set(
 			(Math.sin(time * 15) + Math.cos(time * 23)) * 0.5 * intensity,
 			(Math.sin(time * 17) + Math.cos(time * 31)) * 0.5 * intensity,
@@ -536,7 +536,8 @@ export class PostProcessing {
 		this.motionBlurPass.uniforms.speed.value = normalizedSpeed;
 
 		// Animate film-grain time uniform
-		this.filmGrainPass.uniforms.time.value = performance.now() * 0.001;
+		this._renderNow = performance.now();
+		this.filmGrainPass.uniforms.time.value = this._renderNow * 0.001;
 
 		this.updateDayNight(dt);
 		this.getShakeOffset(dt);

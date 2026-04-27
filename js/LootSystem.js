@@ -408,8 +408,6 @@ export class LootSystem {
 
         if (drop.unidentified && !drop.identified) {
             // Unidentified items can't be equipped directly
-            // Notify player (console for now, UI later)
-            console.log(`[Loot] Picked up UNIDENTIFIED ${drop.itemData.name || 'item'} — take to safehouse to identify!`);
             // Store in a temporary unidentified stash
             if (!this._unidentifiedStash) this._unidentifiedStash = [];
             this._unidentifiedStash.push(drop.itemData);
@@ -417,7 +415,6 @@ export class LootSystem {
         }
 
         this.exoSuit.equip(drop.itemData);
-        console.log(`[Loot] Equipped ${drop.itemData.name || 'gear'} (${drop.slot})`);
     }
 
     _pickupScrap(drop) {

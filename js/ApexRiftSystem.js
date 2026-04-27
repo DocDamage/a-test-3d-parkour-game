@@ -70,7 +70,6 @@ export class ApexRiftSystem {
     const result = document.getElementById('rift-result-overlay');
     if (result) result.style.display = 'none';
 
-    console.log(`[Apex Rift] Started level ${this.riftLevel}. Time limit: ${this.timeLimit}s`);
     return true;
   }
 
@@ -85,7 +84,6 @@ export class ApexRiftSystem {
       if (timeUsed < 600) upgrades = 3;
       else if (timeUsed < 900) upgrades = 1;
       this.riftLevel += upgrades;
-      console.log(`[Apex Rift] CLEARED! +${upgrades} levels. New level: ${this.riftLevel}`);
       if (this.challengeSystem) {
         this.challengeSystem.unlock('riftClear');
         if (this.riftLevel >= 10) this.challengeSystem.unlock('riftLevel10');
@@ -95,7 +93,6 @@ export class ApexRiftSystem {
         if (this.riftLevel >= 100) this.challengeSystem.unlock('riftLevel100');
       }
     } else {
-      console.log(`[Apex Rift] FAILED. Level unchanged: ${this.riftLevel}`);
     }
 
     const hud = document.getElementById('rift-hud');
@@ -305,7 +302,6 @@ export class ApexRiftSystem {
 
   _spawnGuardian() {
     this.guardianSpawned = true;
-    console.log('[Apex Rift] Rift Guardian spawned!');
 
     if (this.bossFight && typeof this.bossFight.start === 'function') {
       // Scale boss health by rift level and difficulty

@@ -393,6 +393,7 @@ export class RivalSystem {
   /* ---------- Update ---------- */
 
   update(dt, player) {
+    const now = performance.now();
     // Face player if hostile and within range
     for (const [rivalId, mesh] of this._entities) {
       const rival = this._rivals.get(rivalId);
@@ -406,7 +407,7 @@ export class RivalSystem {
       }
 
       // Bobbing animation
-      const bob = Math.sin(performance.now() * 0.003 + rivalId.length) * 0.03;
+      const bob = Math.sin(now * 0.003 + rivalId.length) * 0.03;
       mesh.position.y += bob * dt * 2;
       // Clamp back to reasonable floor height
       if (mesh.position.y < 0.5) mesh.position.y = 0.5 + rival.height / 2;
@@ -419,7 +420,7 @@ export class RivalSystem {
         if (target && player.position.distanceTo(target) < 2.0) {
           challenge.nextCheckpoint += 1;
           if (challenge.nextCheckpoint >= challenge.checkpoints.length) {
-            this.resolveRace(rivalId, true, performance.now() - challenge.startTime);
+            this.resolveRace(rivalId, true, now - challenge.startTime);
           }
         }
       }

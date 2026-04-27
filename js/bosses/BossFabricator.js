@@ -64,7 +64,6 @@ export class BossFabricator {
         this.torchOverheat = 3;
         this.torchVulnerable = false;
         this.lavaActive = false;
-        console.log('[Boss] Fabricator activated — Phase 1');
     }
 
     stop() {
@@ -123,7 +122,6 @@ export class BossFabricator {
         if (index >= 0 && index < 3) {
             this.assemblyLines[index] = false;
             this.health -= 300;
-            console.log(`[Boss] Assembly line ${index} destroyed!`);
         }
     }
 
@@ -141,7 +139,6 @@ export class BossFabricator {
                 this.torchVulnerable = true;
                 this.torchVulnTimer = 5.0;
                 this.torchOverheat = 0;
-                console.log('[Boss] Welding torch OVERHEATED — 5s vulnerability!');
             }
         }
 
@@ -150,7 +147,6 @@ export class BossFabricator {
             if (this.torchVulnTimer <= 0) {
                 this.torchVulnerable = false;
                 this.torchOverheat = 3;
-                console.log('[Boss] Torch cooled down.');
             }
         }
 
@@ -203,7 +199,6 @@ export class BossFabricator {
 
     _transitionToPhase(phase) {
         this.currentPhase = phase;
-        console.log(`[Boss] Fabricator entering Phase ${phase}`);
     }
 
     /* ------------------------------------------------------------------ */
@@ -237,7 +232,6 @@ export class BossFabricator {
     die() {
         this.isDead = true;
         this.isActive = false;
-        console.log('[Boss] Fabricator DEFEATED');
         // Explosion visual
         if (this.group) {
             this.group.children.forEach(c => {

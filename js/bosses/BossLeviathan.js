@@ -50,7 +50,6 @@ export class BossLeviathan {
         for (let i = 0; i < 6; i++) {
             this._spawnTentacle(i);
         }
-        console.log('[Boss] Leviathan activated — Phase 1');
     }
 
     stop() {
@@ -152,7 +151,6 @@ export class BossLeviathan {
 
     _transitionToPhase(phase) {
         this.currentPhase = phase;
-        console.log(`[Boss] Leviathan entering Phase ${phase}`);
     }
 
     takeDamage(amount, type, source) {
@@ -168,7 +166,6 @@ export class BossLeviathan {
     die() {
         this.isDead = true;
         this.isActive = false;
-        console.log('[Boss] Leviathan DEFEATED');
         setTimeout(() => { if (this.group) this.group.visible = false; }, 3000);
     }
 
