@@ -14,9 +14,10 @@
  */
 
 export class NephalemGlory {
-  constructor(player, challengeSystem) {
+  constructor(player, challengeSystem, enemyHealthBars = []) {
     this.player = player;
     this.challengeSystem = challengeSystem;
+    this.enemyHealthBars = enemyHealthBars;
 
     this.killStreak = 0;
     this.bestStreak = 0;
@@ -42,6 +43,12 @@ export class NephalemGlory {
     // Multiplier cache
     this.damageMultiplier = 1.0;
     this.moveSpeedMultiplier = 1.0;
+
+    this._gloryEl = document.getElementById('glory-overlay');
+  }
+
+  setEnemyHealthBars(bars) {
+    this.enemyHealthBars = bars;
   }
 
   /* ------------------------------------------------------------------ */
@@ -161,6 +168,40 @@ export class NephalemGlory {
       if (tier >= 2) this.challengeSystem.unlock('gloryTier2');
       if (tier >= 3) this.challengeSystem.unlock('gloryTier3');
     }
+
+    this._applyTier(tier);
+  }
+
+  _applyTier(tier) {
+    if (!this._gloryEl) return;
+    if (tier === 1) {
+      this._gloryEl.style.background = 'rgba(255, 215, 0, 0.08)';
+      this._gloryEl.style.opacity = '0.08';
+    } else if (tier === 2) {
+      this._gloryEl.style.background = 'rgba(255, 140, 0, 0.15)';
+      this._gloryEl.style.opacity = '0.15';
+      this.enemyHealthBars.forEach(bar => { if (bar) bar._pulseGold = true; });
+    } else if (tier === 3) {
+      this._gloryEl.style.background = 'rgba(255, 0, 0, 0.25)';
+      this._gloryEl.style.opacity = '0.25';
+      const float = document.createElement('div');
+      float.style.position = 'fixed'; float.style.top = '30%'; float.style.left = '50%';
+      float.style.transform = 'translate(-50%, -50%)';
+      float.style.color = '#ff4444'; float.style.fontSize = '28px'; float.style.fontWeight = 'bold';
+      float.style.textShadow = '0 2px 8px rgba(0,0,0,0.8)'; float.style.pointerEvents = 'none';
+      float.style.zIndex = '100'; float.style.transition = 'opacity 1s';
+      float.textContent = 'NEPHALEM GLORY';
+      document.body.appendChild(float);
+      setTimeout(() => { float.style.opacity = '0'; }, 2000);
+      setTimeout(() => { if (float.parentNode) float.parentNode.removeChild(float); }, 3000);
+    }
+  }
+
+  _clearTier() {
+    if (!this._gloryEl) return;
+    this._gloryEl.style.background = '';
+    this._gloryEl.style.opacity = '0';
+    this.enemyHealthBars.forEach(bar => { if (bar) bar._pulseGold = false; });
   }
 
   _breakStreak(reason) {
@@ -177,6 +218,7 @@ export class NephalemGlory {
     this.screenTint = 0;
     this.damageMultiplier = 1.0;
     this.moveSpeedMultiplier = 1.0;
+    this._clearTier();
   }
 
   _updateMultipliers() {

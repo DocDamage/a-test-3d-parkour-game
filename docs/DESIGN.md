@@ -24,13 +24,18 @@ The skill bar (LMB/RMB/Q/E/R) is the primary interface. Parkour state transition
 
 ## Archetype Identity
 
-Each archetype has a distinct resource and playstyle:
+Each archetype has a distinct resource and playstyle. **All 25 skills across 5 archetypes are now wired and playable.**
 
 - **Traceur** (Momentum): Build by moving, spend on big moves. Pure parkour-combat.
+  - LMB: light_strike | RMB: dive_kick | Q: air_dash | E: slide_tackle | R: ground_pound
 - **Operative** (Focus): Build by hitting, spend on stealth. Hit-and-run.
+  - LMB: silenced_pistol | RMB: ghost_bullet | Q: predator_vision | E: smoke_bomb | R: assassinate
 - **Saboteur** (Chaos): Build by exploding, spend on gadgets. Area denial.
+  - LMB: scrap_throw | RMB: grenade_toss | Q: proxy_mine | E: decoy | R: zero_cooldown
 - **Specimen** (Fury): Build by taking damage, spend on berserk. Risk-reward.
+  - LMB: claw_swipe | RMB: berserk_lunge | Q: roar | E: adrenaline_rush | R: primal_surge
 - **Netrunner** (Charge): Build over time, spend on hacks. Pet/drone master.
+  - LMB: zap | RMB: hack_drone | Q: emp_pulse | E: firewall | R: swarm_override
 
 ## Rarity Color Language
 
@@ -60,9 +65,23 @@ We follow Diablo conventions so players immediately understand drop quality:
 
 - **Skill bar is always visible** when in-game (bottom center)
 - **Player health bar** is always visible (bottom center, below skill bar)
-- **Enemy health bars** appear only when damaged (billboard sprites)
+- **Enemy health bars** appear when damaged; always visible if Omniscience legendary power is equipped
 - **Damage numbers** float upward, color-coded by type, larger for crits
-- **RPG panels** toggle with single keys (P, G, U, F, H, J, K, L, N)
+- **RPG panels** toggle with single keys:
+  - **P** — Passive Tree
+  - **Shift+P** — Character Panel
+  - **G** — Gear Panel
+  - **U** — Companion Panel
+  - **F** — Faction Panel (when not in dialogue/shop/dungeon)
+  - **H** — Safehouse Panel
+  - **J** — Bounty Panel
+  - **K** — Codex Panel
+  - **L** — Mastery Panel
+  - **N** — Implants Panel
+  - **O** — Settings Panel
+  - **Shift+O** — Rising Tide toggle
+  - **T** — Apex Rift
+  - **M** — Cycle Difficulty Tier
 
 ## Progression Pacing
 
@@ -79,6 +98,5 @@ We follow Diablo conventions so players immediately understand drop quality:
 ## Anti-Patterns
 
 - **Don't add cooldowns to parkour moves without visual feedback.** The skill bar must show the cooldown.
-- **Don't make gear auto-equip without notification.** Players need to know what they picked up.
 - **Don't scale enemy HP without scaling damage.** Boring fights = longer TTK without higher lethality.
 - **Don't add inventory management before combat feels good.** Auto-equip is fine until Phase 5.

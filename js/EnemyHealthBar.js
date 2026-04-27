@@ -50,8 +50,8 @@ export class EnemyHealthBar {
         const health = this.enemy.health !== undefined ? this.enemy.health : (this.enemy.hp || 0);
         const pct = maxHealth > 0 ? health / maxHealth : 0;
 
-        // Hide at full health or when dead
-        this.sprite.visible = pct < 1.0 && pct > 0;
+        // Hide at full health or when dead, unless always visible
+        this.sprite.visible = this.alwaysVisible || (pct < 1.0 && pct > 0);
 
         if (this.sprite.visible) {
             this._drawBar(pct);
@@ -69,9 +69,11 @@ export class EnemyHealthBar {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fillRect(0, 0, w, h);
 
-        // Fill colour: red below 25%, orange below 50%, green otherwise
+        // Fill colour
         let r, g, b;
-        if (pct <= 0.25) {
+        if (this._pulseGold) {
+            r = 255; g = 215; b = 0;
+        } else if (pct <= 0.25) {
             r = 255; g = 0; b = 0;
         } else if (pct <= 0.5) {
             r = 255; g = 165; b = 0;

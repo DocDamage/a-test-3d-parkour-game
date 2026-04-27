@@ -136,6 +136,8 @@ export class ExoSuitSystem {
     const prev = this.equipped[item.slot];
     this.equipped[item.slot] = item;
     this._syncGearBonuses();
+    this._save();
+    if (this.onEquip) this.onEquip(item);
     return prev;
   }
 
@@ -278,5 +280,28 @@ export class ExoSuitSystem {
       descriptions.push(`Set (${bonus.manufacturer} ${bonus.pieces}pc): ${bonus.description}`);
     }
     return descriptions;
+  }
+
+  _save() {
+    try {
+      const data = {};
+      for (const slot of VALID_SLOTS) {
+        const item = this.equipped[slot];
+        data[slot] = item ? { ...item } : null;
+      }
+      localStorage.setItem('apex_exosuit', JSON.stringify(data));
+    } catch (e) { /* ignore */ }
+  }
+
+  _load() {
+    try {
+      const raw = localStorage.getItem('apex_exosuit');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      for (const slot of VALID_SLOTS) {
+        this.equipped[slot] = data[slot] || null;
+      }
+      this._syncGearBonuses();
+    } catch (e) { /* ignore */ }
   }
 }

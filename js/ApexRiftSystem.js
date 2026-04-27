@@ -64,6 +64,11 @@ export class ApexRiftSystem {
     // Time limit shrinks slightly at higher rift levels (min 7 min)
     this.timeLimit = Math.max(420, 600 - (this.riftLevel - 1) * 5);
 
+    const hud = document.getElementById('rift-hud');
+    if (hud) hud.style.display = 'block';
+    const result = document.getElementById('rift-result-overlay');
+    if (result) result.style.display = 'none';
+
     console.log(`[Apex Rift] Started level ${this.riftLevel}. Time limit: ${this.timeLimit}s`);
     return true;
   }
@@ -92,6 +97,20 @@ export class ApexRiftSystem {
       console.log(`[Apex Rift] FAILED. Level unchanged: ${this.riftLevel}`);
     }
 
+    const hud = document.getElementById('rift-hud');
+    if (hud) hud.style.display = 'none';
+    const result = document.getElementById('rift-result-overlay');
+    if (result) {
+      result.style.display = 'flex';
+      const title = document.getElementById('rift-result-title');
+      if (title) title.textContent = success ? 'CLEARED' : 'FAILED';
+      const timeEl = document.getElementById('rift-result-time');
+      if (timeEl) timeEl.textContent = `Time: ${Math.floor(timeUsed / 60)}:${String(Math.floor(timeUsed % 60)).padStart(2, '0')}`;
+      const lvlEl = document.getElementById('rift-result-levels');
+      if (lvlEl) lvlEl.textContent = `Levels Gained: ${upgrades}`;
+      setTimeout(() => { if (result) result.style.display = 'none'; }, 3000);
+    }
+
     this._cleanupArena();
     this._save();
     return { success, timeUsed, upgrades, riftLevel: this.riftLevel };
@@ -103,6 +122,7 @@ export class ApexRiftSystem {
 
   update(dt) {
     if (!this.active) return;
+    this._updateHUD();
 
     this.elapsed += dt;
 
@@ -275,6 +295,31 @@ export class ApexRiftSystem {
       const riftMult = Math.pow(this.riftScaling, this.riftLevel - 1);
       this.bossFight._riftMultiplier = diffMult * riftMult;
       this.bossFight.start();
+    }
+  }
+
+  _updateHUD() {
+    const levelEl = document.getElementById('rift-level');
+    const timerEl = document.getElementById('rift-timer');
+    const fillEl = document.getElementById('rift-progress-fill');
+    const waveEl = document.getElementById('rift-wave');
+    const killsEl = document.getElementById('rift-kills');
+    const flashEl = document.getElementById('rift-flash');
+
+    if (levelEl) levelEl.textContent = this.riftLevel;
+    if (timerEl) {
+      const remaining = Math.max(0, this.timeLimit - this.elapsed);
+      timerEl.textContent = `${Math.floor(remaining / 60)}:${String(Math.floor(remaining % 60)).padStart(2, '0')}`;
+    }
+    if (fillEl) fillEl.style.width = `${Math.min(100, this.progress)}%`;
+    if (waveEl) waveEl.textContent = this.floor;
+    if (killsEl) killsEl.textContent = this.kills;
+    if (flashEl) {
+      if (this.guardianSpawned && !this.guardianDefeated) {
+        flashEl.style.opacity = '1';
+      } else {
+        flashEl.style.opacity = '0';
+      }
     }
   }
 

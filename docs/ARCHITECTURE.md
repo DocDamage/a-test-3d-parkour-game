@@ -51,7 +51,10 @@ index.html (UI shell, canvas, CSS)
         │   ├── SkillSystem ←───────┤ (reads player.getRPGStats() for CDR)
         │   ├── ResourceSystem      │
         │   ├── SkillBarUI          │
-        │   └── SkillData           │
+        │   ├── SkillData           │
+        │   ├── ProjectileManager   │ (ranged projectile trajectory + collision)
+        │   ├── LegendaryPowerSystem│ (executes legendary affix powers from gear)
+        │   └── PassiveTree         │ (node investment, bonus aggregation, UI)
         │                           │
         ├── ENDGAME MODULES (Phase 4)
         │   ├── DifficultyTierSystem│
@@ -105,12 +108,25 @@ All subsystems expect `player` to expose:
 - `getRPGStats()` → returns merged base + gear + temp bonuses
 - `RADIUS`, `currentHeight`
 
+**New skill-related fields (added for archetype skills):**
+- `moveSpeedMultiplier` (number) — applied to all movement speeds
+- `_damageMultiplier` (number) — aggregated via CharacterSheet temp bonuses
+- `_regenPerSecond` (number) — passive health regen tick
+- `_staggerImmune` (boolean)
+- `isInvisible` (boolean) — smoke bomb
+- `_firewallActive` (boolean) — netrunner firewall
+- `_predatorVisionActive` (boolean) — operative predator vision
+- `_critBonusFromPredator` (number) — +0.15 crit while active
+- `onJump(isDoubleJump)` — callback fired from `startJump()`
+
 ### World Arrays
 - `world.collidables[]` — THREE.Mesh objects for AABB collision
 - `world.climbables[]` — subset of collidables the player can climb
 - `world.platforms[]` — MovingPlatform or compatible objects
 - `world.grapplePoints[]` — THREE.Vector3 positions
 - `world.drones.drones[]` — DroneAI instances
+- `world._proximityMines[]` — Saboteur proxy mines (trigger volumes, NOT collision surfaces)
+- `world._decoys[]` — Saboteur decoy objects with `mesh`, `health`, `takeDamage()`
 
 **Rule:** Never mutate these arrays directly from gameplay modules. Use World placement methods or the Level Editor.
 
@@ -121,14 +137,26 @@ const slowMo = droneTakedown.update(dt, player, activeInput, world.drones.drones
 const finalDt = dt * Math.min(timeScale, slowMo);
 ```
 
+### Legendary Power Hooks
+`LegendaryPowerSystem` receives event hooks from:
+- `light_strike` / `claw_swipe` callbacks → `onMeleeHit(target)`
+- `Player.startJump()` → `onJump(isDoubleJump)`
+- `animate()` sprint check → `onSprint(dt)`
+- `Player.takeDamage()` fatal path → `onTakeFatalDamage()`
+- `drone.onDeath()` → `onEnemyKilled(enemy)`
+- `Player.onDamageTaken()` → `onDamageDealt(target, amount)` (via DamageSystem)
+- Perfect parry (not yet implemented) → `onPerfectParry()`
+
 ## File Size Budgets
 
 | File | Target | Current |
 |------|--------|---------|
-| Player.js | < 2000 lines | ~1715 |
-| main.js | < 1500 lines | ~1290 |
+| Player.js | < 2000 lines | ~1743 |
+| main.js | < 1500 lines | ~1970 ⚠️ |
 | World.js | < 1500 lines | ~900 |
 | New modules | < 500 lines each | varies |
+
+> **Note:** `main.js` exceeded 1500 lines after wiring 20 skill callbacks, hint system, settings wiring, and gamepad rumble. Consider extracting skill callbacks to `js/SkillCallbacks.js` or per-archetype files if it grows further.
 
 ## Performance Budgets
 
@@ -139,6 +167,7 @@ const finalDt = dt * Math.min(timeScale, slowMo);
 | Drone AI (all drones) | < 0.5ms |
 | Post-processing (full chain) | GPU-bound, ~2ms |
 | Particle effects | < 0.3ms |
+| ProjectileManager (max 20 live) | < 0.2ms |
 
 ## Dependency Rules
 

@@ -448,6 +448,24 @@ export class PostProcessing {
 		this.vignettePass.enabled = this.vignetteEnabled;
 	}
 
+	setEffectEnabled(name, enabled) {
+		switch (name) {
+			case 'bloom': this.toggleBloom(enabled); break;
+			case 'sao': this.toggleSAO(enabled); break;
+			case 'motionBlur': this.toggleMotionBlur(enabled); break;
+			case 'filmGrain': this.toggleFilmGrain(enabled); break;
+			case 'chromaticAberration': this.toggleChromaticAberration(enabled); break;
+			case 'vignette': this.toggleVignette(enabled); break;
+		}
+	}
+
+	setFOV(degrees) {
+		if (this.camera) {
+			this.camera.fov = Math.max(60, Math.min(120, degrees));
+			this.camera.updateProjectionMatrix();
+		}
+	}
+
 	/* ---------- internals ---------- */
 
 	applyPresetValues(preset, _t) {

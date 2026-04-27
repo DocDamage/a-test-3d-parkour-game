@@ -111,7 +111,7 @@ export class SkillSystem {
 
     // Cooldown check
     const cd = this.cooldowns.get(skillId) || 0;
-    if (cd > 0) return false;
+    if (cd > 0 && !this._noCooldown) return false;
 
     // Charge check
     const charges = this.charges.get(skillId);
@@ -155,7 +155,7 @@ export class SkillSystem {
 
     // Apply cooldown
     const finalCd = this._applyCDR(resolved.finalCooldown);
-    if (finalCd > 0) {
+    if (finalCd > 0 && !this._noCooldown) {
       this.cooldowns.set(skillId, finalCd);
     }
 
@@ -299,6 +299,13 @@ export class SkillSystem {
     for (const [skillId, max] of this._getAllChargeSkills()) {
       this.charges.set(skillId, max);
     }
+  }
+
+  /**
+   * Toggle no-cooldown mode (for zero_cooldown ultimate).
+   */
+  setNoCooldown(enabled) {
+    this._noCooldown = enabled;
   }
 
   /* ------------------------------------------------------------------ */

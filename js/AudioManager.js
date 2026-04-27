@@ -66,6 +66,24 @@ export class AudioManager {
         }
     }
 
+    setSFXVolume(vol) {
+        this.ensureInit();
+        if (this.dryGain) {
+            this.dryGain.gain.setTargetAtTime(Math.max(0, vol), this.ctx.currentTime, 0.05);
+        }
+    }
+
+    setMusicVolume(vol) {
+        this.ensureInit();
+        // Music is part of ambience; scale ambience nodes
+        const target = Math.max(0, vol);
+        for (const node of this.ambienceNodes) {
+            if (node.gain) {
+                try { node.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05); } catch (e) {}
+            }
+        }
+    }
+
     // ------------------------------------------------------------
     // Surface detection
     // ------------------------------------------------------------

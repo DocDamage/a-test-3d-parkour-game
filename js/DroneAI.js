@@ -32,8 +32,16 @@ class Drone {
         this.health = this.maxHealth;
         this.isDead = false;
         this.faction = 'vanguard';
+        this.team = 'enemy';
         this.isElite = false;
         this.attackCooldown = 0;
+        this._feared = false;
+        this._disabled = false;
+        this._hackExpiry = 0;
+        this._ethereal = false;
+        this._etherealTimer = 0;
+        this._smokeBlind = false;
+        this._decoyTarget = null;
 
         // ---- Visuals ----
         this.group = new THREE.Group();
@@ -94,11 +102,53 @@ class Drone {
     /* ------------------------------------------------------------------ */
     update(dt, player) {
         if (this.isDead) return;
+
+        // Status effect timers
+        if (this._disabled) return;
+        if (this._hackExpiry > 0) {
+            this._hackExpiry -= dt;
+            if (this._hackExpiry <= 0) {
+                this.team = 'enemy';
+                this._hackExpiry = 0;
+            }
+        }
+        if (this._etherealTimer > 0) {
+            this._etherealTimer -= dt;
+            if (this._etherealTimer <= 0) this._ethereal = false;
+        }
+
         this.attackCooldown -= dt;
+
+        // Burning DoT tick
+        if (this._burning) {
+            this._burning.tick -= dt;
+            if (this._burning.tick <= 0) {
+                this._burning.tick = 1.0;
+                this._burning.duration -= 1.0;
+                this.takeDamage(this._burning.dmg, 'energy', null);
+                if (this._burning.duration <= 0) this._burning = null;
+            }
+        }
 
         // Idle ring spin
         this.ring.rotation.x += dt * 2.5;
         this.ring.rotation.y += dt * 1.8;
+
+        // Feared: flee from player
+        if (this._feared) {
+            if (player) {
+                const away = this.group.position.clone().sub(player.position).normalize();
+                this.group.position.addScaledVector(away, this.speed * dt * 1.5);
+            }
+            this.updateVisuals();
+            return;
+        }
+
+        // Smoke blind: pause vision
+        if (this._smokeBlind) {
+            this.updateVisuals();
+            return;
+        }
 
         // Vision test
         const canSee = player ? this.checkVision(player) : false;
@@ -164,11 +214,38 @@ class Drone {
         }
 
         // Melee attack while chasing
-        if (this.state === 'CHASE' && player && !this.isDead) {
+        if (this.state === 'CHASE' && player && !this.isDead && this.team !== 'player') {
             const distToPlayer = this.group.position.distanceTo(player.position);
             if (distToPlayer < 1.5 && this.attackCooldown <= 0) {
                 if (player.takeDamage) player.takeDamage(10, 'kinetic', this);
                 this.attackCooldown = 1.5;
+            }
+        }
+
+        // Hacked drone attacks enemies
+        if (this.team === 'player' && !this.isDead) {
+            const drones = this.scene?.userData?.allDrones || [];
+            // Fallback: try to find enemy drones via world reference if available
+            let enemies = [];
+            if (this.world && this.world.drones && this.world.drones.drones) {
+                enemies = this.world.drones.drones.filter(d => d !== this && d.team !== 'player' && !d.isDead);
+            }
+            if (enemies.length > 0) {
+                let nearest = null; let nearestDist = Infinity;
+                for (const d of enemies) {
+                    const pos = d.position || (d.mesh && d.mesh.position);
+                    if (!pos) continue;
+                    const dist = this.group.position.distanceTo(pos);
+                    if (dist < nearestDist) { nearest = d; nearestDist = dist; }
+                }
+                if (nearest && nearestDist < 1.5 && this.attackCooldown <= 0) {
+                    if (nearest.takeDamage) nearest.takeDamage(10, 'kinetic', this);
+                    this.attackCooldown = 1.5;
+                } else if (nearest) {
+                    const pos = nearest.position || (nearest.mesh && nearest.mesh.position);
+                    const dir = pos.clone().sub(this.group.position).normalize();
+                    this.group.position.addScaledVector(dir, this.speed * dt);
+                }
             }
         }
 
@@ -370,6 +447,7 @@ export class DroneAI {
     addDrone(config) {
         const drone = new Drone(this.scene, this.world, config);
         this.drones.push(drone);
+        return drone;
     }
 
     update(dt) {

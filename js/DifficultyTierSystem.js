@@ -48,6 +48,7 @@ export class DifficultyTierSystem {
     }
     this.currentTier = tierId;
     this._save();
+    this.updateHUD();
     return true;
   }
 
@@ -122,5 +123,33 @@ export class DifficultyTierSystem {
       const raw = localStorage.getItem('apex_difficulty');
       if (raw) this.deserialize(JSON.parse(raw));
     } catch (e) { /* ignore */ }
+    this.updateHUD();
+  }
+
+  updateHUD() {
+    const badge = document.getElementById('difficulty-badge');
+    const popup = document.getElementById('difficulty-popup');
+    if (!badge) return;
+    const cfg = this.getTierConfig();
+    badge.textContent = cfg.name;
+    badge.className = 'tier-' + (cfg.id.startsWith('torment') ? 'torment' : cfg.id);
+    if (popup) {
+      popup.innerHTML = '';
+      for (const id of TIER_ORDER) {
+        const t = TIERS[id];
+        const div = document.createElement('div');
+        div.className = 'diff-tier' + (this.unlockedTiers.has(id) ? '' : ' locked');
+        div.textContent = t.name;
+        div.onclick = () => {
+          if (this.setTier(id)) {
+            popup.style.display = 'none';
+          }
+        };
+        popup.appendChild(div);
+      }
+    }
+    badge.onclick = () => {
+      if (popup) popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+    };
   }
 }

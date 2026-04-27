@@ -768,7 +768,7 @@ export default class BossFight {
         if (this.currentPhase === 2) {
             this.bossHoverBaseY = 8;
             this.bossOrbitSpeed = 1.2;
-            this.coreExposed = [true, true, false];
+            this.coreExposed = [true, true, true];
             for (let i = 0; i < 3; i++) {
                 this.cores[i].visible = this.coreExposed[i];
             }
@@ -901,7 +901,7 @@ export default class BossFight {
     sweepBeam() {
         this.bossState = 'attack_windup';
         this.currentAttack = 'sweepBeam';
-        this.attackWindupTimer = this.currentPhase === 3 ? 2.0 : 1.2;
+        this.attackWindupTimer = this.currentPhase === 3 ? 3.0 : 1.2;
         this.attackDuration = 3.5;
 
         const laserGeo = new THREE.CylinderGeometry(0.12, 0.12, 16, 8);
@@ -926,7 +926,7 @@ export default class BossFight {
     shockwaveSlam() {
         this.bossState = 'attack_windup';
         this.currentAttack = 'shockwaveSlam';
-        this.attackWindupTimer = this.currentPhase === 3 ? 2.0 : 1.0;
+        this.attackWindupTimer = this.currentPhase === 3 ? 3.0 : 1.0;
         this.attackDuration = 2.5;
     }
 
@@ -945,7 +945,7 @@ export default class BossFight {
     diveBomb() {
         this.bossState = 'attack_windup';
         this.currentAttack = 'diveBomb';
-        this.attackWindupTimer = this.currentPhase === 3 ? 2.0 : 1.0;
+        this.attackWindupTimer = this.currentPhase === 3 ? 3.0 : 1.0;
         this.attackDuration = 2.0;
         this.diveTarget = this.player.position.clone();
         this.diveTarget.y = 0.5;
@@ -1234,6 +1234,10 @@ export default class BossFight {
             this.coreExposed[0] = true;
             this.cores[0].visible = true;
             this.cores[0].position.set(0, 0, 0);
+            if (this.world && this.world.collidables && !this.world.collidables.includes(this.cores[0])) {
+                this.world.collidables.push(this.cores[0]);
+                this._coreInCollidables = true;
+            }
         }
 
         if (pick === 'sweepBeam') this.sweepBeam();
@@ -1386,6 +1390,11 @@ export default class BossFight {
         this.currentAttack = null;
         this.bossState = 'patrol';
         this.attackTimer = this.currentPhase === 3 ? 2 : this.currentPhase === 2 ? 3 : 4;
+        if (this._coreInCollidables && this.world && this.world.collidables) {
+            const idx = this.world.collidables.indexOf(this.cores[0]);
+            if (idx >= 0) this.world.collidables.splice(idx, 1);
+            this._coreInCollidables = false;
+        }
 
         if (this.shockwave) {
             this.scene.remove(this.shockwave.mesh);

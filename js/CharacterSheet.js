@@ -82,6 +82,8 @@ export class CharacterSheet {
         return this._stats[statName] ?? 0;
     }
 
+    getAttributePoints() { return this._attributePoints; }
+    grantAttributePoints(amount) { this._attributePoints += amount; this._save(); }
     spendAttributePoint(statName) {
         if (this._stats[statName] === undefined) {
             console.warn(`CharacterSheet: cannot spend point on unknown stat "${statName}"`);
@@ -90,11 +92,37 @@ export class CharacterSheet {
         if (this._attributePoints <= 0) return false;
         this._attributePoints--;
         this._stats[statName]++;
+        this._save();
         return true;
     }
 
-    getAttributePoints() { return this._attributePoints; }
-    grantAttributePoints(amount) { this._attributePoints += amount; }
+    _save() {
+        try {
+            const data = {
+                stats: { ...this._stats },
+                attributePoints: this._attributePoints,
+                tempBonuses: Array.from(this._tempBonuses.entries()).map(([k, v]) => ({ key: k, ...v }))
+            };
+            localStorage.setItem('apex_character', JSON.stringify(data));
+        } catch (e) { /* ignore */ }
+    }
+
+    _load() {
+        try {
+            const raw = localStorage.getItem('apex_character');
+            if (!raw) return;
+            const data = JSON.parse(raw);
+            if (data.stats) this._stats = { ...this._stats, ...data.stats };
+            if (data.attributePoints !== undefined) this._attributePoints = data.attributePoints;
+            if (Array.isArray(data.tempBonuses)) {
+                this._tempBonuses.clear();
+                for (const tb of data.tempBonuses) {
+                    const { key, ...rest } = tb;
+                    this._tempBonuses.set(key, rest);
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
 
     /* ============================================================
        LEVEL / XP DELEGATION

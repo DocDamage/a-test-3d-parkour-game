@@ -28,6 +28,12 @@ export class GrapplingHook {
         
         // Swing physics data
         this.swingPlaneNormal = new THREE.Vector3(0, 1, 0);
+
+        /**
+         * When true (set by KeyItemSystem until the grappling_hook item is
+         * found in the Underground Tunnel dungeon), the hook cannot be used.
+         */
+        this.locked = false;
     }
     
     _createCable() {
@@ -219,8 +225,9 @@ export class GrapplingHook {
         }
     }
     
-    /** Attempt to enter aim mode. Returns false if on cooldown. */
+    /** Attempt to enter aim mode. Returns false if on cooldown or locked. */
     startAim() {
+        if (this.locked) return false;
         if (this.cooldownTimer > 0) return false;
         this.state = 'AIM';
         return true;

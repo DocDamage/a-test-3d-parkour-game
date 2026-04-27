@@ -121,6 +121,14 @@ export class Player {
         this.isInvincible = false;
         this.invincibleTimer = 0;
         this.isDead = false;
+        this.isInvisible = false;
+        this.moveSpeedMultiplier = 1.0;
+        this._damageMultiplier = 1.0;
+        this._regenPerSecond = 0;
+        this._staggerImmune = false;
+        this._firewallActive = false;
+        this._predatorVisionActive = false;
+        this._critBonusFromPredator = 0;
 
         // RPG system hook
         this.characterSheet = null;
@@ -172,6 +180,7 @@ export class Player {
             speed = this.SPEED_CROUCH;
             nextState = 'CROUCH';
         }
+        speed *= this.moveSpeedMultiplier;
 
         // Slide initiation
         if (input.isPressed('KeyC') && this.wasSprinting && this.state === 'SPRINT') {
@@ -237,7 +246,7 @@ export class Player {
         } else {
             // Air control
             const airControl = 4;
-            const targetVel = moveDir.multiplyScalar(this.SPEED_WALK);
+            const targetVel = moveDir.multiplyScalar(this.SPEED_WALK * this.moveSpeedMultiplier);
             this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVel.x, dt * airControl);
             this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVel.z, dt * airControl);
         }
@@ -439,6 +448,11 @@ export class Player {
         // Update subsystems
         this.comboSystem.update(dt, this.grounded);
 
+        // Passive health regen
+        if (this._regenPerSecond > 0 && this.health < this.maxHealth && !this.isDead) {
+            this.health = Math.min(this.maxHealth, this.health + this._regenPerSecond * dt);
+        }
+
         // State machine
         switch (this.state) {
             case 'IDLE':
@@ -596,6 +610,7 @@ export class Player {
 
         // Apply flow speed boost
         speed *= this.comboSystem.getFlowBoost();
+        speed *= this.moveSpeedMultiplier;
 
         // Slide initiation
         if (input.isPressed('KeyC') && this.wasSprinting && this.state === 'SPRINT') {
@@ -674,7 +689,7 @@ export class Player {
 
         // Air control with flow boost - high responsiveness for strafe jumps
         const airControl = 12;
-        const airSpeed = this.SPEED_SPRINT * 1.1 * this.comboSystem.getFlowBoost();
+        const airSpeed = this.SPEED_SPRINT * 1.1 * this.comboSystem.getFlowBoost() * this.moveSpeedMultiplier;
         const targetVel = moveDir.multiplyScalar(airSpeed);
         this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVel.x, dt * airControl);
         this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVel.z, dt * airControl);
@@ -857,7 +872,7 @@ export class Player {
         const up = input.isPressed('KeyW') ? 1 : input.isPressed('KeyS') ? -1 : 0;
 
         const tangent = this.wallRunData.tangent.clone();
-        const speed = this.SPEED_SPRINT * this.comboSystem.getFlowBoost();
+        const speed = this.SPEED_SPRINT * this.comboSystem.getFlowBoost() * this.moveSpeedMultiplier;
 
         this.velocity.copy(tangent.multiplyScalar(speed));
         this.velocity.y = up * 3;
@@ -999,7 +1014,7 @@ export class Player {
         }
     }
 
-    startJump(input) {
+    startJump(input, isDoubleJump = false) {
         this.state = 'JUMP';
         this.fallStartY = this.position.y;
         this.velocity.y = this.JUMP_FORCE;
@@ -1008,6 +1023,7 @@ export class Player {
         this.airDashUsed = false;
         this.ticTacCount = 0;
         this.ticTacLastSide = null;
+        if (this.onJump) this.onJump(isDoubleJump);
 
         // Bunny hop: if we landed very recently, preserve and boost horizontal velocity
         if (this.justLandedTimer > 0 && this.preLandingHSpeed > 1.0) {
@@ -1044,7 +1060,7 @@ export class Player {
         this.slideTimer = 0.8;
         const forward = moveDir.length() > 0.1 ? moveDir :
             new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
-        const speed = this.SPEED_SPRINT * 1.6 * this.comboSystem.getFlowBoost();
+        const speed = this.SPEED_SPRINT * 1.6 * this.comboSystem.getFlowBoost() * this.moveSpeedMultiplier;
         this.velocity.x = forward.x * speed;
         this.velocity.z = forward.z * speed;
         if (this.audio) this.audio.playSlide(true);
@@ -1682,10 +1698,21 @@ export class Player {
         if (this.isDead || this.isInvincible) return 0;
         this.health -= amount;
         if (this.health <= 0) {
-            this.health = 0;
-            this.die();
+            // Allow legendary powers to block fatal damage
+            let blocked = false;
+            if (this.onDamageTaken) {
+                // onDamageTaken may contain onTakeFatalDamage logic
+                // We call it early for fatal damage checks
+                this.onDamageTaken(amount, type, source);
+                if (this.health > 0) blocked = true;
+            }
+            if (!blocked) {
+                this.health = 0;
+                this.die();
+            }
+        } else {
+            if (this.onDamageTaken) this.onDamageTaken(amount, type, source);
         }
-        if (this.onDamageTaken) this.onDamageTaken(amount, type, source);
         return amount;
     }
 
