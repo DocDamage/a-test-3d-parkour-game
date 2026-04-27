@@ -178,171 +178,6 @@ export class Player {
         this.trailHistory = [];
     }
 
-    updateGrounded(dt, input, moveDir) {
-        // Handle height transitions
-        let targetHeight = this.HEIGHT_STAND;
-
-        if (input.isPressed('KeyC')) {
-            targetHeight = this.HEIGHT_CROUCH;
-        }
-
-        // If trying to stand, check for clearance
-        if (!input.isPressed('KeyC') && this.state === 'CROUCH') {
-            if (!this.canStand()) {
-                targetHeight = this.HEIGHT_CROUCH;
-            }
-        }
-
-        this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, targetHeight, dt * 12);
-
-        // Sprint tracking
-        if (input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND) {
-            this.wasSprinting = true;
-        } else if (moveDir.length() < 0.1) {
-            this.wasSprinting = false;
-        }
-
-        // Determine speed and state
-        let speed = this.SPEED_WALK;
-        let nextState = moveDir.length() > 0.1 ? 'WALK' : 'IDLE';
-
-        const canSprint = !this.staminaSystem || this.staminaSystem.stamina > 0;
-        if (input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND && canSprint) {
-            speed = this.SPEED_SPRINT;
-            nextState = 'SPRINT';
-        } else if (targetHeight === this.HEIGHT_CROUCH) {
-            speed = this.SPEED_CROUCH;
-            nextState = 'CROUCH';
-        }
-        speed *= this.moveSpeedMultiplier;
-
-        // Slide initiation
-        if (input.isPressed('KeyC') && this.wasSprinting && this.state === 'SPRINT') {
-            this.startSlide(moveDir);
-            return;
-        }
-
-        // Auto-vault when sprinting into low obstacles
-        if (this.state === 'SPRINT') {
-            const vaultInfo = this.checkAutoVault();
-            if (vaultInfo) {
-                this.startVault(vaultInfo);
-                return;
-            }
-        }
-
-        // Jump / Vault
-        if (this.jumpBuffer > 0) {
-            this.jumpBuffer = 0;
-
-            const wallInfo = this.checkWallInFront();
-            if (wallInfo && wallInfo.canVault) {
-                this.startVault(wallInfo);
-                return;
-            }
-
-            if (this.grounded || this.coyoteTime > 0) {
-                const sprintJump = input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND;
-                this.startJump(sprintJump);
-                return;
-            }
-        }
-
-        // Apply horizontal movement with acceleration
-        const targetVel = moveDir.multiplyScalar(speed);
-        const accel = this.grounded ? 22 : 10;
-        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVel.x, dt * accel);
-        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVel.z, dt * accel);
-
-        // Apply friction when no input
-        if (moveDir.length() < 0.1 && this.grounded) {
-            this.velocity.x *= (1 - dt * 14);
-            this.velocity.z *= (1 - dt * 14);
-            if (Math.abs(this.velocity.x) < 0.01) this.velocity.x = 0;
-            if (Math.abs(this.velocity.z) < 0.01) this.velocity.z = 0;
-        }
-
-        this.state = nextState;
-    }
-
-    updateAirborne(dt, input, moveDir) {
-        // Dash handling
-        const canDash = this.canDash && this.dashTimer <= 0 &&
-            (!this.staminaSystem || this.staminaSystem.canSpend(15));
-        if (input.isPressed('KeyQ') && canDash) {
-            this.startDash(moveDir);
-            if (this.staminaSystem) this.staminaSystem.spend(15);
-        }
-
-        if (this.dashTimer > 0) {
-            this.dashTimer -= dt;
-            this.velocity.copy(this.dashDirection);
-            if (this.dashTimer <= 0) {
-                this.velocity.multiplyScalar(0.3);
-            }
-        } else {
-            // Air control
-            const airControl = 4;
-            const targetVel = moveDir.multiplyScalar(this.SPEED_WALK * this.moveSpeedMultiplier);
-            this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVel.x, dt * airControl);
-            this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVel.z, dt * airControl);
-        }
-
-        // Auto-hang when falling near a ledge
-        if (this.velocity.y < -1 && this.dashTimer <= 0) {
-            const hangInfo = this.checkLedgeHang();
-            if (hangInfo) {
-                this.startHang(hangInfo);
-                return;
-            }
-        }
-
-        // Check for wall interactions on jump press
-        if (this.jumpBuffer > 0) {
-            this.jumpBuffer = 0;
-
-            const wallInfo = this.checkWallInFront();
-            if (wallInfo) {
-                if (wallInfo.canClimb) {
-                    this.startClimb(wallInfo);
-                    return;
-                } else if (wallInfo.canVault) {
-                    this.startVault(wallInfo);
-                    return;
-                }
-            }
-        }
-
-        // Check for wall run
-        if (!this.grounded && this.dashTimer <= 0 && this.state !== 'WALLRUN') {
-            const wallRunInfo = this.checkWallRun();
-            if (wallRunInfo) {
-                this.startWallRun(wallRunInfo);
-                return;
-            }
-        }
-
-        // Ceiling Run: hold Ctrl near ceiling to attach
-        if (!this.grounded && input.isPressed('ControlLeft') && this.dashTimer <= 0) {
-            const ceilingInfo = this.checkCeilingAbove();
-            if (ceilingInfo) {
-                this.startCeilingRun(ceilingInfo);
-                return;
-            }
-        }
-
-        // Platform Grab: hold E near platform edge
-        if (input.isPressed('KeyE') && this.dashTimer <= 0) {
-            const grabInfo = this.checkPlatformGrab();
-            if (grabInfo) {
-                this.startPlatformGrab(grabInfo);
-                return;
-            }
-        }
-
-        this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, this.HEIGHT_STAND, dt * 5);
-    }
-
     createMesh() {
         const group = new THREE.Group();
 
@@ -476,8 +311,9 @@ export class Player {
         this.facing = cameraYaw;
         const moveDir = this.getMoveDir(input, cameraYaw);
 
-        // Track previous velocity for impact detection
+        // Track previous velocity and grounded state
         this.prevVelocity.copy(this.velocity);
+        this.prevGrounded = this.grounded;
 
         // Update timers
         if (this.grounded) {
@@ -1343,9 +1179,7 @@ export class Player {
         }
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Ceiling Run (Magnet Boots)                                        */
-    /* ------------------------------------------------------------------ */
+    // --- Ceiling Run (Magnet Boots) ---
 
     checkCeilingAbove() {
         const origin = this.position.clone().add(new THREE.Vector3(0, this.currentHeight, 0));
@@ -1379,6 +1213,24 @@ export class Player {
         this.position.y = info.y - this.currentHeight - 0.05;
         this.comboSystem.registerMove('ceilingRun');
         if (this.audio) this.audio.playClimbGrab();
+    }
+
+    updateGrappleAim(dt, input) {
+        if (!this.grapplingHook) { this.state = 'FALL'; return; }
+        this.grapplingHook.update(dt, { isPressed: () => false }, this.facing);
+        if (this.grapplingHook.state !== 'AIM') this.state = 'FALL';
+    }
+
+    updateGrappleSwing(dt, input) {
+        if (!this.grapplingHook) { this.state = 'FALL'; return; }
+        this.grapplingHook.update(dt, input, this.facing);
+        if (!this.grapplingHook.isActive()) this.state = 'FALL';
+    }
+
+    updateGrappleRetract(dt, input) {
+        if (!this.grapplingHook) { this.state = 'FALL'; return; }
+        this.grapplingHook.update(dt, input, this.facing);
+        if (!this.grapplingHook.isActive()) this.state = 'FALL';
     }
 
     updateCeilingRun(dt, input) {
@@ -1427,9 +1279,7 @@ export class Player {
         }
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Platform Grab / Shield                                            */
-    /* ------------------------------------------------------------------ */
+    // --- Platform Grab / Shield ---
 
     checkPlatformGrab() {
         // Look for a platform edge near the player

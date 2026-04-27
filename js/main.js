@@ -252,8 +252,7 @@ const factions = new FactionSystem(null); // eventBus placeholder
 const territory = new TerritorySystem(world, factions);
 const safehouse = new SafehouseSystem(player, characterSheet, progression, exoSuit, affixSystem);
 characterSheet.setSafehouseSystem(safehouse);
-if (damageSystem) damageSystem.setSafehouseSystem(safehouse);
-// Wire safehouse passive effects
+// Wire safehouse passive effects (damageSystem hook added after damageSystem is instantiated below)
 function _updateSafehousePassives() {
     const effects = safehouse.getPassiveEffects();
     player._respawnHPBonus = effects.respawnHPBonus || 0;
@@ -289,15 +288,7 @@ for (const [slot, skillId] of Object.entries(defaultLoadout)) {
     skillSystem.assignSkill(slot, skillId);
 }
 
-// Wire all 25 skill execution callbacks (extracted to keep main.js under limit)
-wireSkillCallbacks({
-    skillSystem, staminaSystem, Hitbox, hitboxSystem,
-    world, player, projectileManager, resourceSystem,
-    particleEffects, legendaryPowerSystem, gamepad,
-    scene, audio, spawnDamageNumber, activeArchetypeId,
-    nephalemGlory, enemyHealthBars, characterSheet,
-    postProcessing
-});
+// Skill callbacks will be wired after all referenced systems are instantiated (see below)
 
 const skillBarUI = new SkillBarUI(skillSystem, resourceSystem);
 const passiveTree = new PassiveTree(activeArchetypeId, skillSystem);
@@ -314,6 +305,7 @@ const statusEffectSystem = new StatusEffectSystem();
 // Enemy manager + new combat subsystems (instantiated after combatSystem exists)
 const enemyManager = new EnemyManager(scene, world, player);
 if (damageSystem) enemyManager.setDamageSystem(damageSystem);
+if (damageSystem) damageSystem.setSafehouseSystem(safehouse);
 
 // Weapon system: equip starter loadout
 const weaponSystem = new WeaponSystem(player, scene, hitboxSystem, projectileManager);
@@ -540,8 +532,7 @@ stickyBomb.onExplode = (data) => {
     if (particleEffects) particleEffects.explosion(data.position.clone(), 0xff3300, 20);
 };
 
-// Arena mode
-const arenaMode = new ArenaMode(scene, world, player, enemyManager, bossFight);
+// Arena mode will be instantiated after bossFight is created (see below)
 
 // Debt system (now that enemyManager exists)
 const debt = new DebtSystem(player, enemyManager);
@@ -907,7 +898,7 @@ projectileManager.setInteractiveEnvironment(interEnv);
 const ziplineGun = new ZiplineGun(scene, player, world);
 
 // Advanced drones
-const sniperDrone = new SniperDrone(scene, world, player, { grapplingHook });
+const sniperDrone = new SniperDrone(scene, world, player, { grapplingHook: player.grapplingHook });
 const swarmDrone = new SwarmDrone(scene, world, player);
 const hunterDrone = new HunterDrone(scene, world, player);
 
@@ -934,6 +925,7 @@ const challenges = new ChallengeSystem(scene, player);
 // Boss Fight (needs directorMode, bulletTime, challenges)
 const bossFight = new BossFight(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
 const riftGuardian = new RiftGuardian(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
+const arenaMode = new ArenaMode(scene, world, player, enemyManager, bossFight);
 
 // Phase 8: Boss Roster
 const bosses = [];
@@ -1117,6 +1109,16 @@ const damageNumbers = new DamageNumbers(camera);
 function spawnDamageNumber(position, amount, isCrit, damageType) {
     damageNumbers.spawn(position, amount, isCrit, damageType);
 }
+
+// Wire all 25 skill execution callbacks (now that all referenced systems exist)
+wireSkillCallbacks({
+    skillSystem, staminaSystem, Hitbox, hitboxSystem,
+    world, player, projectileManager, resourceSystem,
+    particleEffects, legendaryPowerSystem, gamepad,
+    scene, audio, spawnDamageNumber, activeArchetypeId,
+    nephalemGlory, enemyHealthBars, characterSheet,
+    postProcessing
+});
 
 // Settings panel wiring
 (function wireSettings() {
@@ -1409,13 +1411,13 @@ function animate() {
         ziplineGun.update(finalDt);
 
         // Zipline Gun: Mouse2 aim + Mouse1 fire at enemy
-        if (grapplingHook && grapplingHook.isAiming() && activeInput.wasPressed('Mouse1')) {
+        if (player.grapplingHook && player.grapplingHook.isAiming() && activeInput.wasPressed('Mouse1')) {
             ziplineGun.fire(player.facingDirection || new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)));
         }
 
         // Grapple Pull: Q while grappling aims at enemy
-        if (grapplingHook && grapplingHook.isAiming() && activeInput.wasPressed('KeyQ')) {
-            const pulled = grapplingHook.pullEnemy();
+        if (player.grapplingHook && player.grapplingHook.isAiming() && activeInput.wasPressed('KeyQ')) {
+            const pulled = player.grapplingHook.pullEnemy();
             if (pulled && spawnDamageNumber) {
                 const pPos = pulled.position || (pulled.mesh && pulled.mesh.position);
                 if (pPos) spawnDamageNumber(pPos.clone().add(new THREE.Vector3(0, 1, 0)), 'YANKED', false, 'kinetic');
@@ -1449,8 +1451,8 @@ function animate() {
 
         // Decoy Afterimage: Shift+Q at max flow = hologram clone
         if (activeInput.wasPressed('KeyQ') && activeInput.isPressed('ShiftLeft') &&
-            comboSystem && comboSystem.flowMeter >= 100) {
-            comboSystem.flowMeter = 0;
+            player.comboSystem && player.comboSystem.flowMeter >= 100) {
+            player.comboSystem.flowMeter = 0;
             // Spawn decoy clone using existing decoy system
             if (skillSystem) skillSystem.useSkill('decoy');
             // Player becomes briefly invisible
