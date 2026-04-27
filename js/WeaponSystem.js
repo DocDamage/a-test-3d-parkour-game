@@ -55,8 +55,38 @@ export class WeaponSystem {
         this.reloadTimer = 0;
         this.fireCooldown = 0;
         this.isReloading = false;
+        this.modSystem = null;
 
         this._buildUI();
+    }
+
+    setModSystem(modSystem) {
+        this.modSystem = modSystem;
+    }
+
+    _getEffectiveStats() {
+        const w = this.getCurrentWeapon();
+        if (!w) return null;
+        const stats = {
+            damage: w.damage ?? 20,
+            fireRate: w.fireRate ?? w.attackSpeed ?? 1,
+            spread: w.spread ?? 0,
+            range: w.range ?? 30,
+            reloadTime: w.reloadTime ?? 1.5,
+            clipSize: w.clipSize ?? 10,
+            projectileSpeed: w.projectileSpeed ?? 40,
+        };
+        if (this.modSystem) {
+            const modStats = this.modSystem.getModStats(this.currentSlot);
+            stats.damage *= modStats.damageMul;
+            stats.fireRate *= modStats.fireRateMul;
+            stats.spread *= modStats.spreadMul;
+            stats.range *= modStats.rangeMul;
+            stats.reloadTime /= modStats.reloadSpeedMul; // higher mul = faster = lower time
+            stats.clipSize += modStats.clipSizeAdd;
+            stats.projectileSpeed *= modStats.projectileSpeedMul;
+        }
+        return stats;
     }
 
     /* ------------------------------------------------------------------ */
@@ -131,8 +161,10 @@ export class WeaponSystem {
         // Delegate to weapon object if it has its own state
         if (w.canFire && typeof w.canFire === 'function') return w.canFire();
         if (w.type === 'melee') return true;
+        const eff = this._getEffectiveStats();
         const ammo = this.ammo[w.ammoType];
-        return ammo && ammo.clip > 0;
+        const effectiveClip = eff ? Math.round(eff.clipSize) : (w.clipSize || 10);
+        return ammo && ammo.clip > 0 && ammo.clip <= effectiveClip;
     }
 
     fire(origin, direction) {
@@ -168,7 +200,9 @@ export class WeaponSystem {
             if (ammo) ammo.clip--;
         }
 
-        this.fireCooldown = w.fireRate ? (1 / w.fireRate) : (w.attackSpeed ? (1 / w.attackSpeed) : 0.2);
+        const eff = this._getEffectiveStats();
+        const fireRate = eff ? eff.fireRate : (w.fireRate || w.attackSpeed || 5);
+        this.fireCooldown = 1 / fireRate;
         this._updateUI();
         return true;
     }
@@ -176,16 +210,19 @@ export class WeaponSystem {
     startReload() {
         const w = this.getCurrentWeapon();
         if (!w || w.type === 'melee' || this.isReloading) return false;
+        const eff = this._getEffectiveStats();
+        const reloadTime = eff ? eff.reloadTime : (w.reloadTime || 1.5);
+        const clipSize = eff ? Math.round(eff.clipSize) : (w.clipSize || 10);
         if (w.reload && typeof w.reload === 'function') {
             const did = w.reload();
-            if (did) { this.isReloading = true; this.reloadTimer = w.reloadTime || 1.5; }
+            if (did) { this.isReloading = true; this.reloadTimer = reloadTime; }
             return did;
         }
         const ammo = this.ammo[w.ammoType];
-        if (!ammo || ammo.reserve <= 0 || ammo.clip >= w.clipSize) return false;
+        if (!ammo || ammo.reserve <= 0 || ammo.clip >= clipSize) return false;
 
         this.isReloading = true;
-        this.reloadTimer = w.reloadTime || 1.5;
+        this.reloadTimer = reloadTime;
         return true;
     }
 
@@ -229,36 +266,54 @@ export class WeaponSystem {
         if (!this.hitboxSystem) return;
         const { Hitbox } = this._getHitboxCtor();
         if (!Hitbox) return;
+        const eff = this._getEffectiveStats();
+        const damage = eff ? eff.damage : (weapon.damage || 15);
+        const range = eff ? eff.range : (weapon.range || 1.2);
 
         const offset = direction.clone().multiplyScalar(0.8);
         offset.y = 0.5;
         const hb = new Hitbox(
             this.player, 'melee',
-            { type: 'sphere', radius: weapon.range || 1.2 },
+            { type: 'sphere', radius: range },
             offset, 0.15,
             (hitbox, target) => {
                 if (target && target.takeDamage) {
-                    target.takeDamage(weapon.damage || 15, 'kinetic', this.player);
+                    target.takeDamage(damage, 'kinetic', this.player);
                 }
             }
         );
-        hb.damage = weapon.damage || 15;
+        hb.damage = damage;
         hb.team = 'player';
         this.hitboxSystem.registerHitbox(hb);
     }
 
     _fireProjectile(weapon, origin, direction) {
         if (!this.projectileManager) return;
-        this.projectileManager.fire(origin, direction, {
-            speed: weapon.projectileSpeed || 40,
-            range: weapon.range || 30,
+        const eff = this._getEffectiveStats();
+        const speed = eff ? eff.projectileSpeed : (weapon.projectileSpeed || 40);
+        const range = eff ? eff.range : (weapon.range || 30);
+        const damage = eff ? eff.damage : (weapon.damage || 20);
+        const spread = eff ? eff.spread : (weapon.spread || 0);
+
+        // Apply spread to direction
+        let fireDir = direction.clone().normalize();
+        if (spread > 0) {
+            fireDir.x += (Math.random() - 0.5) * spread;
+            fireDir.y += (Math.random() - 0.5) * spread;
+            fireDir.z += (Math.random() - 0.5) * spread;
+            fireDir.normalize();
+        }
+
+        this.projectileManager.fire(origin, fireDir, {
+            speed,
+            range,
             radius: 0.15,
-            damage: weapon.damage || 20,
+            damage,
             damageType: weapon.damageType || 'kinetic',
             color: weapon.color || 0xffffff,
             onHit: (target) => {
                 if (target && target.takeDamage) {
-                    target.takeDamage(weapon.damage || 20, weapon.damageType || 'kinetic', this.player);
+                    target.takeDamage(damage, weapon.damageType || 'kinetic', this.player);
                 }
             }
         });
@@ -269,8 +324,11 @@ export class WeaponSystem {
         if (!this.hitboxSystem) return;
         const { Hitbox } = this._getHitboxCtor();
         if (!Hitbox) return;
+        const eff = this._getEffectiveStats();
+        const damage = eff ? eff.damage : (weapon.damage || 20);
+        const range = eff ? eff.range : (weapon.range || 20);
 
-        const offset = direction.clone().multiplyScalar(weapon.range || 20);
+        const offset = direction.clone().multiplyScalar(range);
         offset.y = 0.5;
         const hb = new Hitbox(
             this.player, 'projectile',
@@ -278,11 +336,11 @@ export class WeaponSystem {
             offset, 0.02,
             (hitbox, target) => {
                 if (target && target.takeDamage) {
-                    target.takeDamage(weapon.damage || 20, weapon.damageType || 'kinetic', this.player);
+                    target.takeDamage(damage, weapon.damageType || 'kinetic', this.player);
                 }
             }
         );
-        hb.damage = weapon.damage || 20;
+        hb.damage = damage;
         hb.team = 'player';
         this.hitboxSystem.registerHitbox(hb);
     }
@@ -293,7 +351,9 @@ export class WeaponSystem {
         const ammo = this.ammo[w.ammoType];
         if (!ammo) { this.isReloading = false; return; }
 
-        const needed = w.clipSize - ammo.clip;
+        const eff = this._getEffectiveStats();
+        const clipSize = eff ? Math.round(eff.clipSize) : (w.clipSize || 10);
+        const needed = clipSize - ammo.clip;
         const taken = Math.min(needed, ammo.reserve);
         ammo.clip += taken;
         ammo.reserve -= taken;

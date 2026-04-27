@@ -36,6 +36,7 @@ import { CombatSystem } from './CombatSystem.js';
 import { StatusEffectSystem } from './StatusEffectSystem.js';
 import { EnemyManager } from './EnemyManager.js';
 import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
+import { WeaponModSystem } from './WeaponModSystem.js';
 import { ArenaMode } from './ArenaMode.js';
 import { BossFabricator } from './bosses/BossFabricator.js';
 import { BossWarden } from './bosses/BossWarden.js';
@@ -300,6 +301,12 @@ if (damageSystem) enemyManager.setDamageSystem(damageSystem);
 
 // Weapon system: equip starter loadout
 const weaponSystem = new WeaponSystem(player, scene, hitboxSystem, projectileManager);
+const weaponModSystem = new WeaponModSystem();
+weaponSystem.setModSystem(weaponModSystem);
+// Pre-equip demo mods on starter loadout
+weaponModSystem.equipMod(weaponModSystem.generateMod('barrel', 'rare'), WEAPON_SLOTS.PRIMARY, 'barrel');
+weaponModSystem.equipMod(weaponModSystem.generateMod('scope', 'uncommon'), WEAPON_SLOTS.PRIMARY, 'scope');
+weaponModSystem.equipMod(weaponModSystem.generateMod('grip', 'common'), WEAPON_SLOTS.SIDEARM, 'grip');
 const pipeWrench = new PipeWrench(scene, player);
 const semiAutoPistol = new SemiAutoPistol(scene, player);
 const assaultRifle = new AssaultRifle(scene, player);
@@ -731,12 +738,13 @@ const advMovement = new AdvancedMovement(player, scene, audio, tpc);
 
 // Interactive environment
 const interEnv = new InteractiveEnvironment(scene, world, player, world.hazards, audio);
+projectileManager.setInteractiveEnvironment(interEnv);
 
 // Zipline gun gadget
 const ziplineGun = new ZiplineGun(scene, player, world);
 
 // Advanced drones
-const sniperDrone = new SniperDrone(scene, world, player);
+const sniperDrone = new SniperDrone(scene, world, player, { grapplingHook });
 const swarmDrone = new SwarmDrone(scene, world, player);
 const hunterDrone = new HunterDrone(scene, world, player);
 

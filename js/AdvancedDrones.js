@@ -9,6 +9,7 @@ export class SniperDrone {
         this.scene = scene;
         this.world = world;
         this.player = player;
+        this.grapplingHook = config.grapplingHook || null;
 
         this.position = (config.position !== undefined) ? config.position.clone() : new THREE.Vector3(0, 12, 0);
         this.beamRadius = config.beamRadius ?? 1.0;
@@ -185,6 +186,24 @@ export class SniperDrone {
             const dist = p.mesh.position.distanceTo(this.player.position);
             const hitRadius = (this.player.RADIUS ?? 0.5) + 0.15;
             if (dist < hitRadius) {
+                // Grapple Block: while grappling, projectiles are intercepted
+                if (this.grapplingHook && this.grapplingHook.isActive()) {
+                    // Destroy projectile and spawn block visual
+                    this.removeProjectile(i);
+                    if (this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                        const pos = this.player.position.clone();
+                        pos.y += 1.2;
+                        this.scene.userData.spawnDamageNumber(pos, 'BLOCKED', false, 'energy');
+                    }
+                    // Damage the sniper drone for blocking with grapple
+                    if (!this.health) this.health = 60;
+                    this.health -= 15;
+                    if (this.health <= 0 && this.isAlive) {
+                        this.isAlive = false;
+                        this.scene.remove(this.group);
+                    }
+                    continue;
+                }
                 if (typeof this.player.startStumble === 'function') {
                     this.player.startStumble();
                 }

@@ -11,6 +11,11 @@ export class ProjectileManager {
         this.world = world;
         this.projectiles = [];
         this._tempVec = new THREE.Vector3();
+        this._interactiveEnv = null;
+    }
+
+    setInteractiveEnvironment(ie) {
+        this._interactiveEnv = ie;
     }
 
     /**
@@ -286,6 +291,74 @@ export class ProjectileManager {
                 }
             }
 
+            // Steam Redirect: projectiles passing through steam jets get boosted upward
+            if (!hit && this._interactiveEnv) {
+                for (const jet of this._interactiveEnv.steamJets || []) {
+                    if (jet.timer <= 0) continue;
+                    const dx = p.mesh.position.x - jet.pipe.x;
+                    const dz = p.mesh.position.z - jet.pipe.z;
+                    const dy = p.mesh.position.y - jet.baseY;
+                    const horizDist = Math.hypot(dx, dz);
+                    if (horizDist < 0.9 && dy >= 0 && dy <= jet.height) {
+                        // Boost upward and slow horizontal
+                        p.velocity.y += 18 * dt;
+                        p.velocity.x *= 0.9;
+                        p.velocity.z *= 0.9;
+                        // Tint white to show steam influence
+                        if (p.mesh.material && p.mesh.material.color) {
+                            p.mesh.material.color.lerp(new THREE.Color(0xffffff), 0.1);
+                        }
+                        // Heat-seek toward nearest enemy if in steam long enough
+                        if (!p._steamTime) p._steamTime = 0;
+                        p._steamTime += dt;
+                        if (p._steamTime > 0.2) {
+                            let nearest = null;
+                            let nearestDist = Infinity;
+                            for (const drone of drones) {
+                                if (drone.isDead) continue;
+                                const dPos = drone.position || (drone.mesh && drone.mesh.position);
+                                if (!dPos) continue;
+                                const dist = dPos.distanceTo(p.mesh.position);
+                                if (dist < nearestDist) { nearest = drone; nearestDist = dist; }
+                            }
+                            if (nearest) {
+                                const dPos = nearest.position || (nearest.mesh && nearest.mesh.position);
+                                const seekDir = new THREE.Vector3().subVectors(dPos, p.mesh.position).normalize();
+                                p.velocity.lerp(seekDir.multiplyScalar(p.velocity.length()), 0.15);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Mirror Laser: projectiles reflect off mirror surfaces
+            if (!hit && this._interactiveEnv) {
+                for (const mirror of this._interactiveEnv.mirrors || []) {
+                    const group = mirror.group;
+                    if (!group) continue;
+                    const box = new THREE.Box3().setFromObject(group);
+                    if (box.containsPoint(p.mesh.position) || box.distanceToPoint(p.mesh.position) < p.radius) {
+                        // Compute mirror normal (same formula as InteractiveEnvironment)
+                        const normal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), mirror.rotationY + Math.PI / 4);
+                        const dir = p.velocity.clone().normalize();
+                        const dot = dir.dot(normal);
+                        if (Math.abs(dot) >= 0.01) {
+                            // Reflect: R = D - 2(D·N)N
+                            const reflectDir = dir.clone().sub(normal.clone().multiplyScalar(2 * dot)).normalize();
+                            p.velocity.copy(reflectDir.multiplyScalar(p.velocity.length()));
+                            // Spawn spark visual
+                            this._spawnSpark(p.mesh.position, 0x00ffff);
+                            // Limit to one mirror bounce per projectile
+                            if (!p._mirrorBounces) p._mirrorBounces = 0;
+                            p._mirrorBounces++;
+                            if (p._mirrorBounces >= 2) hit = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
             if (hit) {
                 this._removeProjectile(i);
             }
@@ -323,6 +396,42 @@ export class ProjectileManager {
             mat.opacity = Math.max(0, life / 0.2);
             if (life > 0) requestAnimationFrame(anim);
             else { this.scene.remove(line); geo.dispose(); mat.dispose(); }
+        };
+        anim();
+    }
+
+    _spawnSpark(pos, color) {
+        const geo = new THREE.BufferGeometry();
+        const count = 12;
+        const positions = new Float32Array(count * 3);
+        const velocities = [];
+        for (let i = 0; i < count; i++) {
+            positions[i * 3] = pos.x;
+            positions[i * 3 + 1] = pos.y;
+            positions[i * 3 + 2] = pos.z;
+            velocities.push(new THREE.Vector3(
+                (Math.random() - 0.5) * 4,
+                (Math.random() - 0.5) * 4,
+                (Math.random() - 0.5) * 4
+            ));
+        }
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({ color, size: 0.08, transparent: true, opacity: 0.9 });
+        const points = new THREE.Points(geo, mat);
+        this.scene.add(points);
+        let life = 0.3;
+        const anim = () => {
+            life -= 0.016;
+            const posArr = points.geometry.attributes.position.array;
+            for (let i = 0; i < count; i++) {
+                posArr[i * 3] += velocities[i].x * 0.016;
+                posArr[i * 3 + 1] += velocities[i].y * 0.016;
+                posArr[i * 3 + 2] += velocities[i].z * 0.016;
+            }
+            points.geometry.attributes.position.needsUpdate = true;
+            mat.opacity = Math.max(0, life / 0.3);
+            if (life > 0) requestAnimationFrame(anim);
+            else { this.scene.remove(points); geo.dispose(); mat.dispose(); }
         };
         anim();
     }
