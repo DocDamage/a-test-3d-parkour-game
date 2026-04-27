@@ -1,0 +1,18 @@
+export const Shotgun = {
+    id: 'shotgun',
+    name: 'Combat Shotgun',
+    shortName: 'Shotgun',
+    type: 'projectile',
+    damage: 12,
+    fireRate: 1.5,
+    clipSize: 6,
+    reloadTime: 2.5,
+    ammoType: 'shotgun',
+    projectileSpeed: 45,
+    range: 10,
+    color: 0xffaa00,
+    pellets: 8,
+    spread: 0.15,
+    special: 'spread_close',
+    desc: '8-pellet spread. Devastating at close range.',
+};

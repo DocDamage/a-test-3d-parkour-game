@@ -901,6 +901,7 @@ export class Player {
             const away = this.wallRunData.normal.clone().multiplyScalar(7);
             this.velocity.set(away.x * 1.4, this.JUMP_FORCE * 1.05, away.z * 1.4);
             this.wallRunData = null;
+            this.wallKickJump();
             if (this.audio) this.audio.playJump();
             return;
         }
@@ -960,6 +961,11 @@ export class Player {
             const forward = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
             this.velocity.x += forward.x * 8 * dt;
             this.velocity.z += forward.z * 8 * dt;
+        }
+
+        // Rolling Thunder: invincible tackle through enemies
+        if (this.onRollHit && this.rollTimer > 0) {
+            this.onRollHit(this.position.clone(), this.facing);
         }
 
         if (this.rollTimer <= 0) {
@@ -1063,6 +1069,15 @@ export class Player {
             this.velocity.z += forward.z * 3;
         }
 
+        // Backflip Kick: if jumping with backward input, launch enemy upward
+        if (input) {
+            const moveDir = this.getMoveDir(input, this.facing);
+            const facingDir = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
+            if (moveDir.dot(facingDir) < -0.5 && this.onBackflipKick) {
+                this.onBackflipKick(this.position.clone(), this.facing);
+            }
+        }
+
         this.comboSystem.registerMove('jump');
         if (this.audio) this.audio.playJump();
     }
@@ -1114,6 +1129,11 @@ export class Player {
         }
         this.comboSystem.registerMove('vault');
         if (this.audio) this.audio.playVault();
+
+        // Vault Strike hook — main.js wires hitbox creation
+        if (this.onVaultStrike) {
+            this.onVaultStrike(this.vaultStartPos, this.vaultEndPos, this.facing);
+        }
     }
 
     startWallRun(info) {
@@ -1122,6 +1142,12 @@ export class Player {
         this.wallRunData = info;
         this.airDashUsed = false;
         this.comboSystem.registerMove('wallrun');
+    }
+
+    wallKickJump() {
+        // Called when jumping off wallrun — triggers Wall-Kick Stun
+        const kickDir = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
+        if (this.onWallKick) this.onWallKick(this.position.clone(), kickDir);
     }
 
     startHang(info) {

@@ -36,8 +36,10 @@ import { StatusEffectSystem } from './StatusEffectSystem.js';
 import { EnemyManager } from './EnemyManager.js';
 import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
 import { ArenaMode } from './ArenaMode.js';
+import { BossFabricator } from './bosses/BossFabricator.js';
 import { ConsequenceSystem } from './ConsequenceSystem.js';
 import { DebtSystem } from './DebtSystem.js';
+import { wireSkillCallbacks } from './SkillCallbacks.js';
 import { SpeedrunILs } from './SpeedrunILs.js';
 import { ChallengeSystem } from './ChallengeSystem.js';
 import { GodRays } from './GodRays.js';
@@ -235,542 +237,14 @@ for (const [slot, skillId] of Object.entries(defaultLoadout)) {
     skillSystem.assignSkill(slot, skillId);
 }
 
-// Register skill execution callbacks
-skillSystem.onExecute('light_strike', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
-    // Melee hitbox — same as existing LMB attack
-    const attackDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
-    const offset = attackDir.multiplyScalar(0.8);
-    offset.y = 0.5;
-    const hitbox = new Hitbox(
-        p, 'melee', { type: 'sphere', radius: 0.6 }, offset, 0.15,
-        (hb, target) => {
-            if (target && typeof spawnDamageNumber === 'function') {
-                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 15), false, 'kinetic');
-            }
-            if (target && legendaryPowerSystem) legendaryPowerSystem.onMeleeHit(target);
-        }
-    );
-    hitbox.damage = skill.finalDamage || 15;
-    hitbox.team = 'player';
-    hitboxSystem.registerHitbox(hitbox);
-    if (gamepad && gamepad.rumble) gamepad.rumble(0.1, 0.4, 50);
-});
-
-skillSystem.onExecute('dive_kick', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.heavyAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.heavyAttack);
-    if (p.startDiveKick) p.startDiveKick();
-    // Damage hitbox on landing area
-    const offset = new THREE.Vector3(0, -0.5, 0);
-    const hitbox = new Hitbox(
-        p, 'melee', { type: 'sphere', radius: 1.2 }, offset, 0.3,
-        (hb, target) => {
-            if (target && target.takeDamage) {
-                target.takeDamage(skill.finalDamage || 50, 'kinetic', p);
-            }
-            if (target && typeof spawnDamageNumber === 'function') {
-                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 50), false, 'kinetic');
-            }
-        }
-    );
-    hitbox.damage = skill.finalDamage || 50;
-    hitbox.team = 'player';
-    hitboxSystem.registerHitbox(hitbox);
-});
-
-skillSystem.onExecute('air_dash', (skill, targetPos, p) => {
-    const moveDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
-    if (p.startAirDash) p.startAirDash(moveDir);
-});
-
-skillSystem.onExecute('slide_tackle', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
-    const moveDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
-    if (p.startSlide) p.startSlide(moveDir);
-    // Slide hitbox
-    const hitbox = new Hitbox(
-        p, 'melee', { type: 'sphere', radius: 0.8 }, new THREE.Vector3(0, 0.3, 0), 0.5,
-        (hb, target) => {
-            if (target && target.takeDamage) {
-                target.takeDamage(skill.finalDamage || 30, 'kinetic', p);
-            }
-            if (target && typeof spawnDamageNumber === 'function') {
-                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 30), false, 'kinetic');
-            }
-        }
-    );
-    hitbox.damage = skill.finalDamage || 30;
-    hitbox.team = 'player';
-    hitboxSystem.registerHitbox(hitbox);
-});
-
-skillSystem.onExecute('ground_pound', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.heavyAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.heavyAttack);
-    if (p.startGroundPound) p.startGroundPound();
-    // AoE hitbox on impact — registered now, expires quickly
-    const hitbox = new Hitbox(
-        p, 'explosion', { type: 'sphere', radius: 5.0 }, new THREE.Vector3(0, 0, 0), 0.4,
-        (hb, target) => {
-            if (target && target.takeDamage) {
-                target.takeDamage(skill.finalDamage || 80, 'explosive', p);
-            }
-            if (target && typeof spawnDamageNumber === 'function') {
-                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 80), false, 'explosive');
-            }
-        }
-    );
-    hitbox.damage = skill.finalDamage || 80;
-    hitbox.team = 'player';
-    hitboxSystem.registerHitbox(hitbox);
-    if (gamepad && gamepad.rumble) gamepad.rumble(0.5, 1.0, 200);
-});
-
-// ------------------------------------------------------------------
-// Phase 2 — Operative callbacks
-// ------------------------------------------------------------------
-skillSystem.onExecute('silenced_pistol', (skill, targetPos, p) => {
-    const dir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
-    projectileManager.fire(p.position.clone().add(new THREE.Vector3(0, 1.2, 0)), dir, {
-        speed: 60, range: 25, radius: 0.15, damage: skill.finalDamage || 12,
-        damageType: 'kinetic', color: 0x00ccff,
-        onHit: (target) => {
-            if (target && target.takeDamage) {
-                target.takeDamage(skill.finalDamage || 12, 'kinetic', p);
-            }
-            const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-            spawnDamageNumber(tPos, Math.round(skill.finalDamage || 12), false, 'kinetic');
-        }
-    });
-});
-
-skillSystem.onExecute('ghost_bullet', (skill, targetPos, p) => {
-    const dir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
-    projectileManager.firePiercing(p.position.clone().add(new THREE.Vector3(0, 1.2, 0)), dir, {
-        range: 25, radius: 0.5, damage: skill.finalDamage || 60,
-        damageType: 'energy', color: 0x00ffcc,
-        onHit: (target) => {
-            if (target && target.takeDamage) {
-                target.takeDamage(skill.finalDamage || 60, 'energy', p);
-            }
-            const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-            spawnDamageNumber(tPos, Math.round(skill.finalDamage || 60), false, 'energy');
-        }
-    });
-});
-
-skillSystem.onExecute('predator_vision', (skill, targetPos, p) => {
-    p._predatorVisionActive = true;
-    p._critBonusFromPredator = 0.15;
-    const overlay = document.getElementById('glory-overlay');
-    if (overlay) { overlay.style.background = 'rgba(0,100,255,0.12)'; overlay.style.opacity = '0.12'; }
-    enemyHealthBars.forEach(bar => { if (bar && bar.sprite) bar.sprite.visible = true; });
-    setTimeout(() => {
-        p._predatorVisionActive = false;
-        p._critBonusFromPredator = 0;
-        if (overlay) { overlay.style.background = ''; overlay.style.opacity = '0'; }
-    }, 6000);
-});
-
-skillSystem.onExecute('smoke_bomb', (skill, targetPos, p) => {
-    particleEffects.explosion(p.position.clone(), 0x333333, 15);
-    p.isInvisible = true;
-    const overlay = document.getElementById('glory-overlay');
-    if (overlay) { overlay.style.background = 'rgba(0,0,0,0.4)'; overlay.style.opacity = '0.3'; }
-    const drones = world.drones ? world.drones.drones : [];
-    for (const drone of drones) {
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (pos && pos.distanceTo(p.position) < 4) {
-            drone._smokeBlind = true;
-            setTimeout(() => { drone._smokeBlind = false; }, 3000);
-        }
-    }
-    setTimeout(() => {
-        p.isInvisible = false;
-        if (overlay) { overlay.style.background = ''; overlay.style.opacity = '0'; }
-    }, 3000);
-});
-
-skillSystem.onExecute('assassinate', (skill, targetPos, p) => {
-    const drones = world.drones ? world.drones.drones : [];
-    let nearest = null;
-    let nearestDist = Infinity;
-    for (const drone of drones) {
-        if (drone.isDead) continue;
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (!pos) continue;
-        const dist = pos.distanceTo(p.position);
-        if (dist < 15 && dist < nearestDist) {
-            nearest = drone; nearestDist = dist;
-        }
-    }
-    if (nearest) {
-        const tPos = nearest.position || (nearest.mesh && nearest.mesh.position);
-        const behind = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing)).normalize();
-        p.position.copy(tPos).sub(behind.multiplyScalar(1.2));
-        p.position.y = Math.max(p.position.y, 0.5);
-        const hitbox = new Hitbox(
-            p, 'melee', { type: 'sphere', radius: 0.8 }, new THREE.Vector3(0, 0.3, 0), 0.15,
-            (hb, target) => {
-                if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 200, 'kinetic', p);
-                const tp = target.position || (target.mesh && target.mesh.position) || p.position;
-                spawnDamageNumber(tp, Math.round(skill.finalDamage || 200), false, 'kinetic');
-            }
-        );
-        hitbox.damage = skill.finalDamage || 200;
-        hitbox.team = 'player';
-        hitboxSystem.registerHitbox(hitbox);
-        postProcessing.shake(0.6, 0.3);
-    }
-});
-
-// ------------------------------------------------------------------
-// Phase 2 — Saboteur callbacks
-// ------------------------------------------------------------------
-skillSystem.onExecute('scrap_throw', (skill, targetPos, p) => {
-    const dir = new THREE.Vector3(Math.sin(p.facing), 0.1, Math.cos(p.facing)).normalize();
-    projectileManager.fire(p.position.clone().add(new THREE.Vector3(0, 1.0, 0)), dir, {
-        speed: 25, range: 12, radius: 0.25, damage: skill.finalDamage || 18,
-        damageType: 'kinetic', color: 0xff3333,
-        onHit: (target) => {
-            if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 18, 'kinetic', p);
-            const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-            spawnDamageNumber(tPos, Math.round(skill.finalDamage || 18), false, 'kinetic');
-        }
-    });
-});
-
-skillSystem.onExecute('grenade_toss', (skill, targetPos, p) => {
-    const start = p.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-    const dir = new THREE.Vector3(Math.sin(p.facing), 0.4, Math.cos(p.facing)).normalize();
-    const end = start.clone().add(dir.multiplyScalar(10));
-    // Simple lob arc
-    let t = 0;
-    const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xff3333 })
-    );
-    mesh.position.copy(start);
-    scene.add(mesh);
-    const duration = 1.5;
-    const timer = setInterval(() => {
-        t += 0.05;
-        const frac = Math.min(1, t / duration);
-        mesh.position.lerpVectors(start, end, frac);
-        mesh.position.y += Math.sin(frac * Math.PI) * 3;
-        if (frac >= 1) {
-            clearInterval(timer);
-            scene.remove(mesh);
-            mesh.geometry.dispose(); mesh.material.dispose();
-            particleEffects.explosion(mesh.position.clone(), 0xff5500, 25);
-            const hitbox = new Hitbox(
-                { position: mesh.position }, 'explosion', { type: 'sphere', radius: 4 }, new THREE.Vector3(0, 0, 0), 0.3,
-                (hb, target) => {
-                    if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 55, 'explosive', p);
-                    const tp = target.position || (target.mesh && target.mesh.position) || mesh.position;
-                    spawnDamageNumber(tp, Math.round(skill.finalDamage || 55), false, 'explosive');
-                }
-            );
-            hitbox.damage = skill.finalDamage || 55;
-            hitbox.team = 'player';
-            hitboxSystem.registerHitbox(hitbox);
-        }
-    }, 50);
-});
-
-skillSystem.onExecute('proxy_mine', (skill, targetPos, p) => {
-    const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.3, 0.3),
-        new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.9 })
-    );
-    mesh.position.copy(p.position);
-    mesh.position.y = 0.15;
-    scene.add(mesh);
-    const mine = { mesh, placedAt: performance.now(), exploded: false };
-    if (!world._proximityMines) world._proximityMines = [];
-    world._proximityMines.push(mine);
-    // Auto-remove after 30s
-    setTimeout(() => {
-        if (!mine.exploded) {
-            mine.exploded = true;
-            scene.remove(mesh);
-            mesh.geometry.dispose(); mesh.material.dispose();
-            const idx = world._proximityMines.indexOf(mine);
-            if (idx >= 0) world._proximityMines.splice(idx, 1);
-        }
-    }, 30000);
-});
-
-skillSystem.onExecute('decoy', (skill, targetPos, p) => {
-    const decoyMesh = p.mesh.clone();
-    const forward = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing)).multiplyScalar(3);
-    decoyMesh.position.copy(p.position).add(forward);
-    decoyMesh.position.y = 0.5;
-    scene.add(decoyMesh);
-    const decoy = {
-        mesh: decoyMesh, health: 30, maxHealth: 30, isDead: false, team: 'player',
-        takeDamage(amt) {
-            this.health -= amt;
-            if (this.health <= 0 && !this.isDead) {
-                this.isDead = true;
-                particleEffects.explosion(this.mesh.position.clone(), 0xffaa00, 20);
-                const hb = new Hitbox(
-                    { position: this.mesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3
-                );
-                hb.damage = 30; hb.team = 'player';
-                hitboxSystem.registerHitbox(hb);
-                scene.remove(this.mesh);
-                const idx = world._decoys.indexOf(this);
-                if (idx >= 0) world._decoys.splice(idx, 1);
-            }
-        }
-    };
-    if (!world._decoys) world._decoys = [];
-    world._decoys.push(decoy);
-    // Taunt nearby drones
-    const drones = world.drones ? world.drones.drones : [];
-    for (const drone of drones) {
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (pos && pos.distanceTo(decoyMesh.position) < 10) {
-            drone._decoyTarget = decoy;
-        }
-    }
-    // Explode or despawn after 5s
-    setTimeout(() => {
-        if (!decoy.isDead) {
-            decoy.isDead = true;
-            particleEffects.explosion(decoyMesh.position.clone(), 0xffaa00, 20);
-            const hitbox = new Hitbox(
-                { position: decoyMesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3
-            );
-            hitbox.damage = 30; hitbox.team = 'player';
-            hitboxSystem.registerHitbox(hitbox);
-        }
-        scene.remove(decoyMesh);
-        const idx = world._decoys.indexOf(decoy);
-        if (idx >= 0) world._decoys.splice(idx, 1);
-    }, 5000);
-});
-
-skillSystem.onExecute('zero_cooldown', (skill, targetPos, p) => {
-    skillSystem.setNoCooldown(true);
-    resourceSystem.costMultiplier = 0;
-    setTimeout(() => {
-        skillSystem.setNoCooldown(false);
-        resourceSystem.costMultiplier = 1.0;
-    }, 5000);
-});
-
-// ------------------------------------------------------------------
-// Phase 2 — Specimen callbacks
-// ------------------------------------------------------------------
-skillSystem.onExecute('claw_swipe', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
-    const forward = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
-    let hits = 0;
-    const hitbox = new Hitbox(
-        p, 'melee', { type: 'sphere', radius: 1.5 }, new THREE.Vector3(0, 0.3, 0), 0.2,
-        (hb, target) => {
-            if (hits >= 3) return;
-            const tPos = target.position || (target.mesh && target.mesh.position);
-            if (!tPos) return;
-            const toTarget = tPos.clone().sub(p.position).normalize();
-            const dot = forward.dot(toTarget);
-            if (dot > 0) { // front hemisphere
-                hits++;
-                if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 20, 'kinetic', p);
-                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 20), false, 'kinetic');
-                if (legendaryPowerSystem) legendaryPowerSystem.onMeleeHit(target);
-            }
-        }
-    );
-    hitbox.damage = skill.finalDamage || 20;
-    hitbox.team = 'player';
-    hitboxSystem.registerHitbox(hitbox);
-    if (gamepad && gamepad.rumble) gamepad.rumble(0.1, 0.4, 50);
-});
-
-skillSystem.onExecute('berserk_lunge', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.heavyAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.heavyAttack);
-    const drones = world.drones ? world.drones.drones : [];
-    let nearest = null; let nearestDist = Infinity;
-    for (const drone of drones) {
-        if (drone.isDead) continue;
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (!pos) continue;
-        const dist = pos.distanceTo(p.position);
-        if (dist < 15 && dist < nearestDist) { nearest = drone; nearestDist = dist; }
-    }
-    if (nearest) {
-        const tPos = nearest.position || (nearest.mesh && nearest.mesh.position);
-        p.position.copy(tPos);
-        p.position.y = Math.max(p.position.y, 0.5);
-        postProcessing.shake(0.8, 0.3);
-        const hitbox = new Hitbox(
-            p, 'melee', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3,
-            (hb, target) => {
-                if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 65, 'kinetic', p);
-                const tp = target.position || (target.mesh && target.mesh.position) || p.position;
-                spawnDamageNumber(tp, Math.round(skill.finalDamage || 65), false, 'kinetic');
-            }
-        );
-        hitbox.damage = skill.finalDamage || 65;
-        hitbox.team = 'player';
-        hitboxSystem.registerHitbox(hitbox);
-        if (gamepad && gamepad.rumble) gamepad.rumble(0.5, 1.0, 200);
-    }
-});
-
-skillSystem.onExecute('roar', (skill, targetPos, p) => {
-    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
-    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
-    const drones = world.drones ? world.drones.drones : [];
-    for (const drone of drones) {
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (pos && pos.distanceTo(p.position) < 6) {
-            drone._feared = true;
-            setTimeout(() => { drone._feared = false; }, 2000);
-        }
-    }
-    if (audio && audio.ctx) {
-        const t = audio.ctx.currentTime;
-        const dest = audio._makeDestination();
-        const osc = audio.ctx.createOscillator();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(80, t);
-        osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
-        const gain = audio.ctx.createGain();
-        gain.gain.setValueAtTime(0.25, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-        osc.connect(gain); gain.connect(dest);
-        osc.start(t); osc.stop(t + 0.5);
-    }
-});
-
-skillSystem.onExecute('adrenaline_rush', (skill, targetPos, p) => {
-    p.moveSpeedMultiplier *= 1.5;
-    p._regenPerSecond += 0.05 * p.maxHealth;
-    setTimeout(() => {
-        p.moveSpeedMultiplier /= 1.5;
-        p._regenPerSecond -= 0.05 * p.maxHealth;
-    }, 5000);
-});
-
-skillSystem.onExecute('primal_surge', (skill, targetPos, p) => {
-    characterSheet.addTempBonus('primal_surge', 'damageMultiplier', 1.0, 6);
-    p.moveSpeedMultiplier *= 1.5;
-    p._staggerImmune = true;
-    const overlay = document.getElementById('glory-overlay');
-    if (overlay) { overlay.style.background = 'rgba(255,0,0,0.2)'; overlay.style.opacity = '0.2'; }
-    setTimeout(() => {
-        characterSheet.removeTempBonus('primal_surge');
-        p.moveSpeedMultiplier /= 1.5;
-        p._staggerImmune = false;
-        if (overlay) { overlay.style.background = ''; overlay.style.opacity = '0'; }
-    }, 6000);
-});
-
-// ------------------------------------------------------------------
-// Phase 2 — Netrunner callbacks
-// ------------------------------------------------------------------
-skillSystem.onExecute('zap', (skill, targetPos, p) => {
-    projectileManager.fireChainLightning(p.position.clone().add(new THREE.Vector3(0, 1, 0)), null, {
-        maxChains: 1, jumpRange: 6, damage: skill.finalDamage || 14,
-        damageType: 'electric', color: 0xaa66ff,
-        onHit: (target, dmg) => {
-            if (target && target.takeDamage) target.takeDamage(dmg, 'electric', p);
-            const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
-            spawnDamageNumber(tPos, Math.round(dmg), false, 'electric');
-        }
-    });
-});
-
-skillSystem.onExecute('hack_drone', (skill, targetPos, p) => {
-    const drones = world.drones ? world.drones.drones : [];
-    let nearest = null; let nearestDist = Infinity;
-    for (const drone of drones) {
-        if (drone.isDead || drone.team === 'player') continue;
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (!pos) continue;
-        const dist = pos.distanceTo(p.position);
-        if (dist < 12 && dist < nearestDist) { nearest = drone; nearestDist = dist; }
-    }
-    if (nearest) {
-        nearest.team = 'player';
-        nearest._hackExpiry = 8;
-        spawnDamageNumber((nearest.position || nearest.mesh.position).clone().add(new THREE.Vector3(0, 1, 0)), 'HACKED', false, 'electric');
-    }
-});
-
-skillSystem.onExecute('emp_pulse', (skill, targetPos, p) => {
-    const hitbox = new Hitbox(
-        p, 'explosion', { type: 'sphere', radius: 5 }, new THREE.Vector3(0, 0, 0), 0.3,
-        (hb, target) => {
-            if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 30, 'electric', p);
-            target._disabled = true;
-            setTimeout(() => { target._disabled = false; }, 3000);
-            const tp = target.position || (target.mesh && target.mesh.position) || p.position;
-            spawnDamageNumber(tp, Math.round(skill.finalDamage || 30), false, 'electric');
-        }
-    );
-    hitbox.damage = skill.finalDamage || 30;
-    hitbox.team = 'player';
-    hitboxSystem.registerHitbox(hitbox);
-    // EMP ring visual
-    const ringGeo = new THREE.RingGeometry(0.1, 0.2, 64);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.position.copy(p.position); ring.rotation.x = -Math.PI / 2;
-    scene.add(ring);
-    let life = 0.5;
-    const anim = () => {
-        life -= 0.016;
-        const s = 1 + (0.5 - life) * 20;
-        ring.scale.set(s, s, s);
-        ringMat.opacity = Math.max(0, life / 0.5);
-        if (life > 0) requestAnimationFrame(anim);
-        else { scene.remove(ring); ringGeo.dispose(); ringMat.dispose(); }
-    };
-    anim();
-});
-
-skillSystem.onExecute('firewall', (skill, targetPos, p) => {
-    p._firewallActive = true;
-    const geo = new THREE.SphereGeometry(1.2, 16, 16);
-    const mat = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.25, wireframe: true });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(p.position);
-    scene.add(mesh);
-    const interval = setInterval(() => {
-        mesh.position.copy(p.position);
-    }, 16);
-    setTimeout(() => {
-        clearInterval(interval);
-        p._firewallActive = false;
-        scene.remove(mesh);
-        geo.dispose(); mat.dispose();
-    }, 4000);
-});
-
-skillSystem.onExecute('swarm_override', (skill, targetPos, p) => {
-    const drones = world.drones ? world.drones.drones : [];
-    for (const drone of drones) {
-        const pos = drone.position || (drone.mesh && drone.mesh.position);
-        if (!pos || pos.distanceTo(p.position) > 15) continue;
-        drone.team = 'player';
-        drone._hackExpiry = 8;
-        // Purple burst
-        particleEffects.explosion(pos.clone(), 0xaa66ff, 8);
-    }
+// Wire all 25 skill execution callbacks (extracted to keep main.js under limit)
+wireSkillCallbacks({
+    skillSystem, staminaSystem, Hitbox, hitboxSystem,
+    world, player, projectileManager, resourceSystem,
+    particleEffects, legendaryPowerSystem, gamepad,
+    scene, audio, spawnDamageNumber, activeArchetypeId,
+    nephalemGlory, enemyHealthBars, characterSheet,
+    postProcessing
 });
 
 const skillBarUI = new SkillBarUI(skillSystem, resourceSystem);
@@ -862,6 +336,66 @@ player.onJump = (isDoubleJump) => {
 
 player.onPerfectParry = (source) => {
     if (legendaryPowerSystem) legendaryPowerSystem.onPerfectParry();
+};
+
+// Parkour-integrated melee callbacks
+player.onVaultStrike = (startPos, endPos, facing) => {
+    // Vault over enemy = elbow drop behind them
+    const mid = new THREE.Vector3().lerpVectors(startPos, endPos, 0.5);
+    const hitbox = new Hitbox(player, 'melee', { type: 'sphere', radius: 1.0 }, new THREE.Vector3(0, 0.5, 0), 0.2, (hb, target) => {
+        if (target && target.takeDamage) {
+            target.takeDamage(20, 'kinetic', player);
+            spawnDamageNumber(target.position || target.mesh.position, 20, false, 'kinetic');
+        }
+    });
+    hitbox.damage = 20; hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+};
+
+player.onWallKick = (pos, dir) => {
+    // Boot to face — stun enemy in front of wall
+    const offset = dir.clone().multiplyScalar(1.2);
+    offset.y = 0.5;
+    const hitbox = new Hitbox(player, 'melee', { type: 'sphere', radius: 1.0 }, offset, 0.15, (hb, target) => {
+        if (target && target.takeDamage) {
+            target.takeDamage(20, 'kinetic', player);
+            if (target._stunTimer !== undefined) target._stunTimer = 3.0;
+            spawnDamageNumber(target.position || target.mesh.position, 20, false, 'kinetic');
+        }
+    });
+    hitbox.damage = 20; hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+};
+
+player.onRollHit = (pos, facing) => {
+    // Rolling Thunder: invincible tackle
+    const dir = new THREE.Vector3(Math.sin(facing), 0, Math.cos(facing));
+    const offset = dir.clone().multiplyScalar(0.8);
+    offset.y = 0.3;
+    const hitbox = new Hitbox(player, 'melee', { type: 'sphere', radius: 0.7 }, offset, 0.05, (hb, target) => {
+        if (target && target.takeDamage) {
+            target.takeDamage(10, 'kinetic', player);
+            spawnDamageNumber(target.position || target.mesh.position, 10, false, 'kinetic');
+        }
+    });
+    hitbox.damage = 10; hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+};
+
+player.onBackflipKick = (pos, facing) => {
+    // Launch enemy upward
+    const dir = new THREE.Vector3(Math.sin(facing), 0, Math.cos(facing)).negate();
+    const offset = dir.clone().multiplyScalar(1.0);
+    offset.y = 0.5;
+    const hitbox = new Hitbox(player, 'melee', { type: 'sphere', radius: 1.0 }, offset, 0.15, (hb, target) => {
+        if (target && target.takeDamage) {
+            target.takeDamage(20, 'kinetic', player);
+            if (target.velocity) target.velocity.y += 8; // launch upward
+            spawnDamageNumber(target.position || target.mesh.position, 20, false, 'kinetic');
+        }
+    });
+    hitbox.damage = 20; hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
 };
 
 // Hint system
@@ -1736,7 +1270,32 @@ function animate() {
         challenges.update(finalDt);
         challenges.updateMovementTime(finalDt, player.state === 'SPRINT');
         if (player.state === 'SPRINT' && legendaryPowerSystem) legendaryPowerSystem.onSprint(finalDt);
-        
+
+        // Sprint Shoulder Bash: auto-trigger when sprinting into enemy
+        if (player.state === 'SPRINT') {
+            if (!player._shoulderBashCooldown) player._shoulderBashCooldown = 0;
+            player._shoulderBashCooldown -= finalDt;
+            if (player._shoulderBashCooldown <= 0) {
+                const allEnemies = [
+                    ...(world.drones ? world.drones.drones : []),
+                    ...(enemyManager ? enemyManager.enemies : [])
+                ];
+                for (const e of allEnemies) {
+                    if (e.isDead || e.team === 'player') continue;
+                    const pos = e.position || (e.mesh && e.mesh.position);
+                    if (!pos) continue;
+                    const dist = player.position.distanceTo(pos);
+                    if (dist < 1.5) {
+                        if (e.takeDamage) e.takeDamage(25, 'kinetic', player);
+                        spawnDamageNumber(pos.clone().add(new THREE.Vector3(0, 1, 0)), 25, false, 'kinetic');
+                        if (gamepad && gamepad.rumble) gamepad.rumble(0.3, 0.6, 80);
+                        player._shoulderBashCooldown = 1.0;
+                        break;
+                    }
+                }
+            }
+        }
+
         // RPG systems update
         if (archetype) archetype.update(dt);
         if (progression) progression.update(dt);

@@ -1,0 +1,16 @@
+export const StickyBomb = {
+    id: 'sticky_bomb',
+    name: 'Sticky Bomb',
+    shortName: 'Sticky',
+    type: 'projectile',
+    damage: 60,
+    fireRate: 1,
+    clipSize: 3,
+    reloadTime: 3.0,
+    ammoType: 'gadget',
+    projectileSpeed: 15,
+    range: 15,
+    color: 0xff3300,
+    special: 'sticky_detonate',
+    desc: 'Sticks to surfaces or enemies. Detonate with E or timer.',
+};

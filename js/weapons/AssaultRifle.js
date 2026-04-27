@@ -1,0 +1,16 @@
+export const AssaultRifle = {
+    id: 'assault_rifle',
+    name: 'Assault Rifle',
+    shortName: 'AR',
+    type: 'projectile',
+    damage: 18,
+    fireRate: 10,
+    clipSize: 30,
+    reloadTime: 2.0,
+    ammoType: 'rifle',
+    projectileSpeed: 80,
+    range: 40,
+    color: 0x88ff88,
+    special: 'full_auto',
+    desc: 'Full-auto rifle. Reliable at all ranges.',
+};

@@ -1,0 +1,16 @@
+export const SemiAutoPistol = {
+    id: 'semi_auto_pistol',
+    name: 'Semi-Auto Pistol',
+    shortName: 'Pistol',
+    type: 'projectile',
+    damage: 15,
+    fireRate: 5,
+    clipSize: 12,
+    reloadTime: 1.2,
+    ammoType: 'pistol',
+    projectileSpeed: 60,
+    range: 25,
+    color: 0xcccccc,
+    special: 'headshot_2x',
+    desc: 'Reliable sidearm. Headshots deal double damage.',
+};
