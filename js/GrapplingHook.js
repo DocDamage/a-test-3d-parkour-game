@@ -282,7 +282,68 @@ export class GrapplingHook {
     getAimValid() {
         return this.aimValid;
     }
-    
+
+    /**
+     * Grapple Pull: if aiming at an enemy, yank them toward player.
+     * Returns true if an enemy was pulled.
+     */
+    pullEnemy() {
+        if (this.state !== 'AIM') return null;
+        const origin = this.player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+        const ray = new THREE.Ray(origin, this.aimDirection);
+
+        const drones = this.world?.drones?.drones || [];
+        let bestEnemy = null;
+        let bestDist = this.MAX_RANGE;
+
+        for (const drone of drones) {
+            if (drone.isDead || drone.team === 'player') continue;
+            const pos = drone.position || (drone.mesh && drone.mesh.position);
+            if (!pos) continue;
+            const dist = origin.distanceTo(pos);
+            if (dist > this.MAX_RANGE) continue;
+            // Check if enemy is roughly in aim direction
+            const toEnemy = pos.clone().sub(origin).normalize();
+            if (toEnemy.dot(this.aimDirection) > 0.85) {
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestEnemy = drone;
+                }
+            }
+        }
+
+        if (!bestEnemy) return null;
+
+        // Yank enemy toward player
+        const ePos = bestEnemy.position || (bestEnemy.mesh && bestEnemy.mesh.position);
+        if (!ePos) return null;
+
+        const pullDir = origin.clone().sub(ePos).normalize();
+        const pullForce = 15;
+
+        // Animate pull
+        let t = 0;
+        const startPos = ePos.clone();
+        const endPos = origin.clone().add(pullDir.clone().multiplyScalar(1.5));
+        const anim = () => {
+            t += 0.05;
+            if (t >= 1) {
+                ePos.copy(endPos);
+                if (bestEnemy.takeDamage) bestEnemy.takeDamage(20, 'kinetic', this.player);
+                return;
+            }
+            const frac = 1 - Math.pow(1 - t, 2); // ease out
+            ePos.lerpVectors(startPos, endPos, frac);
+            requestAnimationFrame(anim);
+        };
+        anim();
+
+        this.state = 'IDLE';
+        this.cooldownTimer = this.COOLDOWN;
+        this._hideCable();
+        return bestEnemy;
+    }
+
     dispose() {
         this.scene.remove(this.cableLine);
         this.cableLine.geometry.dispose();

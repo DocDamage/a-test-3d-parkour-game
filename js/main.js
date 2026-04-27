@@ -15,6 +15,7 @@ import { OverclockSystem } from './OverclockSystem.js';
 import { MagnetBoots } from './MagnetBoots.js';
 import { ChainGrappleRelays } from './ChainGrappleRelays.js';
 import { DroneTakedown } from './DroneTakedown.js';
+import { ZiplineGun } from './ZiplineGun.js';
 import { WeatherGameplay } from './WeatherGameplay.js';
 import { PowerUpSystem } from './PowerUpSystem.js';
 import { HologramPlatforms } from './HologramPlatforms.js';
@@ -707,6 +708,9 @@ const advMovement = new AdvancedMovement(player, scene, audio, tpc);
 // Interactive environment
 const interEnv = new InteractiveEnvironment(scene, world, player, world.hazards, audio);
 
+// Zipline gun gadget
+const ziplineGun = new ZiplineGun(scene, player, world);
+
 // Advanced drones
 const sniperDrone = new SniperDrone(scene, world, player);
 const swarmDrone = new SwarmDrone(scene, world, player);
@@ -797,6 +801,9 @@ interEnv.addSteamPipe(25, 2, -15, 'y');
 interEnv.addMirror(-10, 1.5, -30, 0);
 interEnv.addMirror(-10, 1.5, -28, Math.PI/2);
 interEnv.addCraneHook(0, 8, 35);
+interEnv.addExplosiveBarrel(10, 0, 15);
+interEnv.addExplosiveBarrel(-12, 0, 8);
+interEnv.addExplosiveBarrel(25, 0, -20);
 
 // Place new world features
 world.placeZiplines(ziplines);
@@ -1178,6 +1185,21 @@ function animate() {
         
         // Interactive environment
         interEnv.update(finalDt, activeInput);
+        ziplineGun.update(finalDt);
+
+        // Zipline Gun: Mouse2 aim + Mouse1 fire at enemy
+        if (grapplingHook && grapplingHook.isAiming() && activeInput.wasPressed('Mouse1')) {
+            ziplineGun.fire(player.facingDirection || new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)));
+        }
+
+        // Grapple Pull: Q while grappling aims at enemy
+        if (grapplingHook && grapplingHook.isAiming() && activeInput.wasPressed('KeyQ')) {
+            const pulled = grapplingHook.pullEnemy();
+            if (pulled && spawnDamageNumber) {
+                const pPos = pulled.position || (pulled.mesh && pulled.mesh.position);
+                if (pPos) spawnDamageNumber(pPos.clone().add(new THREE.Vector3(0, 1, 0)), 'YANKED', false, 'kinetic');
+            }
+        }
         
         // Advanced drones
         sniperDrone.update(finalDt);

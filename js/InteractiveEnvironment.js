@@ -22,6 +22,7 @@ export class InteractiveEnvironment {
         this.steamJets = [];
         this.reflectedBeams = [];
         this.particleSystems = [];
+        this.barrels = [];
 
         // Ensure grapple points array exists for the existing grapple system
         if (!this.world.grapplePoints) {
@@ -218,7 +219,123 @@ export class InteractiveEnvironment {
         this.updateCraneHooks(dt);
         this.updateSteamJets(dt);
         this.updateReflectedLasers(dt);
+        this.updateBarrels(dt);
         this.updateParticles(dt);
+    }
+
+    // --------------------------------------------------------
+    //  EXPLOSIVE BARRELS
+    // --------------------------------------------------------
+
+    addExplosiveBarrel(x, y, z) {
+        const geo = new THREE.CylinderGeometry(0.35, 0.35, 0.9, 16);
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xcc2200,
+            roughness: 0.4,
+            metalness: 0.3,
+            emissive: 0x440000,
+            emissiveIntensity: 0.2
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y + 0.45, z);
+        mesh.castShadow = true;
+        mesh.userData.isBarrel = true;
+
+        // Warning stripe
+        const stripeGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.15, 16);
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+        stripe.position.y = 0.2;
+        mesh.add(stripe);
+
+        this.scene.add(mesh);
+        this.world.collidables.push(mesh);
+
+        this.barrels.push({
+            mesh,
+            x, y: y + 0.45, z,
+            exploded: false,
+            fuseSpark: null
+        });
+    }
+
+    updateBarrels(dt) {
+        for (const barrel of this.barrels) {
+            if (barrel.exploded) continue;
+
+            const p = this.player.position;
+            const dist = new THREE.Vector3(p.x, p.y + this.player.currentHeight / 2, p.z).distanceTo(new THREE.Vector3(barrel.x, barrel.y, barrel.z));
+
+            // Sprint into barrel = kick as projectile
+            if (dist < 0.8 + this.player.RADIUS && this.player.state === 'SPRINT') {
+                this._kickBarrel(barrel);
+            }
+        }
+    }
+
+    _kickBarrel(barrel) {
+        barrel.exploded = true;
+
+        // Remove from collidables
+        const idx = this.world.collidables.indexOf(barrel.mesh);
+        if (idx !== -1) this.world.collidables.splice(idx, 1);
+
+        // Launch barrel forward
+        const dir = new THREE.Vector3(Math.sin(this.player.facing), 0.3, Math.cos(this.player.facing)).normalize();
+        const speed = 12;
+        let pos = barrel.mesh.position.clone();
+        const vel = dir.clone().multiplyScalar(speed);
+
+        // Animate tumbling barrel
+        const rotVel = new THREE.Vector3(Math.random() * 4, Math.random() * 4, Math.random() * 4);
+        let life = 1.5;
+        const anim = () => {
+            life -= 0.016;
+            pos.add(vel.clone().multiplyScalar(0.016));
+            vel.y -= 9.8 * 0.016;
+            barrel.mesh.position.copy(pos);
+            barrel.mesh.rotation.x += rotVel.x * 0.016;
+            barrel.mesh.rotation.y += rotVel.y * 0.016;
+            barrel.mesh.rotation.z += rotVel.z * 0.016;
+
+            // Ground bounce
+            if (pos.y < 0.45) {
+                pos.y = 0.45;
+                vel.y *= -0.5;
+                vel.x *= 0.8;
+                vel.z *= 0.8;
+            }
+
+            if (life > 0) requestAnimationFrame(anim);
+            else this._explodeBarrel(barrel, pos);
+        };
+        anim();
+    }
+
+    _explodeBarrel(barrel, pos) {
+        // AOE damage
+        const drones = this.world?.drones?.drones || [];
+        for (const drone of drones) {
+            if (drone.isDead) continue;
+            const dPos = drone.position || (drone.mesh && drone.mesh.position);
+            if (!dPos) continue;
+            if (dPos.distanceTo(pos) < 4) {
+                if (drone.takeDamage) drone.takeDamage(50, 'explosive', null);
+            }
+        }
+
+        // Player damage if too close
+        if (this.player.position.distanceTo(pos) < 4) {
+            if (this.player.takeDamage) this.player.takeDamage(30, 'explosive', null);
+        }
+
+        // Visuals
+        this.spawnParticles(pos.x, pos.y, pos.z, 0xff5500, 40, 6);
+        this._playMetalCrash(pos.x, pos.y, pos.z);
+
+        this.scene.remove(barrel.mesh);
+        barrel.mesh.geometry.dispose();
+        barrel.mesh.material.dispose();
     }
 
     // --------------------------------------------------------

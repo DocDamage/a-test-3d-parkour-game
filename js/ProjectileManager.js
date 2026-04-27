@@ -93,6 +93,112 @@ export class ProjectileManager {
     }
 
     /**
+     * Fire a ricocheting disk projectile that bounces off collidables up to N times.
+     * @param {THREE.Vector3} origin
+     * @param {THREE.Vector3} direction
+     * @param {object} config
+     * @param {number} config.bounces — max ricochets (default 3)
+     */
+    fireRicochet(origin, direction, config = {}) {
+        const speed = config.speed ?? 30;
+        const bounces = config.bounces ?? 3;
+        const radius = config.radius ?? 0.25;
+        const color = config.color ?? 0xccff00;
+        const damage = config.damage ?? 15;
+        const damageType = config.damageType ?? 'kinetic';
+        const onHit = config.onHit || null;
+
+        const collidables = this.world?.collidables || [];
+        const drones = this.world?.drones?.drones || [];
+
+        let pos = origin.clone();
+        let dir = direction.clone().normalize();
+        let remainingBounces = bounces;
+        let hitEnemies = new Set();
+
+        // Visual disk mesh
+        const geo = new THREE.CylinderGeometry(radius, radius, 0.08, 16);
+        geo.rotateX(Math.PI / 2);
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        this.scene.add(mesh);
+
+        const step = 0.05;
+        const maxSteps = 600; // 30 units at 0.05 per step
+        let steps = 0;
+        let alive = true;
+
+        const anim = () => {
+            if (!alive || steps >= maxSteps) {
+                this.scene.remove(mesh);
+                geo.dispose();
+                mat.dispose();
+                return;
+            }
+            steps++;
+
+            const nextPos = pos.clone().add(dir.clone().multiplyScalar(speed * step));
+
+            // Check enemy hits
+            for (const drone of drones) {
+                if (drone.isDead || hitEnemies.has(drone)) continue;
+                const dPos = drone.position || (drone.mesh && drone.mesh.position);
+                if (!dPos) continue;
+                if (dPos.distanceTo(nextPos) < radius + 0.5) {
+                    hitEnemies.add(drone);
+                    if (onHit) onHit(drone);
+                    else if (drone.takeDamage) drone.takeDamage(damage, damageType, null);
+                }
+            }
+
+            // Check collidable bounce
+            let bounced = false;
+            for (const obj of collidables) {
+                const box = new THREE.Box3().setFromObject(obj);
+                if (box.containsPoint(nextPos) || box.distanceToPoint(nextPos) < radius) {
+                    if (remainingBounces > 0) {
+                        // Simple reflection: reverse closest axis
+                        const center = box.getCenter(new THREE.Vector3());
+                        const dx = Math.abs(nextPos.x - center.x);
+                        const dy = Math.abs(nextPos.y - center.y);
+                        const dz = Math.abs(nextPos.z - center.z);
+                        const normal = new THREE.Vector3();
+                        if (dx >= dy && dx >= dz) normal.set(dir.x > 0 ? -1 : 1, 0, 0);
+                        else if (dy >= dx && dy >= dz) normal.set(0, dir.y > 0 ? -1 : 1, 0);
+                        else normal.set(0, 0, dir.z > 0 ? -1 : 1);
+                        dir.reflect(normal).normalize();
+                        remainingBounces--;
+                        bounced = true;
+                        // Spark effect
+                        this._spawnArc(pos, nextPos, color);
+                    } else {
+                        alive = false;
+                    }
+                    break;
+                }
+            }
+
+            if (!bounced) {
+                pos.copy(nextPos);
+                mesh.position.copy(pos);
+                mesh.rotation.z += 0.3;
+            }
+
+            // Range limit
+            if (pos.distanceTo(origin) > (config.range ?? 40)) alive = false;
+
+            if (alive) requestAnimationFrame(anim);
+            else {
+                this.scene.remove(mesh);
+                geo.dispose();
+                mat.dispose();
+            }
+        };
+        anim();
+    }
+
+    /**
      * Chain lightning: hops from origin to nearest enemy, then chains.
      */
     fireChainLightning(origin, targets, config = {}) {
