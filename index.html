@@ -408,6 +408,161 @@
             pointer-events: none;
         }
 
+        /* Character Panel */
+        #character-panel {
+            position: fixed;
+            top: 20px;
+            left: 340px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 16px;
+            border-radius: 10px;
+            user-select: none;
+            pointer-events: none;
+            z-index: 10;
+            max-width: 260px;
+            display: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #character-panel h2 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #ffaa00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        #character-panel .xp-bar-wrap {
+            width: 100%;
+            height: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        #character-panel .xp-bar-fill {
+            height: 100%;
+            background: #ffaa00;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        #character-panel .stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin: 4px 0;
+            color: #ccc;
+        }
+        #character-panel .stat-row span {
+            color: #0f0;
+            font-weight: bold;
+        }
+        #character-panel .info-row {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        #character-panel .info-row strong {
+            color: #ffaa00;
+        }
+        #character-panel .resource-bar-wrap {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        #character-panel .resource-bar-fill {
+            height: 100%;
+            background: #00ccff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Character Creation Overlay */
+        #char-create {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #char-create h2 {
+            font-size: 36px;
+            color: #ffaa00;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+        #char-create .cc-section {
+            margin-bottom: 20px;
+            width: 90%;
+            max-width: 600px;
+        }
+        #char-create .cc-section h3 {
+            font-size: 20px;
+            color: #ffaa00;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 6px;
+        }
+        #char-create .cc-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        #char-create .cc-option {
+            background: #1a1a22;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            min-width: 120px;
+        }
+        #char-create .cc-option:hover {
+            background: #2a2a35;
+            border-color: #ffaa00;
+        }
+        #char-create .cc-option.selected {
+            background: #ffaa00;
+            color: #111;
+            border-color: #ffaa00;
+            font-weight: bold;
+        }
+        #char-create .cc-desc {
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+            margin-top: 8px;
+            min-height: 20px;
+        }
+        #char-create button {
+            padding: 12px 32px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #ffaa00;
+            color: #111;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        #char-create button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+
         /* Boss Fight UI */
         #boss-hud {
             position: fixed;
@@ -439,6 +594,40 @@
             width: 100%; height: 100%;
             background: linear-gradient(90deg, #ff0000, #ff6600);
             transition: width 0.3s;
+        }
+        /* Player Health Bar */
+        #player-health-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 20;
+            display: none;
+            pointer-events: none;
+        }
+        #player-health-fill {
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, #ff3333, #ff6666);
+            transition: width 0.2s;
+        }
+        #player-health-text {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+            z-index: 21;
+            display: none;
+            pointer-events: none;
         }
         #boss-phase {
             color: #ffaa00;
@@ -487,6 +676,311 @@
             color: #111;
             font-weight: bold;
         }
+        /* === RPG Gear Panel === */
+        #gear-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 220px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 16px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(255, 170, 0, 0.3);
+        }
+        #gear-panel h2 {
+            font-size: 14px;
+            color: #ffaa00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 6px;
+        }
+        .gear-slot {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 12px;
+        }
+        .gear-slot .slot-name {
+            color: #888;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+        .gear-slot .item-name {
+            color: #0f0;
+            font-weight: bold;
+        }
+        .gear-slot .item-name.empty {
+            color: #555;
+        }
+
+        /* === Companion Panel === */
+        #companion-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            padding: 10px 20px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            text-align: center;
+            min-width: 200px;
+        }
+        #companion-panel h2 {
+            font-size: 12px;
+            color: #0ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+        .companion-row {
+            font-size: 12px;
+            color: #ccc;
+            margin: 2px 0;
+        }
+        .companion-row strong {
+            color: #fff;
+        }
+
+        /* === Faction Panel === */
+        #faction-panel {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            padding: 12px 20px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            text-align: center;
+        }
+        #faction-panel h2 {
+            font-size: 12px;
+            color: #f44;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        .faction-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            margin: 4px 0;
+        }
+        .faction-bar {
+            width: 100px;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .faction-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        /* === RPG Safehouse Panel === */
+        #safehouse-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 24px;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 20;
+            display: none;
+            border: 1px solid rgba(255, 170, 0, 0.4);
+        }
+        #safehouse-panel h2 {
+            font-size: 18px;
+            color: #ffaa00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .sh-upgrade {
+            padding: 10px;
+            margin: 6px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .sh-upgrade .name {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+        .sh-upgrade .level {
+            color: #888;
+            float: right;
+        }
+
+        /* === RPG Bounty Panel === */
+        #bounty-panel {
+            position: fixed;
+            top: 20px;
+            right: 260px;
+            width: 240px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 16px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+        #bounty-panel h2 {
+            font-size: 14px;
+            color: #f44;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .bounty-contract {
+            padding: 8px;
+            margin: 4px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        /* === RPG Codex Panel === */
+        #codex-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 280px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 16px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+        #codex-panel h2 {
+            font-size: 14px;
+            color: #0ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .codex-entry {
+            padding: 6px;
+            margin: 3px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .codex-entry.unlocked {
+            border-left: 3px solid #0ff;
+        }
+        .codex-entry.locked {
+            color: #555;
+            border-left: 3px solid #333;
+        }
+
+        /* === RPG Mastery Panel === */
+        #mastery-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 260px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 16px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(255, 170, 0, 0.3);
+        }
+        #mastery-panel h2 {
+            font-size: 14px;
+            color: #ffaa00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .mastery-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* === RPG Implants Panel === */
+        #implants-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 360px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 24px;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 20;
+            display: none;
+            border: 1px solid rgba(255, 0, 255, 0.4);
+        }
+        #implants-panel h2 {
+            font-size: 18px;
+            color: #f0f;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .implant-slot {
+            padding: 10px;
+            margin: 6px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .implant-slot .slot-name {
+            color: #f0f;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
     </style>
     <script type="importmap">
     {
@@ -498,12 +992,44 @@
     </script>
 </head>
 <body>
+    <!-- Character Creation Overlay -->
+    <div id="char-create">
+        <h2>Create Your Runner</h2>
+        <div class="cc-section">
+            <h3>Origin</h3>
+            <div class="cc-options" id="origin-options"></div>
+            <p class="cc-desc" id="origin-desc">Select an origin.</p>
+        </div>
+        <div class="cc-section">
+            <h3>Primary Archetype</h3>
+            <div class="cc-options" id="archetype-options"></div>
+            <p class="cc-desc" id="archetype-desc">Select an archetype.</p>
+        </div>
+        <button id="cc-confirm" disabled>Confirm & Start</button>
+    </div>
+
     <div id="start-screen">
         <h1>Warehouse Parkour</h1>
         <p>Click anywhere to start</p>
         <div class="click-hint">Mouse to look • WASD to move • Space to jump/climb</div>
     </div>
     
+    <div id="character-panel">
+        <h2>Character</h2>
+        <div>Level <span id="char-level">1</span></div>
+        <div class="xp-bar-wrap"><div class="xp-bar-fill" id="char-xp-fill"></div></div>
+        <div class="stat-row">MOB <span id="char-mob">10</span></div>
+        <div class="stat-row">REF <span id="char-ref">10</span></div>
+        <div class="stat-row">SYN <span id="char-syn">10</span></div>
+        <div class="stat-row">FOR <span id="char-for">10</span></div>
+        <div class="stat-row">TEC <span id="char-tec">10</span></div>
+        <div class="stat-row">GUT <span id="char-gut">10</span></div>
+        <div class="info-row">Archetype: <strong id="char-archetype">-</strong></div>
+        <div class="info-row">Origin: <strong id="char-origin">-</strong></div>
+        <div class="info-row">Momentum</div>
+        <div class="resource-bar-wrap"><div class="resource-bar-fill" id="char-resource-fill"></div></div>
+    </div>
+
     <div id="ui" style="display: none;">
         <h1>Parkour Controls</h1>
         <div class="controls">
@@ -517,7 +1043,8 @@
             <span>F</span> Drone Takedown (wall-run)<br>
             <span>E</span> Drop / Interact<br>
             <span>T</span> Time Trial<br>
-            <span>P</span> Rising Tide Mode<br>
+            <span>O</span> Rising Tide Mode<br>
+            <span>P</span> Character Panel<br>
             <span>SHIFT+P</span> Assist Mode<br>
             <span>N</span> Day/Night/Neon<br>
             <span>F12</span> Photo Mode<br>
@@ -544,6 +1071,11 @@
         <div class="state">
             State: <span id="state-display">IDLE</span><br>
             Speed: <span id="speed-display">0</span> km/h
+        </div>
+        <div class="rpg" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);font-size:12px;color:#888;">
+            Level: <span id="level-display" style="color:#ffaa00;font-weight:bold;">1</span><br>
+            XP: <span id="xp-display" style="color:#0f0;font-weight:bold;">0%</span><br>
+            AP: <span id="ap-display" style="color:#0af;font-weight:bold;">0</span>
         </div>
     </div>
     <div id="crosshair" style="display: none;"></div>
@@ -610,12 +1142,183 @@
         <div id="boss-health-bar"><div id="boss-health-fill"></div></div>
         <div id="boss-phase">Phase 1: Ground Supremacy</div>
     </div>
+    <div id="player-health-bar"><div id="player-health-fill"></div></div>
+    <div id="player-health-text">100 / 100</div>
+
     <div id="boss-victory">
         <h2>Arena Cleared!</h2>
         <div class="stat" id="boss-time">Time: 00:00</div>
         <div class="stat" id="boss-hits">Hits Taken: 0</div>
         <div class="grade" id="boss-grade">S</div>
         <button id="boss-exit">Return to Warehouse</button>
+    </div>
+
+    <script>
+    (function() {
+        const origins = [
+            { id: 'street_kid', name: 'Street Kid', desc: 'Grew up in the sprawl. Bonus to MOB and GUT.' },
+            { id: 'corp_exile', name: 'Corp Exile', desc: 'Former corporate security. Bonus to TEC and REF.' },
+            { id: 'nomad', name: 'Nomad', desc: 'Traveled the wastes. Bonus to FOR and MOB.' },
+            { id: 'netrunner', name: 'Netrunner', desc: 'Digital ghost. Bonus to SYN and TEC.' }
+        ];
+        const archetypes = [
+            { id: 'traceur', name: 'Traceur', desc: 'Master of movement. Bonus to MOB and REF.' },
+            { id: 'brawler', name: 'Brawler', desc: 'Heavy hitter. Bonus to FOR and GUT.' },
+            { id: 'ghost', name: 'Ghost', desc: 'Unseen operative. Bonus to REF and SYN.' },
+            { id: 'engineer', name: 'Engineer', desc: 'Tech specialist. Bonus to TEC and SYN.' },
+            { id: 'saboteur', name: 'Saboteur', desc: 'Chaos agent. Bonus to TEC and GUT.' }
+        ];
+
+        const charCreate = document.getElementById('char-create');
+        const startScreen = document.getElementById('start-screen');
+        const originOptions = document.getElementById('origin-options');
+        const archetypeOptions = document.getElementById('archetype-options');
+        const originDesc = document.getElementById('origin-desc');
+        const archetypeDesc = document.getElementById('archetype-desc');
+        const confirmBtn = document.getElementById('cc-confirm');
+
+        let selectedOrigin = null;
+        let selectedArchetype = null;
+
+        function renderOptions(container, items, type) {
+            container.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'cc-option';
+                div.textContent = item.name;
+                div.dataset.id = item.id;
+                div.addEventListener('click', () => {
+                    container.querySelectorAll('.cc-option').forEach(o => o.classList.remove('selected'));
+                    div.classList.add('selected');
+                    if (type === 'origin') {
+                        selectedOrigin = item.id;
+                        originDesc.textContent = item.desc;
+                    } else {
+                        selectedArchetype = item.id;
+                        archetypeDesc.textContent = item.desc;
+                    }
+                    confirmBtn.disabled = !(selectedOrigin && selectedArchetype);
+                });
+                container.appendChild(div);
+            });
+        }
+
+        renderOptions(originOptions, origins, 'origin');
+        renderOptions(archetypeOptions, archetypes, 'archetype');
+
+        confirmBtn.addEventListener('click', () => {
+            if (!selectedOrigin || !selectedArchetype) return;
+            sessionStorage.setItem('rpg_origin', selectedOrigin);
+            sessionStorage.setItem('rpg_archetype', selectedArchetype);
+            charCreate.style.display = 'none';
+            startScreen.style.display = 'flex';
+        });
+
+        if (sessionStorage.getItem('rpg_origin') && sessionStorage.getItem('rpg_archetype')) {
+            charCreate.style.display = 'none';
+            startScreen.style.display = 'flex';
+        } else {
+            startScreen.style.display = 'none';
+        }
+    })();
+    </script>
+    <!-- RPG Gear Panel -->
+    <div id="gear-panel">
+        <h2>Exo-Suit</h2>
+        <div class="gear-slot">
+            <span class="slot-name">Frame</span>
+            <span class="item-name empty" id="gear-frame">Empty</span>
+        </div>
+        <div class="gear-slot">
+            <span class="slot-name">Boots</span>
+            <span class="item-name empty" id="gear-boots">Empty</span>
+        </div>
+        <div class="gear-slot">
+            <span class="slot-name">Gloves</span>
+            <span class="item-name empty" id="gear-gloves">Empty</span>
+        </div>
+        <div class="gear-slot">
+            <span class="slot-name">Optics</span>
+            <span class="item-name empty" id="gear-optics">Empty</span>
+        </div>
+        <div class="gear-slot" style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.1);">
+            <span class="slot-name">Gear Score</span>
+            <span class="item-name" id="gear-score">0</span>
+        </div>
+    </div>
+
+    <!-- RPG Companion Panel -->
+    <div id="companion-panel">
+        <h2>Buddy</h2>
+        <div class="companion-row">Mode: <strong id="companion-mode">-</strong></div>
+        <div class="companion-row">Trust: <strong id="companion-trust">-</strong></div>
+        <div class="companion-row">Tier: <strong id="companion-tier">-</strong></div>
+    </div>
+
+    <!-- RPG Faction Panel -->
+    <div id="faction-panel">
+        <h2>Factions</h2>
+        <div class="faction-row">
+            <span style="width:60px; text-align:right;">Vanguard</span>
+            <div class="faction-bar"><div class="faction-fill" id="faction-vanguard-fill" style="width:50%; background:#f44;"></div></div>
+            <span id="faction-vanguard-tier">Neutral</span>
+        </div>
+        <div class="faction-row">
+            <span style="width:60px; text-align:right;">Synapse</span>
+            <div class="faction-bar"><div class="faction-fill" id="faction-synapse-fill" style="width:50%; background:#0ff;"></div></div>
+            <span id="faction-synapse-tier">Neutral</span>
+        </div>
+        <div class="faction-row">
+            <span style="width:60px; text-align:right;">Hollow</span>
+            <div class="faction-bar"><div class="faction-fill" id="faction-hollow-fill" style="width:50%; background:#ff0;"></div></div>
+            <span id="faction-hollow-tier">Neutral</span>
+        </div>
+    </div>
+
+    <!-- RPG Safehouse Panel -->
+    <div id="safehouse-panel">
+        <h2>Safehouse</h2>
+        <div id="safehouse-upgrades"></div>
+    </div>
+
+    <!-- RPG Bounty Panel -->
+    <div id="bounty-panel">
+        <h2>Bounties</h2>
+        <div id="bounty-rank">Rank: Street</div>
+        <div id="bounty-contracts"></div>
+    </div>
+
+    <!-- RPG Codex Panel -->
+    <div id="codex-panel">
+        <h2>Codex</h2>
+        <div id="codex-entries"></div>
+    </div>
+
+    <!-- RPG Mastery Panel -->
+    <div id="mastery-panel">
+        <h2>Mastery</h2>
+        <div id="mastery-moves"></div>
+    </div>
+
+    <!-- RPG Implants Panel -->
+    <div id="implants-panel">
+        <h2>Implants</h2>
+        <div class="implant-slot">
+            <span class="slot-name">Neural</span>
+            <span id="implant-neural">Empty</span>
+        </div>
+        <div class="implant-slot">
+            <span class="slot-name">Muscular</span>
+            <span id="implant-muscular">Empty</span>
+        </div>
+        <div class="implant-slot">
+            <span class="slot-name">Ocular</span>
+            <span id="implant-ocular">Empty</span>
+        </div>
+        <div class="implant-slot">
+            <span class="slot-name">Skeletal</span>
+            <span id="implant-skeletal">Empty</span>
+        </div>
     </div>
 
     <script type="module" src="js/main.js"></script>

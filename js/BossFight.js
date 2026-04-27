@@ -82,6 +82,7 @@ class HealingDrone {
         this.bossGroup = bossGroup;
         this.dead = false;
         this.hp = 8;
+        this.health = this.hp;
 
         this.mesh = new THREE.Group();
         const body = new THREE.Mesh(
@@ -1299,7 +1300,11 @@ export default class BossFight {
 
             const dist = this._distanceToSegment(this.player.position, start, end);
             if (dist < 0.6 && Math.abs(this.player.position.y - bossPos.y) < 1.2) {
-                this.player.takeDamage(10 * dt);
+                if (this.player && typeof this.player.takeDamage === 'function') {
+                    this.player.takeDamage(10 * dt, 'energy', this);
+                } else {
+                    console.warn('BossFight: player.takeDamage not available');
+                }
                 this.hitsTaken++;
                 const push = new THREE.Vector3()
                     .subVectors(this.player.position, bossPos)
@@ -1324,9 +1329,15 @@ export default class BossFight {
             if (!this.shockwave.damageDealt &&
                 Math.abs(dist - this.shockwave.radius) < thickness &&
                 this.player.grounded) {
-                this.player.takeDamage(20);
+                if (this.player && typeof this.player.takeDamage === 'function') {
+                    this.player.takeDamage(20, 'energy', this);
+                } else {
+                    console.warn('BossFight: player.takeDamage not available');
+                }
                 this.hitsTaken++;
-                this.player.startStumble();
+                if (this.player && typeof this.player.startStumble === 'function') {
+                    this.player.startStumble();
+                }
                 this.shockwave.damageDealt = true;
             }
         }
@@ -1355,9 +1366,15 @@ export default class BossFight {
                 }
 
                 if (this.bossGroup.position.distanceTo(this.player.position) < 3) {
-                    this.player.takeDamage(30);
+                    if (this.player && typeof this.player.takeDamage === 'function') {
+                        this.player.takeDamage(30, 'energy', this);
+                    } else {
+                        console.warn('BossFight: player.takeDamage not available');
+                    }
                     this.hitsTaken++;
-                    this.player.startRagdoll();
+                    if (this.player && typeof this.player.startRagdoll === 'function') {
+                        this.player.startRagdoll();
+                    }
                 }
 
                 this._endAttack();
@@ -1396,9 +1413,15 @@ export default class BossFight {
             d.update(dt);
             if (d.dead) {
                 if (d.hitPlayer) {
-                    this.player.takeDamage(10);
+                    if (this.player && typeof this.player.takeDamage === 'function') {
+                        this.player.takeDamage(10, 'energy', this);
+                    } else {
+                        console.warn('BossFight: player.takeDamage not available');
+                    }
                     this.hitsTaken++;
-                    this.player.startStumble();
+                    if (this.player && typeof this.player.startStumble === 'function') {
+                        this.player.startStumble();
+                    }
                 }
                 d.dispose();
                 this.drones.splice(i, 1);
@@ -1412,7 +1435,11 @@ export default class BossFight {
             m.update(dt);
             if (m.exploded) {
                 if (m.hitPlayer) {
-                    this.player.takeDamage(15);
+                    if (this.player && typeof this.player.takeDamage === 'function') {
+                        this.player.takeDamage(15, 'energy', this);
+                    } else {
+                        console.warn('BossFight: player.takeDamage not available');
+                    }
                     this.hitsTaken++;
                 }
                 if (this.bulletTime) {
@@ -1482,7 +1509,11 @@ export default class BossFight {
                 const dx = this.player.position.x - seg.mesh.position.x;
                 const dz = this.player.position.z - seg.mesh.position.z;
                 if (dx * dx + dz * dz < seg.radius * seg.radius && this.player.position.y < 1) {
-                    this.player.takeDamage(6 * dt);
+                    if (this.player && typeof this.player.takeDamage === 'function') {
+                        this.player.takeDamage(6 * dt, 'energy', this);
+                    } else {
+                        console.warn('BossFight: player.takeDamage not available');
+                    }
                     this.hitsTaken++;
                 }
                 if (seg.collapseTimer <= 0 || seg.mesh.position.y < -6) {
@@ -1502,7 +1533,11 @@ export default class BossFight {
 
         // Body collision
         if (this.player.position.distanceTo(bossPos) < 1.1) {
-            this.player.takeDamage(25);
+            if (this.player && typeof this.player.takeDamage === 'function') {
+                this.player.takeDamage(25, 'energy', this);
+            } else {
+                console.warn('BossFight: player.takeDamage not available');
+            }
             this.hitsTaken++;
             const knockback = new THREE.Vector3()
                 .subVectors(this.player.position, bossPos)
@@ -1518,9 +1553,15 @@ export default class BossFight {
             const wPos = new THREE.Vector3();
             arm.getWorldPosition(wPos);
             if (this.player.position.distanceTo(wPos) < 0.7) {
-                this.player.takeDamage(15);
+                if (this.player && typeof this.player.takeDamage === 'function') {
+                    this.player.takeDamage(15, 'energy', this);
+                } else {
+                    console.warn('BossFight: player.takeDamage not available');
+                }
                 this.hitsTaken++;
-                this.player.startRagdoll();
+                if (this.player && typeof this.player.startRagdoll === 'function') {
+                    this.player.startRagdoll();
+                }
                 break;
             }
         }

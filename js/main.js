@@ -37,6 +37,40 @@ import { FootIK } from './FootIK.js';
 import { ProceduralAnimation } from './ProceduralAnimation.js';
 import LevelEditor from './LevelEditor.js';
 import BossFight from './BossFight.js';
+import { CharacterSheet } from './CharacterSheet.js';
+import { ProgressionSystem } from './ProgressionSystem.js';
+import { ArchetypeSystem } from './ArchetypeSystem.js';
+import { OriginSystem } from './OriginSystem.js';
+import { ExoSuitSystem, SLOTS } from './ExoSuitSystem.js';
+import { AffixSystem, RARITY } from './AffixSystem.js';
+import { FamiliaritySystem } from './FamiliaritySystem.js';
+import { CompanionDrone, COMPANION_MODES } from './CompanionDrone.js';
+import { LoyaltySystem } from './LoyaltySystem.js';
+import { FactionSystem, FACTIONS } from './FactionSystem.js';
+import { TerritorySystem, SECTORS } from './TerritorySystem.js';
+import { SafehouseSystem } from './SafehouseSystem.js';
+import { BountySystem } from './BountySystem.js';
+import { NPCSystem } from './NPCSystem.js';
+import { BlackoutSystem } from './BlackoutSystem.js';
+import { RivalSystem } from './RivalSystem.js';
+import { SubLevelSystem } from './SubLevelSystem.js';
+import { MasterySystem } from './MasterySystem.js';
+import { CodexSystem } from './CodexSystem.js';
+import { ImplantSystem } from './ImplantSystem.js';
+import { LegacySystem } from './LegacySystem.js';
+import { NewGamePlus } from './NewGamePlus.js';
+import { CollapseMode } from './CollapseMode.js';
+import { DamageSystem, DAMAGE_TYPES } from './DamageSystem.js';
+import { HitboxSystem, Hitbox } from './HitboxSystem.js';
+import { LootSystem } from './LootSystem.js';
+import { EnemyHealthBar } from './EnemyHealthBar.js';
+import { SkillSystem } from './SkillSystem.js';
+import { ResourceSystem } from './ResourceSystem.js';
+import { SkillBarUI } from './SkillBarUI.js';
+import { getDefaultLoadout, ACTIVE_SKILLS } from './SkillData.js';
+import { DifficultyTierSystem } from './DifficultyTierSystem.js';
+import { ApexRiftSystem } from './ApexRiftSystem.js';
+import { NephalemGlory } from './NephalemGlory.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -121,6 +155,203 @@ const audio = new AudioManager(scene, world);
 // Player first (camera controller wired after tpc is created)
 const player = new Player(scene, world, camera, audio, null);
 
+// RPG Phase 1 systems
+const characterSheet = new CharacterSheet(player);
+const progression = new ProgressionSystem(characterSheet);
+const archetype = new ArchetypeSystem(player, characterSheet);
+const origin = new OriginSystem(player, characterSheet);
+player.setCharacterSheet(characterSheet);
+
+progression.onLevelUp = (level, points) => {
+    console.log(`Level up! Now level ${level}. Attribute points: ${points}`);
+};
+
+// Apply stored character creation choices
+const savedOrigin = sessionStorage.getItem('rpg_origin');
+const savedArchetype = sessionStorage.getItem('rpg_archetype');
+if (savedOrigin) {
+    try { origin.setOrigin(savedOrigin); } catch (e) { console.warn('OriginSystem.setOrigin missing', e); }
+}
+if (savedArchetype) {
+    try { archetype.setPrimary(savedArchetype); } catch (e) { console.warn('ArchetypeSystem.setPrimary missing', e); }
+}
+
+// RPG Phase 2-4 systems
+const exoSuit = new ExoSuitSystem(player, characterSheet);
+const affixSystem = new AffixSystem();
+const familiarity = new FamiliaritySystem();
+const companion = new CompanionDrone(scene, player, null); // eventBus placeholder
+const loyalty = new LoyaltySystem(companion);
+const factions = new FactionSystem(null); // eventBus placeholder
+const territory = new TerritorySystem(world, factions);
+const safehouse = new SafehouseSystem(player, characterSheet, progression, exoSuit, affixSystem);
+const bounty = new BountySystem(player, characterSheet, progression, factions, territory);
+const npcSystem = new NPCSystem(world, player, factions);
+const blackout = new BlackoutSystem(world, player, npcSystem, factions, territory);
+const rivals = new RivalSystem(scene, player, world, exoSuit);
+const subLevels = new SubLevelSystem(world, player, factions);
+const mastery = new MasterySystem(player, characterSheet);
+const codex = new CodexSystem(player, characterSheet);
+const implants = new ImplantSystem(player, characterSheet);
+const legacy = new LegacySystem(characterSheet, progression, exoSuit, familiarity);
+const ngPlus = new NewGamePlus(player, world, characterSheet);
+const collapse = new CollapseMode(world, player, characterSheet, exoSuit, archetype);
+
+// Skill system (Phase 2)
+const activeArchetypeId = savedArchetype || 'traceur';
+const resourceSystem = new ResourceSystem(activeArchetypeId);
+const skillSystem = new SkillSystem(player, resourceSystem, activeArchetypeId);
+
+// Assign default loadout for archetype
+const defaultLoadout = getDefaultLoadout(activeArchetypeId);
+for (const [slot, skillId] of Object.entries(defaultLoadout)) {
+    skillSystem.assignSkill(slot, skillId);
+}
+
+// Register skill execution callbacks
+skillSystem.onExecute('light_strike', (skill, targetPos, p) => {
+    // Melee hitbox — same as existing LMB attack
+    const attackDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
+    const offset = attackDir.multiplyScalar(0.8);
+    offset.y = 0.5;
+    const hitbox = new Hitbox(
+        p, 'melee', { type: 'sphere', radius: 0.6 }, offset, 0.15,
+        (hb, target) => {
+            if (target && typeof spawnDamageNumber === 'function') {
+                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
+                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 15), false, 'kinetic');
+            }
+        }
+    );
+    hitbox.damage = skill.finalDamage || 15;
+    hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+});
+
+skillSystem.onExecute('dive_kick', (skill, targetPos, p) => {
+    if (p.startDiveKick) p.startDiveKick();
+    // Damage hitbox on landing area
+    const offset = new THREE.Vector3(0, -0.5, 0);
+    const hitbox = new Hitbox(
+        p, 'melee', { type: 'sphere', radius: 1.2 }, offset, 0.3,
+        (hb, target) => {
+            if (target && target.takeDamage) {
+                target.takeDamage(skill.finalDamage || 50, 'kinetic', p);
+            }
+            if (target && typeof spawnDamageNumber === 'function') {
+                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
+                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 50), false, 'kinetic');
+            }
+        }
+    );
+    hitbox.damage = skill.finalDamage || 50;
+    hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+});
+
+skillSystem.onExecute('air_dash', (skill, targetPos, p) => {
+    const moveDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
+    if (p.startAirDash) p.startAirDash(moveDir);
+});
+
+skillSystem.onExecute('slide_tackle', (skill, targetPos, p) => {
+    const moveDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
+    if (p.startSlide) p.startSlide(moveDir);
+    // Slide hitbox
+    const hitbox = new Hitbox(
+        p, 'melee', { type: 'sphere', radius: 0.8 }, new THREE.Vector3(0, 0.3, 0), 0.5,
+        (hb, target) => {
+            if (target && target.takeDamage) {
+                target.takeDamage(skill.finalDamage || 30, 'kinetic', p);
+            }
+            if (target && typeof spawnDamageNumber === 'function') {
+                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
+                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 30), false, 'kinetic');
+            }
+        }
+    );
+    hitbox.damage = skill.finalDamage || 30;
+    hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+});
+
+skillSystem.onExecute('ground_pound', (skill, targetPos, p) => {
+    if (p.startGroundPound) p.startGroundPound();
+    // AoE hitbox on impact — registered now, expires quickly
+    const hitbox = new Hitbox(
+        p, 'explosion', { type: 'sphere', radius: 5.0 }, new THREE.Vector3(0, 0, 0), 0.4,
+        (hb, target) => {
+            if (target && target.takeDamage) {
+                target.takeDamage(skill.finalDamage || 80, 'explosive', p);
+            }
+            if (target && typeof spawnDamageNumber === 'function') {
+                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
+                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 80), false, 'explosive');
+            }
+        }
+    );
+    hitbox.damage = skill.finalDamage || 80;
+    hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+});
+
+const skillBarUI = new SkillBarUI(skillSystem, resourceSystem);
+
+// Combat systems
+const damageSystem = new DamageSystem(characterSheet);
+const hitboxSystem = new HitboxSystem();
+const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
+const enemyHealthBars = []; // tracks EnemyHealthBar instances
+
+// Wire drone death to loot and damage numbers
+if (world.drones && world.drones.drones) {
+    world.drones.drones.forEach(drone => {
+        if (drone && !drone.onDeath) {
+            drone.onDeath = (deadDrone, source) => {
+                // Phase 4: Nephalem Glory kill streak
+                if (nephalemGlory) nephalemGlory.onKill(deadDrone);
+                // Phase 4: Apex Rift progress
+                if (apexRift) apexRift.onEnemyKilled(deadDrone, source);
+                // Loot drop with difficulty scaling
+                const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
+                const drop = lootSystem.generateDrop(deadDrone.type || 'patrol', deadDrone.isElite, 1.0 + diffLootMult, activeArchetypeId);
+                if (drop) lootSystem.spawnDrop(drop, deadDrone.position || deadDrone.mesh.position);
+            };
+            drone.onDamageTaken = (amount, type, source) => {
+                const pos = drone.position ? drone.position.clone() : drone.mesh.position.clone();
+                pos.y += 1.0;
+                spawnDamageNumber(pos, Math.ceil(amount), false, type);
+            };
+            const bar = new EnemyHealthBar(scene, drone);
+            enemyHealthBars.push(bar);
+            // Register hurtbox for player attacks
+            if (hitboxSystem) {
+                const hurtbox = new Hitbox(drone, 'hurtbox', { type: 'sphere', radius: 0.5 }, new THREE.Vector3(0, 0.4, 0), -1, null);
+                hurtbox.team = 'enemy';
+                hitboxSystem.registerHitbox(hurtbox);
+            }
+        }
+    });
+}
+
+// Player damage numbers + Nephalem Glory streak break
+player.onDamageTaken = (amount, type, source) => {
+    const pos = player.position.clone();
+    pos.y += 1.5;
+    spawnDamageNumber(pos, Math.ceil(amount), false, type);
+    if (nephalemGlory) nephalemGlory.onDamageTaken();
+};
+
+// Equip starter gear based on origin
+const startingGear = origin.getStartingGear ? origin.getStartingGear() : null;
+if (startingGear && exoSuit) {
+    const template = exoSuit.getItemTemplate ? exoSuit.getItemTemplate(startingGear) : null;
+    if (template && affixSystem) {
+        const item = affixSystem.generateItem(template);
+        exoSuit.equip(item);
+    }
+}
+
 // Third person camera
 const tpc = new ThirdPersonCamera(camera, player);
 tpc.setPostProcessing(postProcessing);
@@ -161,6 +392,22 @@ const grappleRelays = new ChainGrappleRelays(scene);
 
 // Drone takedowns
 const droneTakedown = new DroneTakedown(scene);
+droneTakedown.onKill = (drone) => {
+    if (progression && typeof progression.addXP === 'function') {
+        const xpBase = 50;
+        const xpScaled = difficultyTier ? difficultyTier.scaleXP(xpBase) : xpBase;
+        progression.addXP(Math.floor(xpScaled), 'enemy_kill');
+    }
+    if (familiarity && drone && drone.weaponId) {
+        familiarity.addKill(drone.weaponId);
+    }
+    if (factions && drone && drone.faction) {
+        factions.onDroneKilled(drone.faction, drone.isElite);
+    }
+    if (companion && typeof companion.triggerSynergy === 'function') {
+        companion.triggerSynergy();
+    }
+};
 
 // Power-ups
 const powerUps = new PowerUpSystem(scene, player);
@@ -222,6 +469,25 @@ const challenges = new ChallengeSystem(scene, player);
 // Boss Fight (needs directorMode, bulletTime, challenges)
 const bossFight = new BossFight(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
 
+// Phase 4: Endgame systems
+const difficultyTier = new DifficultyTierSystem(challenges);
+const apexRift = new ApexRiftSystem(scene, world, player, bossFight, challenges, lootSystem, difficultyTier);
+const nephalemGlory = new NephalemGlory(player, challenges);
+
+// Apply difficulty scaling to existing world drones
+if (world.drones && world.drones.drones && difficultyTier) {
+    const diffConfig = difficultyTier.getTierConfig();
+    world.drones.drones.forEach(drone => {
+        if (drone && drone.maxHealth) {
+            drone.maxHealth = Math.floor(drone.maxHealth * diffConfig.hpMult);
+            drone.health = drone.maxHealth;
+        }
+        if (drone && drone.meleeDamage) {
+            drone.meleeDamage = (drone.meleeDamage || 10) * diffConfig.dmgMult;
+        }
+    });
+}
+
 // Place interactive environment features
 interEnv.addVent(20, 2, 10, 1.5, 1.5);
 interEnv.addVent(-15, 3, -10, 1.5, 1.5);
@@ -251,6 +517,9 @@ const ui = document.getElementById('ui');
 const crosshair = document.getElementById('crosshair');
 const stateDisplay = document.getElementById('state-display');
 const speedDisplay = document.getElementById('speed-display');
+const levelDisplay = document.getElementById('level-display');
+const xpDisplay = document.getElementById('xp-display');
+const apDisplay = document.getElementById('ap-display');
 
 // Editor UI elements
 const editorUI = document.getElementById('editor-ui');
@@ -280,6 +549,11 @@ document.addEventListener('pointerlockchange', () => {
         if (!levelEditor.isActive()) {
             ui.style.display = 'block';
             crosshair.style.display = 'block';
+            const phb = document.getElementById('player-health-bar');
+            const pht = document.getElementById('player-health-text');
+            if (phb) phb.style.display = 'block';
+            if (pht) pht.style.display = 'block';
+            if (skillBarUI) skillBarUI.show();
         }
         audio.playAmbience();
     } else {
@@ -287,6 +561,11 @@ document.addEventListener('pointerlockchange', () => {
         startScreen.style.display = 'flex';
         ui.style.display = 'none';
         crosshair.style.display = 'none';
+        const phb = document.getElementById('player-health-bar');
+        const pht = document.getElementById('player-health-text');
+        if (phb) phb.style.display = 'none';
+        if (pht) pht.style.display = 'none';
+        if (skillBarUI) skillBarUI.hide();
         editorUI.classList.remove('active');
     }
 });
@@ -446,6 +725,35 @@ let dayNightPressed = false;
 const presets = ['day', 'night', 'neon'];
 let presetIndex = 0;
 
+// Damage number floating text system
+const damageNumbers = [];
+function spawnDamageNumber(position, amount, isCrit, damageType) {
+    const div = document.createElement('div');
+    div.style.position = 'fixed';
+    div.style.left = '50%';
+    div.style.top = '50%';
+    div.style.transform = 'translate(-50%, -50%)';
+    div.style.color = isCrit ? '#ffaa00' : '#ffffff';
+    div.style.fontWeight = 'bold';
+    div.style.fontSize = isCrit ? '24px' : '16px';
+    div.style.textShadow = '0 1px 4px rgba(0,0,0,0.8)';
+    div.style.pointerEvents = 'none';
+    div.style.zIndex = '100';
+    div.style.transition = 'opacity 0.5s';
+    div.textContent = amount;
+    document.body.appendChild(div);
+    
+    // Project 3D position to screen
+    const vec = position.clone();
+    vec.project(camera);
+    const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
+    div.style.left = x + 'px';
+    div.style.top = y + 'px';
+    
+    damageNumbers.push({ div, life: 0.8, vy: -30 });
+}
+
 // Game loop
 const clock = new THREE.Clock();
 
@@ -478,11 +786,35 @@ function animate() {
             }
         }
         
+        // === SKILL BAR INPUTS (LMB / RMB / Q / E / R) ===
+        if (skillSystem && player && !player.isDead) {
+            if (activeInput.wasPressed('Mouse1')) skillSystem.useSkill('LMB');
+            if (activeInput.wasPressed('Mouse2')) skillSystem.useSkill('RMB');
+            if (activeInput.wasPressed('KeyQ')) skillSystem.useSkill('Q');
+            if (activeInput.wasPressed('KeyE') && player.state !== 'CLIMB' && player.state !== 'HANG') skillSystem.useSkill('E');
+            if (activeInput.wasPressed('KeyR')) skillSystem.useSkill('R');
+        }
+        
         // === BOSS FIGHT TOGGLE (B) ===
         if (activeInput.wasPressed('KeyB') && !bossFight.isActive() && !levelEditor.isActive()) {
             bossFight.start();
             bossHUD.style.display = 'block';
             ui.style.display = 'none';
+        }
+        
+        // === APEX RIFT TOGGLE (T) ===
+        if (activeInput.wasPressed('KeyT') && apexRift && !apexRift.active && !bossFight.isActive() && !levelEditor.isActive()) {
+            apexRift.startRift();
+        }
+        
+        // === DIFFICULTY TIER CYCLE (M) ===
+        if (activeInput.wasPressed('KeyM')) {
+            const tiers = ['normal', 'nightmare', 'hell', 'torment1', 'torment2', 'torment3', 'torment4', 'torment5', 'torment6'];
+            const currentIdx = tiers.indexOf(difficultyTier.currentTier);
+            const nextIdx = (currentIdx + 1) % tiers.length;
+            if (difficultyTier.setTier(tiers[nextIdx])) {
+                console.log(`[Difficulty] Set to: ${difficultyTier.getDisplayString()}`);
+            }
         }
         
         // === EDITOR MODE ===
@@ -534,14 +866,69 @@ function animate() {
             challenges.reportEvent('climbCancel');
         }
         
+        // Character panel toggle
+        if (activeInput.wasPressed('KeyP') && !activeInput.isPressed('ShiftLeft')) {
+            const cp = document.getElementById('character-panel');
+            cp.style.display = (cp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Assist mode toggle
+        if (activeInput.wasPressed('KeyP') && activeInput.isPressed('ShiftLeft')) {
+            assistMode.toggle();
+        }
+        
+        // Gear panel toggle
+        if (activeInput.wasPressed('KeyG')) {
+            const gp = document.getElementById('gear-panel');
+            if (gp) gp.style.display = (gp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Companion panel toggle (U for Buddy)
+        if (activeInput.wasPressed('KeyU')) {
+            const comp = document.getElementById('companion-panel');
+            if (comp) comp.style.display = (comp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Faction panel toggle
+        if (activeInput.wasPressed('KeyF') && !activeInput.isPressed('ShiftLeft')) {
+            const fp = document.getElementById('faction-panel');
+            if (fp) fp.style.display = (fp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Safehouse panel toggle (H for Hub)
+        if (activeInput.wasPressed('KeyH')) {
+            const sp = document.getElementById('safehouse-panel');
+            if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Bounty panel toggle
+        if (activeInput.wasPressed('KeyJ')) {
+            const bp = document.getElementById('bounty-panel');
+            if (bp) bp.style.display = (bp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Codex panel toggle
+        if (activeInput.wasPressed('KeyK')) {
+            const cop = document.getElementById('codex-panel');
+            if (cop) cop.style.display = (cop.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Mastery panel toggle
+        if (activeInput.wasPressed('KeyL')) {
+            const mp = document.getElementById('mastery-panel');
+            if (mp) mp.style.display = (mp.style.display === 'block') ? 'none' : 'block';
+        }
+        
+        // Implants panel toggle
+        if (activeInput.wasPressed('KeyN')) {
+            const ip = document.getElementById('implants-panel');
+            if (ip) ip.style.display = (ip.style.display === 'block') ? 'none' : 'block';
+        }
+        
         // Rising Tide toggle
-        if (activeInput.wasPressed('KeyP')) {
-            if (activeInput.isPressed('ShiftLeft')) {
-                assistMode.toggle();
-            } else {
-                if (risingTide.active) risingTide.stop();
-                else risingTide.start();
-            }
+        if (activeInput.wasPressed('KeyO')) {
+            if (risingTide.active) risingTide.stop();
+            else risingTide.start();
         }
         
         // Speedrun IL hotkeys
@@ -655,6 +1042,41 @@ function animate() {
         challenges.update(finalDt);
         challenges.updateMovementTime(finalDt, player.state === 'SPRINT');
         
+        // RPG systems update
+        if (archetype) archetype.update(dt);
+        if (progression) progression.update(dt);
+        if (companion) companion.update(finalDt, player, world, world.drones ? world.drones.drones : []);
+        if (territory) territory.update(finalDt);
+        if (loyalty && typeof loyalty.update === 'function') loyalty.update(finalDt);
+        if (npcSystem) npcSystem.update && npcSystem.update(finalDt, 12); // noon default
+        if (blackout) blackout.update && blackout.update(finalDt, 12);
+        if (rivals) rivals.update && rivals.update(finalDt, player);
+        if (mastery) mastery.update && mastery.update(finalDt, player);
+        if (subLevels) subLevels.update && subLevels.update(finalDt, player);
+        if (collapse) collapse.update && collapse.update(finalDt, player);
+        if (apexRift) apexRift.update(finalDt);
+        if (nephalemGlory) nephalemGlory.update(finalDt);
+        
+        // Sync Nephalem Glory damage multiplier to CharacterSheet temp bonus
+        if (nephalemGlory && characterSheet) {
+            const gloryMult = nephalemGlory.getDamageMultiplier();
+            const baseMult = gloryMult > 1.0 ? gloryMult - 1.0 : 0;
+            characterSheet.addTempBonus('nephalem_glory', 'damageMultiplier', baseMult, 10);
+        }
+        if (codex) codex.update && codex.update(finalDt, player);
+        
+        // Combat systems update
+        if (hitboxSystem) {
+            hitboxSystem.update(finalDt);
+            hitboxSystem.checkCollisions(damageSystem);
+        }
+        if (lootSystem) lootSystem.update(finalDt, player.position);
+        enemyHealthBars.forEach(bar => { if (bar && bar.update) bar.update(finalDt); });
+        
+        // Skill system update
+        if (skillSystem) skillSystem.update(finalDt);
+        if (skillBarUI) skillBarUI.update();
+        
         // === BOSS FIGHT UPDATE ===
         if (bossFight.isActive()) {
             bossFight.update(finalDt);
@@ -682,6 +1104,185 @@ function animate() {
         // Update UI
         stateDisplay.textContent = player.getStateDisplay();
         speedDisplay.textContent = player.getSpeed();
+        
+        // Update player health bar
+        const healthBar = document.getElementById('player-health-bar');
+        const healthText = document.getElementById('player-health-text');
+        const healthFill = document.getElementById('player-health-fill');
+        if (healthBar && healthFill && player) {
+            const pct = player.maxHealth > 0 ? (player.health / player.maxHealth) * 100 : 100;
+            healthFill.style.width = pct + '%';
+            if (healthText) healthText.textContent = Math.ceil(player.health) + ' / ' + player.maxHealth;
+        }
+        if (levelDisplay) {
+            levelDisplay.textContent = progression.getLevel();
+        }
+        if (xpDisplay) {
+            const pct = progression.getXPToNext() > 0
+                ? Math.floor((progression.getXP() / progression.getXPToNext()) * 100)
+                : 100;
+            xpDisplay.textContent = pct + '%';
+        }
+        if (apDisplay) {
+            apDisplay.textContent = characterSheet.getAttributePoints();
+        }
+        
+        // Update gear panel
+        const gp = document.getElementById('gear-panel');
+        if (gp && gp.style.display === 'block' && exoSuit) {
+            const equipped = exoSuit.getAllEquipped ? exoSuit.getAllEquipped() : {};
+            const slots = ['frame', 'boots', 'gloves', 'optics'];
+            slots.forEach(slot => {
+                const el = document.getElementById('gear-' + slot);
+                if (el) {
+                    const item = equipped[slot];
+                    if (item) {
+                        el.textContent = item.name || item.id || 'Equipped';
+                        el.classList.remove('empty');
+                    } else {
+                        el.textContent = 'Empty';
+                        el.classList.add('empty');
+                    }
+                }
+            });
+            const gsEl = document.getElementById('gear-score');
+            if (gsEl) gsEl.textContent = exoSuit.getGearScore ? exoSuit.getGearScore() : 0;
+        }
+        
+        // Update companion panel
+        const compPanel = document.getElementById('companion-panel');
+        if (compPanel && compPanel.style.display === 'block' && companion && loyalty) {
+            const modeEl = document.getElementById('companion-mode');
+            const trustEl = document.getElementById('companion-trust');
+            const tierEl = document.getElementById('companion-tier');
+            if (modeEl) modeEl.textContent = companion.getMode ? companion.getMode() : '-';
+            if (trustEl) trustEl.textContent = loyalty.getTrust ? loyalty.getTrust() : '-';
+            if (tierEl) tierEl.textContent = loyalty.getTier ? loyalty.getTier() : '-';
+        }
+        
+        // Update damage numbers
+        for (let i = damageNumbers.length - 1; i >= 0; i--) {
+            const dn = damageNumbers[i];
+            dn.life -= dt;
+            const rect = dn.div.getBoundingClientRect();
+            dn.div.style.top = (rect.top + dn.vy * dt) + 'px';
+            if (dn.life <= 0.3) dn.div.style.opacity = dn.life / 0.3;
+            if (dn.life <= 0) {
+                dn.div.remove();
+                damageNumbers.splice(i, 1);
+            }
+        }
+        
+        // Update faction panel
+        const fp = document.getElementById('faction-panel');
+        if (fp && fp.style.display === 'block' && factions) {
+            const facs = ['vanguard', 'synapse', 'hollow'];
+            facs.forEach(f => {
+                const rep = factions.getReputation ? factions.getReputation(f) : 0;
+                const tier = factions.getTier ? factions.getTier(f) : 'neutral';
+                const fillEl = document.getElementById('faction-' + f + '-fill');
+                const tierEl = document.getElementById('faction-' + f + '-tier');
+                if (fillEl) {
+                    const pct = ((rep + 100) / 200) * 100;
+                    fillEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
+                }
+                if (tierEl) tierEl.textContent = tier.charAt(0).toUpperCase() + tier.slice(1);
+            });
+        }
+        
+        // Update safehouse panel
+        const sp = document.getElementById('safehouse-panel');
+        if (sp && sp.style.display === 'block' && safehouse) {
+            const upgContainer = document.getElementById('safehouse-upgrades');
+            if (upgContainer && safehouse.getAllUpgrades) {
+                const upgrades = safehouse.getAllUpgrades();
+                upgContainer.innerHTML = upgrades.map(u => {
+                    return `<div class="sh-upgrade"><span class="name">${u.name}</span><span class="level">Lv${u.currentLevel}/${u.maxLevel}</span><br/><span style="color:#888;">${u.description}</span></div>`;
+                }).join('');
+            }
+        }
+        
+        // Update bounty panel
+        const bp = document.getElementById('bounty-panel');
+        if (bp && bp.style.display === 'block' && bounty) {
+            const rankEl = document.getElementById('bounty-rank');
+            const contractsEl = document.getElementById('bounty-contracts');
+            if (rankEl && bounty.getRunnerRank) rankEl.textContent = 'Rank: ' + bounty.getRunnerRank();
+            if (contractsEl && bounty.getActiveContracts) {
+                const contracts = bounty.getActiveContracts();
+                contractsEl.innerHTML = contracts.slice(0, 3).map(c => {
+                    return `<div class="bounty-contract"><strong>${c.targetType}</strong> in ${c.sectorId}<br/>Reward: ${c.reward}</div>`;
+                }).join('') || '<div class="bounty-contract">No active contracts</div>';
+            }
+        }
+        
+        // Update codex panel
+        const cop = document.getElementById('codex-panel');
+        if (cop && cop.style.display === 'block' && codex) {
+            const entriesEl = document.getElementById('codex-entries');
+            if (entriesEl && codex.getAllEntries) {
+                const entries = codex.getAllEntries();
+                entriesEl.innerHTML = entries.map(e => {
+                    const cls = e.unlocked ? 'codex-entry unlocked' : 'codex-entry locked';
+                    return `<div class="${cls}">${e.unlocked ? e.title : '???'}</div>`;
+                }).join('');
+            }
+        }
+        
+        // Update mastery panel
+        const mp = document.getElementById('mastery-panel');
+        if (mp && mp.style.display === 'block' && mastery) {
+            const movesEl = document.getElementById('mastery-moves');
+            if (movesEl && mastery.getMasteryOverview) {
+                const overview = mastery.getMasteryOverview();
+                movesEl.innerHTML = overview.map(m => {
+                    return `<div class="mastery-row"><span>${m.name}</span><span>Lv${m.level}</span></div>`;
+                }).join('');
+            }
+        }
+        
+        // Update implants panel
+        const ip = document.getElementById('implants-panel');
+        if (ip && ip.style.display === 'block' && implants) {
+            const slots = ['neural', 'muscular', 'ocular', 'skeletal'];
+            slots.forEach(s => {
+                const el = document.getElementById('implant-' + s);
+                if (el && implants.getImplant) {
+                    const imp = implants.getImplant(s);
+                    el.textContent = imp ? (imp.name || imp.id) : 'Empty';
+                }
+            });
+        }
+        
+        // Update character panel
+        const cp = document.getElementById('character-panel');
+        if (cp && cp.style.display === 'block') {
+            const lvlEl = document.getElementById('char-level');
+            const xpFill = document.getElementById('char-xp-fill');
+            if (lvlEl && progression) {
+                lvlEl.textContent = progression.getLevel ? progression.getLevel() : (progression.level ?? 1);
+                const xpVal = progression.getXP ? progression.getXP() : (progression.xp ?? 0);
+                const xpNext = progression.getXPToNext ? progression.getXPToNext() : (progression.maxXp ?? 1);
+                const xpPct = xpNext > 0 ? (xpVal / xpNext * 100) : 100;
+                xpFill.style.width = Math.max(0, Math.min(100, xpPct)) + '%';
+            }
+            const stats = player.getRPGStats();
+            const statMap = { mob: 'char-mob', ref: 'char-ref', syn: 'char-syn', for: 'char-for', tec: 'char-tec', gut: 'char-gut' };
+            for (const [key, id] of Object.entries(statMap)) {
+                const el = document.getElementById(id);
+                if (el) el.textContent = stats[key] ?? 10;
+            }
+            const archEl = document.getElementById('char-archetype');
+            const origEl = document.getElementById('char-origin');
+            if (archEl && archetype) archEl.textContent = archetype.currentArchetype ?? archetype.name ?? '-';
+            if (origEl && origin) origEl.textContent = origin.currentOrigin ?? origin.name ?? '-';
+            const resFill = document.getElementById('char-resource-fill');
+            if (resFill && characterSheet) {
+                const res = archetype ? archetype.getResourceValue() : 0;
+                const maxRes = archetype ? archetype.getResourceMax() : 100;
+                resFill.style.width = (maxRes > 0 ? (res / maxRes * 100) : 0) + '%';
+            }
+        }
         
         // Time freeze from power-up
         let renderDt = finalDt;

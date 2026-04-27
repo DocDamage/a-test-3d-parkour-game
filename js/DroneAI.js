@@ -27,6 +27,14 @@ class Drone {
         this.alertBaseRotation = 0;
         this.alertScanAngle = 0;
 
+        // Combat stats
+        this.maxHealth = 40;
+        this.health = this.maxHealth;
+        this.isDead = false;
+        this.faction = 'vanguard';
+        this.isElite = false;
+        this.attackCooldown = 0;
+
         // ---- Visuals ----
         this.group = new THREE.Group();
         this.scene.add(this.group);
@@ -85,6 +93,9 @@ class Drone {
     /*  Per-frame update                                                    */
     /* ------------------------------------------------------------------ */
     update(dt, player) {
+        if (this.isDead) return;
+        this.attackCooldown -= dt;
+
         // Idle ring spin
         this.ring.rotation.x += dt * 2.5;
         this.ring.rotation.y += dt * 1.8;
@@ -150,6 +161,15 @@ class Drone {
             case 'ALERT':   this.updateAlert(dt);   break;
             case 'CHASE':   this.updateChase(dt);   break;
             case 'SEARCH':  this.updateSearch(dt);  break;
+        }
+
+        // Melee attack while chasing
+        if (this.state === 'CHASE' && player && !this.isDead) {
+            const distToPlayer = this.group.position.distanceTo(player.position);
+            if (distToPlayer < 1.5 && this.attackCooldown <= 0) {
+                if (player.takeDamage) player.takeDamage(10, 'kinetic', this);
+                this.attackCooldown = 1.5;
+            }
         }
 
         // Aim spotlight & cone mesh forward
@@ -298,6 +318,28 @@ class Drone {
 
     getMeshes() {
         return [this.group];
+    }
+
+    takeDamage(amount, type, source) {
+        if (this.isDead) return 0;
+        this.health -= amount;
+        if (this.health <= 0) {
+            this.health = 0;
+            this.die(source);
+        }
+        if (this.onDamageTaken) this.onDamageTaken(amount, type, source);
+        return amount;
+    }
+
+    die(source) {
+        this.isDead = true;
+        this.state = 'DEAD';
+        if (this.onDeath) this.onDeath(this, source);
+        setTimeout(() => { if (this.group) this.group.visible = false; }, 2000);
+    }
+
+    getHealthPercent() {
+        return this.maxHealth > 0 ? this.health / this.maxHealth : 0;
     }
 }
 

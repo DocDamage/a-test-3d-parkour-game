@@ -5,6 +5,7 @@ export class DroneTakedown {
         this.scene = scene;
         this.slowMoTimer = 0;
         this.slowMoDuration = 0.4;
+        this.onKill = null;
     }
 
     update(dt, player, input, drones) {
@@ -79,6 +80,7 @@ export class DroneTakedown {
 
         // Disable drone
         drone.state = 'SEARCH';
+        if (this.onKill) this.onKill(drone);
         drone.detection = 0;
         drone.group.visible = false;
         drone.spotLight.visible = false;

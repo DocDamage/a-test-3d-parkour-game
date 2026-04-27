@@ -114,6 +114,17 @@ export class Player {
         this.grapplingHook = new GrapplingHook(scene, this, world);
         this.comboSystem = new ComboSystem();
 
+        // Health / damage system
+        this.maxHealth = 100;
+        this.health = 100;
+        this.shield = 0;
+        this.isInvincible = false;
+        this.invincibleTimer = 0;
+        this.isDead = false;
+
+        // RPG system hook
+        this.characterSheet = null;
+
         // Visuals
         this.mesh = this.createMesh();
         this.shadow = this.createShadow();
@@ -392,6 +403,9 @@ export class Player {
     }
 
     update(dt, input, cameraYaw) {
+        // Sync max health from character sheet gear bonuses
+        this._syncMaxHealth();
+
         // Snapshot input state for edge detection (wasPressed / wasMouse2Released)
         input.preUpdate();
 
@@ -461,6 +475,12 @@ export class Player {
             case 'RAGDOLL':
                 this.updateRagdoll(dt);
                 break;
+            case 'DIVE_KICK':
+                this.updateDiveKick(dt);
+                break;
+            case 'GROUND_POUND':
+                this.updateGroundPound(dt);
+                break;
             case 'GRAPPLE_AIM':
                 this.updateGrappleAim(dt, input);
                 break;
@@ -474,7 +494,8 @@ export class Player {
 
         // Apply gravity (skip special states)
         if (!this.grounded && this.state !== 'CLIMB' && this.state !== 'VAULT' && this.state !== 'HANG' &&
-            this.state !== 'GRAPPLE_AIM' && this.state !== 'GRAPPLE_SWING' && this.state !== 'GRAPPLE_RETRACT') {
+            this.state !== 'GRAPPLE_AIM' && this.state !== 'GRAPPLE_SWING' && this.state !== 'GRAPPLE_RETRACT' &&
+            this.state !== 'DIVE_KICK' && this.state !== 'GROUND_POUND') {
             this.velocity.y += this.GRAVITY * dt;
             this.velocity.y = Math.max(this.velocity.y, -25);
         }
@@ -668,10 +689,10 @@ export class Player {
             }
         }
 
-        // Air dash
-        if (input.isPressed('KeyQ') && !this.airDashUsed) {
-            this.startAirDash(moveDir);
-        }
+        // Air dash (handled by SkillSystem in Phase 2)
+        // if (input.isPressed('KeyQ') && !this.airDashUsed) {
+        //     this.startAirDash(moveDir);
+        // }
 
         // Grapple aim initiation while airborne
         if (input.isPressed('Mouse2') && this.grapplingHook.state !== 'AIM') {
@@ -952,6 +973,32 @@ export class Player {
         }
     }
 
+    updateDiveKick(dt) {
+        this.diveKickTimer -= dt;
+        // Continue falling fast; gravity handled separately
+        this.velocity.y += this.GRAVITY * dt * 0.5; // reduced gravity for control
+        this.velocity.x *= 0.98;
+        this.velocity.z *= 0.98;
+        if (this.grounded || this.diveKickTimer <= 0) {
+            this.state = 'IDLE';
+            this.velocity.set(0, 0, 0);
+        }
+    }
+
+    updateGroundPound(dt) {
+        this.groundPoundTimer -= dt;
+        // Fast slam
+        this.velocity.y += this.GRAVITY * dt * 2.0; // extra gravity
+        if (this.grounded || this.groundPoundTimer <= 0) {
+            // Impact resolved by main.js hitbox
+            this.state = 'IDLE';
+            this.velocity.set(0, 0, 0);
+            if (this.cameraController && this.cameraController.shake) {
+                this.cameraController.shake(0.5, 0.4);
+            }
+        }
+    }
+
     startJump(input) {
         this.state = 'JUMP';
         this.fallStartY = this.position.y;
@@ -1096,6 +1143,25 @@ export class Player {
         this.velocity.z = dashDir.z;
         this.velocity.y = Math.max(this.velocity.y + 2, 3);
         this.comboSystem.registerMove('airDash');
+    }
+
+    startDiveKick() {
+        this.state = 'DIVE_KICK';
+        this.diveKickTimer = 0.5;
+        const forward = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
+        this.velocity.x = forward.x * 18;
+        this.velocity.z = forward.z * 18;
+        this.velocity.y = -12;
+        this.comboSystem.registerMove('diveKick');
+    }
+
+    startGroundPound() {
+        this.state = 'GROUND_POUND';
+        this.groundPoundTimer = 0.6;
+        this.velocity.x *= 0.3;
+        this.velocity.z *= 0.3;
+        this.velocity.y = -20;
+        this.comboSystem.registerMove('groundPound');
     }
 
     tryRollLanding() {
@@ -1602,4 +1668,60 @@ export class Player {
         return (spd * 3.6).toFixed(0);
     }
 
+    setCharacterSheet(sheet) {
+        this.characterSheet = sheet;
+    }
+
+    getRPGStats() {
+        if (!this.characterSheet) return {};
+        const stats = this.characterSheet.getStats ? this.characterSheet.getStats() : {};
+        return stats;
+    }
+
+    takeDamage(amount, type = 'kinetic', source = null) {
+        if (this.isDead || this.isInvincible) return 0;
+        this.health -= amount;
+        if (this.health <= 0) {
+            this.health = 0;
+            this.die();
+        }
+        if (this.onDamageTaken) this.onDamageTaken(amount, type, source);
+        return amount;
+    }
+
+    heal(amount) {
+        if (this.isDead) return;
+        this.health = Math.min(this.maxHealth, this.health + amount);
+    }
+
+    die() {
+        this.isDead = true;
+        this.state = 'RAGDOLL';
+        // death handled by caller/main.js
+    }
+
+    respawn() {
+        this.isDead = false;
+        this.health = this.maxHealth;
+        this.state = 'IDLE';
+        this.velocity.set(0, 0, 0);
+    }
+
+    getHealthPercent() {
+        return this.maxHealth > 0 ? this.health / this.maxHealth : 0;
+    }
+
+    _syncMaxHealth() {
+        const baseMax = 100;
+        let bonus = 0;
+        if (this.characterSheet) {
+            bonus = this.characterSheet.getMaxHPBonus ? this.characterSheet.getMaxHPBonus() : 0;
+        }
+        const newMax = baseMax + bonus;
+        if (newMax !== this.maxHealth) {
+            const ratio = this.maxHealth > 0 ? this.health / this.maxHealth : 1;
+            this.maxHealth = newMax;
+            this.health = Math.min(this.maxHealth, this.health);
+        }
+    }
 }
