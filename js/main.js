@@ -389,18 +389,23 @@ const arenaMode = new ArenaMode(scene, world, player, enemyManager, bossFight);
 const debt = new DebtSystem(player, enemyManager);
 
 combatSystem.onHitbox = (data) => {
+    let dmg = data.damage;
+    // Perfect Dodge counter: 2x damage for 2s after successful dodge
+    if (player._perfectDodgeCounter > 0) {
+        dmg *= 2;
+    }
     const hb = new Hitbox(data.owner, data.type, data.shape, data.offset, data.duration, (hitbox, target) => {
         if (target && target.takeDamage) {
-            target.takeDamage(data.damage, 'kinetic', data.owner);
+            target.takeDamage(dmg, 'kinetic', data.owner);
         }
         if (target && typeof spawnDamageNumber === 'function') {
             const tPos = target.position || (target.mesh && target.mesh.position) || data.owner.position;
-            spawnDamageNumber(tPos, Math.round(data.damage), false, 'kinetic');
+            spawnDamageNumber(tPos, Math.round(dmg), false, 'kinetic');
         }
         combatSystem.triggerHitStop(data.isFinisher ? 0.12 : (data.isHeavy ? 0.08 : 0.05));
         if (data.isHeavy || data.isFinisher) combatSystem.triggerCameraShake(0.15, 0.2);
     });
-    hb.damage = data.damage;
+    hb.damage = dmg;
     hb.team = 'player';
     hitboxSystem.registerHitbox(hb);
 };
@@ -530,6 +535,45 @@ player.onBackflipKick = (pos, facing) => {
     });
     hitbox.damage = 20; hitbox.team = 'player';
     hitboxSystem.registerHitbox(hitbox);
+};
+
+player.onSlideTackle = (pos, facing) => {
+    // Slide Tackle: leg sweep knocks down enemy
+    const dir = new THREE.Vector3(Math.sin(facing), 0, Math.cos(facing));
+    const offset = dir.clone().multiplyScalar(0.6);
+    offset.y = 0.3;
+    const hitbox = new Hitbox(player, 'melee', { type: 'sphere', radius: 0.9 }, offset, 0.1, (hb, target) => {
+        if (target && target.takeDamage) {
+            target.takeDamage(15, 'kinetic', player);
+            if (target._stunTimer !== undefined) target._stunTimer = 3.0;
+            spawnDamageNumber(target.position || target.mesh.position, 15, false, 'kinetic');
+        }
+    });
+    hitbox.damage = 15; hitbox.team = 'player';
+    hitboxSystem.registerHitbox(hitbox);
+};
+
+player.onLedgeTakedown = (pos, facing, hangData) => {
+    // Ledge Takedown: pull enemy over ledge if they're near
+    const allEnemies = [
+        ...(world.drones ? world.drones.drones : []),
+        ...(enemyManager ? enemyManager.enemies : [])
+    ];
+    for (const e of allEnemies) {
+        if (e.isDead || e.team === 'player') continue;
+        const ePos = e.position || (e.mesh && e.mesh.position);
+        if (!ePos) continue;
+        // Enemy must be near the ledge edge, below the player
+        const distXZ = Math.hypot(ePos.x - pos.x, ePos.z - pos.z);
+        const distY = pos.y - ePos.y;
+        if (distXZ < 2.0 && distY > 0.5 && distY < 3.0) {
+            if (e.takeDamage) e.takeDamage(50, 'kinetic', player);
+            spawnDamageNumber(ePos.clone().add(new THREE.Vector3(0, 1, 0)), 50, true, 'kinetic');
+            // Pull enemy down
+            if (e.group) e.group.position.y -= 2;
+            break;
+        }
+    }
 };
 
 // Hint system

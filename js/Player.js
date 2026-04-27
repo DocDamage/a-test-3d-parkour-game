@@ -133,6 +133,17 @@ export class Player {
         this._parryCooldown = 0;
         this.onPerfectParry = null;
 
+        // Defensive mechanics
+        this._dodgeWindow = 0;      // perfect dodge i-frame window
+        this._dodgeCooldown = 0;
+        this._knockbackTimer = 0;
+        this._knockbackRecoveryReady = false;
+        this._slideTackleTriggered = false;
+
+        // Parkour melee callbacks
+        this.onSlideTackle = null;
+        this.onLedgeTakedown = null;
+
         // RPG system hook
         this.characterSheet = null;
         this.staminaSystem = null;
@@ -457,6 +468,18 @@ export class Player {
         if (this._parryWindow > 0) this._parryWindow = Math.max(0, this._parryWindow - dt);
         if (this._parryCooldown > 0) this._parryCooldown = Math.max(0, this._parryCooldown - dt);
 
+        // Dodge / defensive timers
+        if (this._dodgeWindow > 0) this._dodgeWindow = Math.max(0, this._dodgeWindow - dt);
+        if (this._dodgeCooldown > 0) this._dodgeCooldown = Math.max(0, this._dodgeCooldown - dt);
+        if (this._perfectDodgeCounter > 0) this._perfectDodgeCounter = Math.max(0, this._perfectDodgeCounter - dt);
+        if (this._knockbackTimer > 0) {
+            this._knockbackTimer -= dt;
+            if (this._knockbackTimer <= 0) {
+                this._knockbackTimer = 0;
+                if (this.state === 'KNOCKBACK') this.state = 'IDLE';
+            }
+        }
+
         // Update subsystems
         this.comboSystem.update(dt, this.grounded);
 
@@ -506,6 +529,14 @@ export class Player {
                 break;
             case 'GROUND_POUND':
                 this.updateGroundPound(dt);
+                break;
+            case 'KNOCKBACK':
+                // Knockback Recovery: press Space to flip out of knockback
+                if (input.wasPressed('Space')) {
+                    this._knockbackRecoveryReady = true;
+                    this.velocity.y = Math.max(this.velocity.y, 6);
+                    this.state = 'JUMP';
+                }
                 break;
             case 'GRAPPLE_AIM':
                 this.updateGrappleAim(dt, input);
@@ -848,10 +879,18 @@ export class Player {
         this.velocity.z *= (1 - dt * friction);
 
         const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
+
+        // Slide Tackle: one hitbox trigger per slide when moving fast
+        if (!this._slideTackleTriggered && speed > 4 && this.onSlideTackle) {
+            this._slideTackleTriggered = true;
+            this.onSlideTackle(this.position.clone(), this.facing);
+        }
+
         if (speed < 2 || this.slideTimer <= 0 || !input.isPressed('KeyC')) {
             if (this.audio) this.audio.playSlide(false);
             this.state = 'CROUCH';
             this.currentHeight = this.HEIGHT_CROUCH;
+            this._slideTackleTriggered = false;
         }
     }
 
@@ -941,6 +980,10 @@ export class Player {
         }
 
         if (input.isPressed('KeyS') || input.isPressed('KeyE')) {
+            // Ledge Takedown: if enemy is near below ledge, pull them down
+            if (input.isPressed('KeyE') && this.onLedgeTakedown) {
+                this.onLedgeTakedown(this.position.clone(), this.facing, this.hangData);
+            }
             this.state = 'FALL';
             this.hangData = null;
             return;
@@ -1085,6 +1128,7 @@ export class Player {
     startSlide(moveDir) {
         this.state = 'SLIDE';
         this.slideTimer = 0.8;
+        this._slideTackleTriggered = false;
         const forward = moveDir.length() > 0.1 ? moveDir :
             new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
         const speed = this.SPEED_SPRINT * 1.6 * this.comboSystem.getFlowBoost() * this.moveSpeedMultiplier;
@@ -1190,6 +1234,11 @@ export class Player {
 
     startAirDash(direction) {
         this.airDashUsed = true;
+        // Perfect dodge window on air dash
+        if (this._dodgeCooldown <= 0) {
+            this._dodgeWindow = 0.35;
+            this._dodgeCooldown = 0.5;
+        }
         const dashDir = direction.length() > 0.1 ? direction :
             new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
         dashDir.normalize().multiplyScalar(this.AIR_DASH_FORCE);
@@ -1741,6 +1790,32 @@ export class Player {
 
     takeDamage(amount, type = 'kinetic', source = null) {
         if (this.isDead || this.isInvincible) return 0;
+
+        // Perfect Dodge: if dashing when damage lands = dodge + counter window
+        if (this._dodgeWindow > 0 && amount > 0) {
+            this._dodgeWindow = 0;
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.8;
+                this.scene.userData.spawnDamageNumber(pos, 'DODGE', true, 'kinetic');
+            }
+            // 2s counter window: next attack deals 2x damage
+            this._perfectDodgeCounter = 2.0;
+            return 0;
+        }
+
+        // Panic Roll: if roll input was pressed right before impact (0.15s window)
+        if (this.rollInputTimer > 0 && amount > 0) {
+            this.rollInputTimer = 0;
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.8;
+                this.scene.userData.spawnDamageNumber(pos, 'DODGED', true, 'kinetic');
+            }
+            // I-frames for remainder of roll
+            this.isInvincible = true;
+            setTimeout(() => { this.isInvincible = false; }, 300);
+            return 0;
+        }
+
         // Perfect Parry: block melee damage during parry window
         if (this._parryWindow > 0 && amount > 0) {
             this._parryWindow = 0;
@@ -1752,6 +1827,22 @@ export class Player {
             }
             return 0;
         }
+
+        // Knockback on heavy hits (>20 damage)
+        if (amount > 20 && this.state !== 'KNOCKBACK') {
+            this.state = 'KNOCKBACK';
+            this._knockbackTimer = 0.5;
+            this._knockbackRecoveryReady = false;
+            // Push back from source
+            if (source && source.position) {
+                const away = this.position.clone().sub(source.position).normalize();
+                this.velocity.x = away.x * 8;
+                this.velocity.z = away.z * 8;
+                this.velocity.y = 5;
+            }
+            amount *= 0.5; // reduce damage during knockback
+        }
+
         this.health -= amount;
         if (this.health <= 0) {
             // Allow legendary powers to block fatal damage
