@@ -4,9 +4,10 @@ import * as THREE from 'three';
  * Single patrol drone with vision-cone detection.
  */
 class Drone {
-    constructor(scene, world, config) {
+    constructor(scene, world, config, damageSystem = null) {
         this.scene = scene;
         this.world = world;
+        this._damageSystem = damageSystem;
 
         // Waypoints are supplied as [x, z]; Y is fixed at height
         this.waypoints = config.waypoints.map(w => new THREE.Vector3(w[0], config.height, w[1]));
@@ -100,6 +101,10 @@ class Drone {
     /* ------------------------------------------------------------------ */
     /*  Per-frame update                                                    */
     /* ------------------------------------------------------------------ */
+    setDamageSystem(ds) {
+        this._damageSystem = ds;
+    }
+
     update(dt, player) {
         if (this.isDead) return;
 
@@ -217,7 +222,20 @@ class Drone {
         if (this.state === 'CHASE' && player && !this.isDead && this.team !== 'player') {
             const distToPlayer = this.group.position.distanceTo(player.position);
             if (distToPlayer < 1.5 && this.attackCooldown <= 0) {
-                if (player.takeDamage) player.takeDamage(10, 'kinetic', this);
+                // Firewall feedback: attacker takes electric damage if player has active firewall
+                if (player._firewallActive) {
+                    if (this._damageSystem) {
+                        this._damageSystem.applyDamage(player, this, 15, 'electric');
+                    } else {
+                        this.takeDamage(15, 'electric', player);
+                    }
+                }
+                // Route damage through DamageSystem for dodge/crit/type modifiers
+                if (this._damageSystem) {
+                    this._damageSystem.applyDamage(this, player, 10, 'kinetic');
+                } else if (player.takeDamage) {
+                    player.takeDamage(10, 'kinetic', this);
+                }
                 this.attackCooldown = 1.5;
             }
         }
@@ -239,7 +257,11 @@ class Drone {
                     if (dist < nearestDist) { nearest = d; nearestDist = dist; }
                 }
                 if (nearest && nearestDist < 1.5 && this.attackCooldown <= 0) {
-                    if (nearest.takeDamage) nearest.takeDamage(10, 'kinetic', this);
+                    if (this._damageSystem) {
+                        this._damageSystem.applyDamage(this, nearest, 10, 'kinetic');
+                    } else if (nearest.takeDamage) {
+                        nearest.takeDamage(10, 'kinetic', this);
+                    }
                     this.attackCooldown = 1.5;
                 } else if (nearest) {
                     const pos = nearest.position || (nearest.mesh && nearest.mesh.position);
@@ -429,11 +451,18 @@ export class DroneAI {
         this.world = world;
         this.player = player;
         this.drones = [];
+        this._damageSystem = null;
     }
 
     /** Wire up the player reference (called from World.setPlayer). */
     setPlayer(player) {
         this.player = player;
+    }
+
+    /** Wire up the damage system for proper dodge/crit/type calculations. */
+    setDamageSystem(ds) {
+        this._damageSystem = ds;
+        for (const d of this.drones) d.setDamageSystem(ds);
     }
 
     /**
@@ -445,7 +474,7 @@ export class DroneAI {
      * @param {number}     [config.pauseTime=1.5]
      */
     addDrone(config) {
-        const drone = new Drone(this.scene, this.world, config);
+        const drone = new Drone(this.scene, this.world, config, this._damageSystem);
         this.drones.push(drone);
         return drone;
     }

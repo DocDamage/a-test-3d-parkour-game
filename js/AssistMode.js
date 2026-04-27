@@ -16,6 +16,9 @@ export class AssistMode {
         this._risingTide = null;
         this._originals = new WeakMap(); // per-player backups
         this._uiBuilt = false;
+        this._jumpAssist = false;
+        this._grappleAssist = false;
+        this._aimAssist = false;
         this._buildUI();
     }
 
@@ -25,12 +28,35 @@ export class AssistMode {
 
     toggle() {
         this._active = !this._active;
+        this._jumpAssist = this._active;
+        this._grappleAssist = this._active;
+        this._aimAssist = this._active;
         this._updateUI();
         return this._active;
     }
 
     isActive() {
         return this._active;
+    }
+
+    setJumpAssist(v) {
+        this._jumpAssist = !!v;
+        this._recomputeActive();
+    }
+
+    setGrappleAssist(v) {
+        this._grappleAssist = !!v;
+        this._recomputeActive();
+    }
+
+    setAimAssist(v) {
+        this._aimAssist = !!v;
+        this._recomputeActive();
+    }
+
+    _recomputeActive() {
+        this._active = this._jumpAssist || this._grappleAssist || this._aimAssist;
+        this._updateUI();
     }
 
     setRisingTide(risingTide) {
@@ -53,68 +79,62 @@ export class AssistMode {
             _assistActive: player._assistActive,
         };
 
-        // 1. Player constants
-        player.VAULT_HEIGHT = 1.3; // already 1.3 in base, kept explicit
-        // Coyote time is hard-coded (0.18) in Player.update — we intercept via setter
-        // Knockback reduction is handled by wrapping velocity methods
-        // Auto-vault expansion is handled in our update() wrapper
-
-        // 2. Intercept coyoteTime assignment (Player sets exactly 0.18 when grounded)
         const self = this;
-        const _rawCoyote = player.coyoteTime;
-        Object.defineProperty(player, 'coyoteTime', {
-            get() { return _rawCoyote; },
-            set(v) {
-                if (self._active && typeof v === 'number' && Math.abs(v - 0.18) < 0.001) {
-                    v = 0.35;
+
+        // 1. Jump Assist: extended coyote time + auto-vault
+        if (this._jumpAssist) {
+            const _rawCoyote = player.coyoteTime;
+            Object.defineProperty(player, 'coyoteTime', {
+                get() { return _rawCoyote; },
+                set(v) {
+                    if (self._jumpAssist && typeof v === 'number' && Math.abs(v - 0.18) < 0.001) {
+                        v = 0.35;
+                    }
+                    _rawCoyote = v;
+                },
+            });
+            backups._coyoteTimeSetter = Object.getOwnPropertyDescriptor(player, 'coyoteTime');
+
+            // Wrap player.update to inject auto-vault in WALK/IDLE/CROUCH
+            backups._playerUpdate = player.update.bind(player);
+            player.update = function (dt, input, yaw) {
+                backups._playerUpdate(dt, input, yaw);
+                if (self._jumpAssist && this.grounded &&
+                    (this.state === 'WALK' || this.state === 'IDLE' || this.state === 'CROUCH')) {
+                    const info = this.checkAutoVault ? this.checkAutoVault() : null;
+                    if (info) this.startVault(info);
                 }
-                _rawCoyote = v;
-            },
-        });
-        backups._coyoteTimeSetter = Object.getOwnPropertyDescriptor(player, 'coyoteTime');
+            };
+        }
 
-        // 3. Reduce hazard knockback by wrapping velocity.add / .copy
-        backups._velAdd = player.velocity.add.bind(player.velocity);
-        player.velocity.add = function (v) {
-            if (self._active && v && v.isVector3) {
-                const mag = v.length();
-                if (mag > 3) {
-                    v = v.clone().multiplyScalar(0.5);
+        // 2. Grapple Assist: reduced knockback from hazards / grapple snaps
+        if (this._grappleAssist) {
+            backups._velAdd = player.velocity.add.bind(player.velocity);
+            player.velocity.add = function (v) {
+                if (self._grappleAssist && v && v.isVector3) {
+                    const mag = v.length();
+                    if (mag > 3) v = v.clone().multiplyScalar(0.5);
                 }
-            }
-            return backups._velAdd(v);
-        };
+                return backups._velAdd(v);
+            };
 
-        backups._velCopy = player.velocity.copy.bind(player.velocity);
-        player.velocity.copy = function (v) {
-            if (self._active && v && v.isVector3) {
-                const mag = v.length();
-                if (mag > 10) {
-                    v = v.clone().multiplyScalar(0.5);
+            backups._velCopy = player.velocity.copy.bind(player.velocity);
+            player.velocity.copy = function (v) {
+                if (self._grappleAssist && v && v.isVector3) {
+                    const mag = v.length();
+                    if (mag > 10) v = v.clone().multiplyScalar(0.5);
                 }
-            }
-            return backups._velCopy(v);
-        };
+                return backups._velCopy(v);
+            };
+        }
 
-        // 4. Wrap player.update to inject auto-vault in WALK/IDLE/CROUCH
-        backups._playerUpdate = player.update.bind(player);
-        player.update = function (dt, input, yaw) {
-            backups._playerUpdate(dt, input, yaw);
-            // After base update, if grounded and not in special state, try auto-vault
-            if (self._active && this.grounded &&
-                (this.state === 'WALK' || this.state === 'IDLE' || this.state === 'CROUCH')) {
-                const info = this.checkAutoVault ? this.checkAutoVault() : null;
-                if (info) {
-                    this.startVault(info);
-                }
-            }
-        };
+        // 3. Aim Assist: drone detection halving
+        if (this._aimAssist) {
+            this._patchDrones(player, true);
+        }
 
-        // 5. Patch drones (2× longer detection)
-        this._patchDrones(player, true);
-
-        // 6. Patch Rising Tide if reference available
-        this._patchRisingTide(true);
+        // 4. Patch Rising Tide if reference available (global, not per-flag)
+        if (this._active) this._patchRisingTide(true);
 
         player._assistActive = true;
         this._originals.set(player, backups);
@@ -131,16 +151,18 @@ export class AssistMode {
         player.JUMP_FORCE = backups.JUMP_FORCE;
         player._assistActive = backups._assistActive;
 
-        // Remove coyoteTime interceptor
-        delete player.coyoteTime;
-        player.coyoteTime = 0;
+        // Remove coyoteTime interceptor (only if jump assist was active)
+        if (backups._coyoteTimeSetter) {
+            delete player.coyoteTime;
+            player.coyoteTime = 0;
+        }
 
-        // Restore velocity methods
-        player.velocity.add = backups._velAdd;
-        player.velocity.copy = backups._velCopy;
+        // Restore velocity methods (only if grapple assist was active)
+        if (backups._velAdd) player.velocity.add = backups._velAdd;
+        if (backups._velCopy) player.velocity.copy = backups._velCopy;
 
-        // Restore update
-        player.update = backups._playerUpdate;
+        // Restore update (only if jump assist was active)
+        if (backups._playerUpdate) player.update = backups._playerUpdate;
 
         // Unpatch drones
         this._patchDrones(player, false);
@@ -154,8 +176,8 @@ export class AssistMode {
     /** Call every frame (after player.update is fine, or before). */
     update(dt, player) {
         if (!this._active) return;
-        // Ensure coyote time stays extended if Player update overwrote it
-        if (player.grounded && player.coyoteTime < 0.35) {
+        // Ensure coyote time stays extended if Jump Assist is active
+        if (this._jumpAssist && player.grounded && player.coyoteTime < 0.35) {
             player.coyoteTime = 0.35;
         }
     }

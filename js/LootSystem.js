@@ -139,19 +139,22 @@ export class LootSystem {
             drop.mesh.position.y += bob * dt * 0.5;
             drop.mesh.rotation.y += dt * 1.5;
 
-            // Health globe auto-pickup within 1 metre
+            // Read legendary loot beacon radius bonus
+            const pickupBonus = (this.player && this.player._lootPickupRadius) ? this.player._lootPickupRadius : 0;
+
+            // Health globe auto-pickup within 1 metre (+ bonus)
             if (drop.type === 'health_globe') {
                 const dist = drop.mesh.position.distanceTo(playerPosition);
-                if (dist <= 1.0) {
+                if (dist <= (1.0 + pickupBonus)) {
                     this.pickupDrop(id);
                     continue;
                 }
             }
 
-            // Generic proximity pickup for scrap / chips (generous 1.5 m)
-            if (drop.type === 'scrap' || drop.type === 'chips') {
+            // Generic proximity pickup for scrap / chips / gear / consumables (generous 1.5 m + bonus)
+            if (drop.type === 'scrap' || drop.type === 'chips' || drop.type === 'gear' || drop.type === 'consumable') {
                 const dist = drop.mesh.position.distanceTo(playerPosition);
-                if (dist <= 1.5) {
+                if (dist <= (1.5 + pickupBonus)) {
                     this.pickupDrop(id);
                 }
             }

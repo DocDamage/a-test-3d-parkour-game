@@ -30,6 +30,14 @@ import { DirectorMode } from './DirectorMode.js';
 import { GhostRacing } from './GhostRacing.js';
 import { BulletTime } from './BulletTime.js';
 import { AssistMode } from './AssistMode.js';
+import { StaminaSystem } from './StaminaSystem.js';
+import { CombatSystem } from './CombatSystem.js';
+import { StatusEffectSystem } from './StatusEffectSystem.js';
+import { EnemyManager } from './EnemyManager.js';
+import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
+import { ArenaMode } from './ArenaMode.js';
+import { ConsequenceSystem } from './ConsequenceSystem.js';
+import { DebtSystem } from './DebtSystem.js';
 import { SpeedrunILs } from './SpeedrunILs.js';
 import { ChallengeSystem } from './ChallengeSystem.js';
 import { GodRays } from './GodRays.js';
@@ -213,6 +221,8 @@ const implants = new ImplantSystem(player, characterSheet);
 const legacy = new LegacySystem(characterSheet, progression, exoSuit, familiarity);
 const ngPlus = new NewGamePlus(player, world, characterSheet);
 const collapse = new CollapseMode(world, player, characterSheet, exoSuit, archetype);
+const consequences = new ConsequenceSystem();
+const debt = new DebtSystem(player, enemyManager);
 
 // Skill system (Phase 2)
 const activeArchetypeId = savedArchetype || 'traceur';
@@ -227,6 +237,8 @@ for (const [slot, skillId] of Object.entries(defaultLoadout)) {
 
 // Register skill execution callbacks
 skillSystem.onExecute('light_strike', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
     // Melee hitbox — same as existing LMB attack
     const attackDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
     const offset = attackDir.multiplyScalar(0.8);
@@ -248,6 +260,8 @@ skillSystem.onExecute('light_strike', (skill, targetPos, p) => {
 });
 
 skillSystem.onExecute('dive_kick', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.heavyAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.heavyAttack);
     if (p.startDiveKick) p.startDiveKick();
     // Damage hitbox on landing area
     const offset = new THREE.Vector3(0, -0.5, 0);
@@ -274,6 +288,8 @@ skillSystem.onExecute('air_dash', (skill, targetPos, p) => {
 });
 
 skillSystem.onExecute('slide_tackle', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
     const moveDir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
     if (p.startSlide) p.startSlide(moveDir);
     // Slide hitbox
@@ -295,6 +311,8 @@ skillSystem.onExecute('slide_tackle', (skill, targetPos, p) => {
 });
 
 skillSystem.onExecute('ground_pound', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.heavyAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.heavyAttack);
     if (p.startGroundPound) p.startGroundPound();
     // AoE hitbox on impact — registered now, expires quickly
     const hitbox = new Hitbox(
@@ -554,6 +572,8 @@ skillSystem.onExecute('zero_cooldown', (skill, targetPos, p) => {
 // Phase 2 — Specimen callbacks
 // ------------------------------------------------------------------
 skillSystem.onExecute('claw_swipe', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
     const forward = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
     let hits = 0;
     const hitbox = new Hitbox(
@@ -579,6 +599,8 @@ skillSystem.onExecute('claw_swipe', (skill, targetPos, p) => {
 });
 
 skillSystem.onExecute('berserk_lunge', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.heavyAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.heavyAttack);
     const drones = world.drones ? world.drones.drones : [];
     let nearest = null; let nearestDist = Infinity;
     for (const drone of drones) {
@@ -609,6 +631,8 @@ skillSystem.onExecute('berserk_lunge', (skill, targetPos, p) => {
 });
 
 skillSystem.onExecute('roar', (skill, targetPos, p) => {
+    if (staminaSystem && !staminaSystem.canSpend(staminaSystem.costs.lightAttack)) return;
+    if (staminaSystem) staminaSystem.spend(staminaSystem.costs.lightAttack);
     const drones = world.drones ? world.drones.drones : [];
     for (const drone of drones) {
         const pos = drone.position || (drone.mesh && drone.mesh.position);
@@ -754,8 +778,28 @@ const passiveTree = new PassiveTree(activeArchetypeId, skillSystem);
 passiveTree._load();
 
 // Combat systems
-const damageSystem = new DamageSystem(characterSheet);
+const damageSystem = new DamageSystem(characterSheet, statusEffectSystem);
 const hitboxSystem = new HitboxSystem();
+const staminaSystem = new StaminaSystem(player);
+player.staminaSystem = staminaSystem;
+const combatSystem = new CombatSystem(player, hitboxSystem, damageSystem, camera, audio);
+const statusEffectSystem = new StatusEffectSystem();
+combatSystem.onHitbox = (data) => {
+    const hb = new Hitbox(data.owner, data.type, data.shape, data.offset, data.duration, (hitbox, target) => {
+        if (target && target.takeDamage) {
+            target.takeDamage(data.damage, 'kinetic', data.owner);
+        }
+        if (target && typeof spawnDamageNumber === 'function') {
+            const tPos = target.position || (target.mesh && target.mesh.position) || data.owner.position;
+            spawnDamageNumber(tPos, Math.round(data.damage), false, 'kinetic');
+        }
+        combatSystem.triggerHitStop(data.isFinisher ? 0.12 : (data.isHeavy ? 0.08 : 0.05));
+        if (data.isHeavy || data.isFinisher) combatSystem.triggerCameraShake(0.15, 0.2);
+    });
+    hb.damage = data.damage;
+    hb.team = 'player';
+    hitboxSystem.registerHitbox(hb);
+};
 const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
 const enemyHealthBars = []; // tracks EnemyHealthBar instances
 
@@ -797,6 +841,11 @@ if (world.drones && world.drones.drones) {
     if (nephalemGlory) nephalemGlory.setEnemyHealthBars(enemyHealthBars);
 }
 
+// Wire DamageSystem into DroneAI for dodge/crit/type calculations
+if (world.drones) {
+    world.drones.setDamageSystem(damageSystem);
+}
+
 // Player damage numbers + Nephalem Glory streak break
 player.onDamageTaken = (amount, type, source) => {
     const pos = player.position.clone();
@@ -809,6 +858,10 @@ player.onDamageTaken = (amount, type, source) => {
 
 player.onJump = (isDoubleJump) => {
     if (legendaryPowerSystem) legendaryPowerSystem.onJump(isDoubleJump);
+};
+
+player.onPerfectParry = (source) => {
+    if (legendaryPowerSystem) legendaryPowerSystem.onPerfectParry();
 };
 
 // Hint system
@@ -972,7 +1025,7 @@ const bossFight = new BossFight(scene, world, player, camera, postProcessing, di
 
 // Phase 4: Endgame systems
 const difficultyTier = new DifficultyTierSystem(challenges);
-const apexRift = new ApexRiftSystem(scene, world, player, bossFight, challenges, lootSystem, difficultyTier);
+const apexRift = new ApexRiftSystem(scene, world, player, bossFight, challenges, lootSystem, difficultyTier, enemyManager);
 const nephalemGlory = new NephalemGlory(player, challenges);
 
 // ── Zelda-style systems ────────────────────────────────────────────────────
@@ -1316,12 +1369,30 @@ function spawnDamageNumber(position, amount, isCrit, damageType) {
     if (volSFX && audio) volSFX.addEventListener('input', (e) => audio.setSFXVolume(parseFloat(e.target.value) / 100));
     const volMusic = document.getElementById('set-vol-music');
     if (volMusic && audio) volMusic.addEventListener('input', (e) => audio.setMusicVolume(parseFloat(e.target.value) / 100));
-    // Assist mode toggles (all wired to global toggle since AssistMode is binary)
-    for (const id of ['set-assist-jump', 'set-assist-grapple', 'set-assist-aim']) {
-        const cb = document.getElementById(id);
-        if (cb && assistMode) {
-            cb.addEventListener('change', () => assistMode.toggle());
-        }
+    // Assist mode toggles (granular flags)
+    const assistJump = document.getElementById('set-assist-jump');
+    if (assistJump && assistMode) {
+        assistJump.addEventListener('change', (e) => {
+            assistMode.setJumpAssist(e.target.checked);
+            if (e.target.checked) assistMode.modifyPlayer(player);
+            else assistMode.restorePlayer(player);
+        });
+    }
+    const assistGrapple = document.getElementById('set-assist-grapple');
+    if (assistGrapple && assistMode) {
+        assistGrapple.addEventListener('change', (e) => {
+            assistMode.setGrappleAssist(e.target.checked);
+            if (e.target.checked) assistMode.modifyPlayer(player);
+            else assistMode.restorePlayer(player);
+        });
+    }
+    const assistAim = document.getElementById('set-assist-aim');
+    if (assistAim && assistMode) {
+        assistAim.addEventListener('change', (e) => {
+            assistMode.setAimAssist(e.target.checked);
+            if (e.target.checked) assistMode.modifyPlayer(player);
+            else assistMode.restorePlayer(player);
+        });
     }
 })();
 
@@ -1365,6 +1436,13 @@ function animate() {
             if (activeInput.wasPressed('KeyE') && player.state !== 'CLIMB' && player.state !== 'HANG') skillSystem.useSkill('E');
             if (activeInput.wasPressed('KeyR')) skillSystem.useSkill('R');
         }
+
+        // Parry input (Shift+F while grounded)
+        if (activeInput.wasPressed('KeyF') && activeInput.isPressed('ShiftLeft') && player.grounded
+            && !dialogueSystem.isOpen && !shop.isOpen && !dungeonSystem.nearbyDungeonId) {
+            const didParry = player.triggerParry();
+            if (didParry && audio) audio.playTone(880, 0.05, 'sine');
+        }
         
         // === BOSS FIGHT TOGGLE (B) ===
         if (activeInput.wasPressed('KeyB') && !bossFight.isActive() && !levelEditor.isActive()) {
@@ -1380,6 +1458,10 @@ function animate() {
         }
         
         // === DIFFICULTY TIER CYCLE (M) ===
+        if (activeInput.wasPressed('KeyT') && activeInput.isPressed('ShiftLeft')) {
+            arenaMode.toggleSelector();
+        }
+
         if (activeInput.wasPressed('KeyM')) {
             const tiers = ['normal', 'nightmare', 'hell', 'torment1', 'torment2', 'torment3', 'torment4', 'torment5', 'torment6'];
             const currentIdx = tiers.indexOf(difficultyTier.currentTier);
@@ -1576,6 +1658,10 @@ function animate() {
         
         // Update drones
         world.drones.update(finalDt);
+        enemyManager.update(finalDt);
+        enemyManager.clearDead();
+        weaponSystem.update(finalDt, activeInput);
+        arenaMode.update(finalDt);
         
         // Update collectibles
         world.collectibles.update(finalDt, player);
@@ -1639,6 +1725,9 @@ function animate() {
         
         // Assist mode
         assistMode.update(finalDt, player, activeInput);
+        staminaSystem.update(finalDt, player);
+        combatSystem.update(finalDt, activeInput);
+        statusEffectSystem.update(finalDt);
         
         // Speedrun ILs
         speedrunILs.update(finalDt);
@@ -1740,6 +1829,8 @@ function animate() {
             characterSheet.addTempBonus('nephalem_glory', 'damageMultiplier', baseMult, 10);
         }
         if (codex) codex.update && codex.update(finalDt, player);
+        if (consequences) consequences.update && consequences.update(finalDt);
+        if (debt) debt.update && debt.update(finalDt);
         
         // Combat systems update
         if (hitboxSystem) {

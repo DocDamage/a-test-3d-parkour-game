@@ -129,9 +129,13 @@ export class Player {
         this._firewallActive = false;
         this._predatorVisionActive = false;
         this._critBonusFromPredator = 0;
+        this._parryWindow = 0;
+        this._parryCooldown = 0;
+        this.onPerfectParry = null;
 
         // RPG system hook
         this.characterSheet = null;
+        this.staminaSystem = null;
 
         // Visuals
         this.mesh = this.createMesh();
@@ -173,7 +177,8 @@ export class Player {
         let speed = this.SPEED_WALK;
         let nextState = moveDir.length() > 0.1 ? 'WALK' : 'IDLE';
 
-        if (input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND) {
+        const canSprint = !this.staminaSystem || this.staminaSystem.stamina > 0;
+        if (input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND && canSprint) {
             speed = this.SPEED_SPRINT;
             nextState = 'SPRINT';
         } else if (targetHeight === this.HEIGHT_CROUCH) {
@@ -233,8 +238,11 @@ export class Player {
 
     updateAirborne(dt, input, moveDir) {
         // Dash handling
-        if (input.isPressed('KeyQ') && this.canDash && this.dashTimer <= 0) {
+        const canDash = this.canDash && this.dashTimer <= 0 &&
+            (!this.staminaSystem || this.staminaSystem.canSpend(15));
+        if (input.isPressed('KeyQ') && canDash) {
             this.startDash(moveDir);
+            if (this.staminaSystem) this.staminaSystem.spend(15);
         }
 
         if (this.dashTimer > 0) {
@@ -444,6 +452,10 @@ export class Player {
 
         this.justLandedTimer = Math.max(0, this.justLandedTimer - dt);
         this.bunnyHopFlashTimer = Math.max(0, this.bunnyHopFlashTimer - dt);
+
+        // Parry timers
+        if (this._parryWindow > 0) this._parryWindow = Math.max(0, this._parryWindow - dt);
+        if (this._parryCooldown > 0) this._parryCooldown = Math.max(0, this._parryCooldown - dt);
 
         // Update subsystems
         this.comboSystem.update(dt, this.grounded);
@@ -1694,8 +1706,26 @@ export class Player {
         return stats;
     }
 
+    triggerParry() {
+        if (this._parryCooldown > 0 || this.isDead) return false;
+        this._parryWindow = 0.25; // 0.25s window
+        this._parryCooldown = 1.0; // 1s cooldown
+        return true;
+    }
+
     takeDamage(amount, type = 'kinetic', source = null) {
         if (this.isDead || this.isInvincible) return 0;
+        // Perfect Parry: block melee damage during parry window
+        if (this._parryWindow > 0 && amount > 0) {
+            this._parryWindow = 0;
+            if (this.onPerfectParry) this.onPerfectParry(source);
+            // Spawn parry visual feedback
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.8;
+                this.scene.userData.spawnDamageNumber(pos, 'PARRY', true, 'kinetic');
+            }
+            return 0;
+        }
         this.health -= amount;
         if (this.health <= 0) {
             // Allow legendary powers to block fatal damage

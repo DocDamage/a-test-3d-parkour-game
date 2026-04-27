@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 
 export class ApexRiftSystem {
-  constructor(scene, world, player, bossFight, challengeSystem, lootSystem, difficultyTier) {
+  constructor(scene, world, player, bossFight, challengeSystem, lootSystem, difficultyTier, enemyManager = null) {
     this.scene = scene;
     this.world = world;
     this.player = player;
@@ -22,6 +22,7 @@ export class ApexRiftSystem {
     this.challengeSystem = challengeSystem;
     this.lootSystem = lootSystem;
     this.difficultyTier = difficultyTier;
+    this.enemyManager = enemyManager;
 
     this.active = false;
     this.riftLevel = 1;
@@ -248,39 +249,51 @@ export class ApexRiftSystem {
   }
 
   _spawnWave(floorNumber) {
-    if (!this.world || !this.world.drones || !this.world.drones.addDrone) return;
-
     const count = Math.min(3 + Math.floor(floorNumber / 2), 8);
     const isEliteChance = Math.min(0.05 + floorNumber * 0.02, 0.4);
+
+    // Enemy type pool expands with floor number
+    const enemyTypes = ['brawler'];
+    if (floorNumber >= 2) enemyTypes.push('shield', 'suicide');
+    if (floorNumber >= 5) enemyTypes.push('turret', 'jammer', 'phantom');
+    if (floorNumber >= 10) enemyTypes.push('medic', 'command', 'minelayer');
 
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
       const dist = 8 + Math.random() * 8;
-      const pos = {
-        x: Math.cos(angle) * dist,
-        y: 0.5,
-        z: Math.sin(angle) * dist
-      };
+      const pos = new THREE.Vector3(
+        Math.cos(angle) * dist,
+        3,
+        Math.sin(angle) * dist
+      );
 
       const isElite = Math.random() < isEliteChance;
-      const drone = this.world.drones.addDrone({
-        position: pos,
-        type: isElite ? 'elite' : 'patrol',
-        isElite
-      });
+      const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
 
-      if (drone) {
+      let enemy = null;
+      if (this.enemyManager) {
+        enemy = this.enemyManager.spawnEnemy(type, { position: pos, isElite });
+      } else if (this.world && this.world.drones && this.world.drones.addDrone) {
+        enemy = this.world.drones.addDrone({ position: { x: pos.x, y: pos.y, z: pos.z }, type: isElite ? 'elite' : 'patrol', isElite });
+      }
+
+      if (enemy) {
         // Apply difficulty + rift scaling
         const diffMult = this.difficultyTier ? this.difficultyTier.getTierConfig().hpMult : 1.0;
         const riftMult = Math.pow(this.riftScaling, this.riftLevel - 1);
         const totalMult = diffMult * riftMult;
 
-        drone.maxHealth = Math.floor((drone.maxHealth || 40) * totalMult);
-        drone.health = drone.maxHealth;
-        if (drone.meleeDamage) drone.meleeDamage *= this.difficultyTier ? this.difficultyTier.getTierConfig().dmgMult : 1.0;
+        enemy.maxHealth = Math.floor((enemy.maxHealth || 40) * totalMult);
+        enemy.health = enemy.maxHealth;
+        if (enemy._attackDamage !== undefined) enemy._attackDamage = Math.floor(enemy._attackDamage * (this.difficultyTier ? this.difficultyTier.getTierConfig().dmgMult : 1.0));
+        if (enemy.meleeDamage) enemy.meleeDamage *= this.difficultyTier ? this.difficultyTier.getTierConfig().dmgMult : 1.0;
 
-        // Track for cleanup
-        this.spawnedEnemies.push(drone);
+        // Wire death callback for loot / progress
+        enemy.onDeath = (deadEnemy, source) => {
+          this.onEnemyKilled(deadEnemy, source);
+        };
+
+        this.spawnedEnemies.push(enemy);
       }
     }
   }

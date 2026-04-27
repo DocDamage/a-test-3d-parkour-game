@@ -12,8 +12,9 @@ export const DAMAGE_TYPES = {
 };
 
 export class DamageSystem {
-    constructor(characterSheet = null) {
+    constructor(characterSheet = null, statusEffectSystem = null) {
         this.characterSheet = characterSheet;
+        this.statusEffectSystem = statusEffectSystem;
     }
 
     /**
@@ -107,7 +108,7 @@ export class DamageSystem {
         const dmg = this.calculateDamage(baseAmount, damageType, sourceStats, targetStats);
         if (target.takeDamage) {
             const dealt = target.takeDamage(dmg.amount, dmg.type, source);
-            this.applyStatusEffect(dmg.type, target);
+            this.applyStatusEffect(dmg.type, target, source);
             return dealt;
         }
         return 0;
@@ -118,14 +119,39 @@ export class DamageSystem {
      * @param {string} damageType
      * @param {object} target - object with optional { addStatus, velocity, shield, ... }
      */
-    applyStatusEffect(damageType, target) {
+    applyStatusEffect(damageType, target, source = null) {
         if (!target) return;
 
+        // Delegate to StatusEffectSystem if available
+        if (this.statusEffectSystem) {
+            switch (damageType) {
+                case DAMAGE_TYPES.FREEZE:
+                    this.statusEffectSystem.applyEffect(target, 'frozen', 3.0);
+                    break;
+                case DAMAGE_TYPES.ELECTRIC:
+                    if (target.shield !== undefined && target.shield > 0) {
+                        const drain = Math.min(target.shield, 10);
+                        target.shield -= drain;
+                    } else {
+                        this.statusEffectSystem.applyEffect(target, 'shocked', 2.0);
+                    }
+                    break;
+                case DAMAGE_TYPES.EXPLOSIVE:
+                    if (target.addStatus) target.addStatus('knockback', 0.3);
+                    break;
+                case DAMAGE_TYPES.ENERGY:
+                    this.statusEffectSystem.applyEffect(target, 'burning', 5.0, { dmg: 5, source });
+                    break;
+                default:
+                    break;
+            }
+            return;
+        }
+
+        // Fallback if no StatusEffectSystem
         switch (damageType) {
             case DAMAGE_TYPES.FREEZE:
-                if (target.addStatus) {
-                    target.addStatus('freeze_slow', 3.0); // 3 second slow
-                }
+                if (target.addStatus) target.addStatus('freeze_slow', 3.0);
                 break;
             case DAMAGE_TYPES.ELECTRIC:
                 if (target.shield !== undefined && target.shield > 0) {
@@ -136,9 +162,7 @@ export class DamageSystem {
                 }
                 break;
             case DAMAGE_TYPES.EXPLOSIVE:
-                if (target.addStatus) {
-                    target.addStatus('knockback', 0.3);
-                }
+                if (target.addStatus) target.addStatus('knockback', 0.3);
                 break;
             default:
                 break;
