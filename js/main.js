@@ -38,6 +38,10 @@ import { EnemyManager } from './EnemyManager.js';
 import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
 import { ArenaMode } from './ArenaMode.js';
 import { BossFabricator } from './bosses/BossFabricator.js';
+import { BossWarden } from './bosses/BossWarden.js';
+import { BossLeviathan } from './bosses/BossLeviathan.js';
+import { BossSwarmQueen } from './bosses/BossSwarmQueen.js';
+import { BossArchitect } from './bosses/BossArchitect.js';
 import { PipeWrench } from './weapons/PipeWrench.js';
 import { SemiAutoPistol } from './weapons/SemiAutoPistol.js';
 import { AssaultRifle } from './weapons/AssaultRifle.js';
@@ -739,6 +743,15 @@ const challenges = new ChallengeSystem(scene, player);
 // Boss Fight (needs directorMode, bulletTime, challenges)
 const bossFight = new BossFight(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
 
+// Phase 8: Boss Roster
+const bosses = [];
+const bossFabricator = new BossFabricator(scene, world, player, enemyManager);
+const bossWarden = new BossWarden(scene, world, player, enemyManager);
+const bossLeviathan = new BossLeviathan(scene, world, player);
+const bossSwarmQueen = new BossSwarmQueen(scene, world, player, enemyManager);
+const bossArchitect = new BossArchitect(scene, world, player);
+bosses.push(bossFabricator, bossWarden, bossLeviathan, bossSwarmQueen, bossArchitect);
+
 // Phase 4: Endgame systems
 const difficultyTier = new DifficultyTierSystem(challenges);
 const apexRift = new ApexRiftSystem(scene, world, player, bossFight, challenges, lootSystem, difficultyTier, enemyManager);
@@ -1140,6 +1153,10 @@ function animate() {
         miniBosses.forEach(mb => mb.update(finalDt));
         weaponSystem.update(finalDt, activeInput);
         arenaMode.update(finalDt);
+        if (bossFight && typeof bossFight.update === 'function') bossFight.update(finalDt);
+        for (const boss of bosses) {
+            if (boss && typeof boss.update === 'function') boss.update(finalDt);
+        }
         
         // Update collectibles
         world.collectibles.update(finalDt, player);
@@ -1199,6 +1216,17 @@ function animate() {
                 const pPos = pulled.position || (pulled.mesh && pulled.mesh.position);
                 if (pPos) spawnDamageNumber(pPos.clone().add(new THREE.Vector3(0, 1, 0)), 'YANKED', false, 'kinetic');
             }
+        }
+
+        // Decoy Afterimage: Shift+Q at max flow = hologram clone
+        if (activeInput.wasPressed('KeyQ') && activeInput.isPressed('ShiftLeft') &&
+            comboSystem && comboSystem.flowMeter >= 100) {
+            comboSystem.flowMeter = 0;
+            // Spawn decoy clone using existing decoy system
+            if (skillSystem) skillSystem.useSkill('decoy');
+            // Player becomes briefly invisible
+            player.isInvisible = true;
+            setTimeout(() => { player.isInvisible = false; }, 3000);
         }
         
         // Advanced drones
