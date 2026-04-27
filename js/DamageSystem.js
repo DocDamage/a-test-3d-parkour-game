@@ -16,6 +16,11 @@ export class DamageSystem {
     constructor(characterSheet = null, statusEffectSystem = null) {
         this.characterSheet = characterSheet;
         this.statusEffectSystem = statusEffectSystem;
+        this.safehouseSystem = null;
+    }
+
+    setSafehouseSystem(safehouse) {
+        this.safehouseSystem = safehouse;
     }
 
     /**
@@ -112,7 +117,13 @@ export class DamageSystem {
         if (!target || target.isDead) return 0;
         const sourceStats = source && source.getRPGStats ? source.getRPGStats() : {};
         const targetStats = target && target.getRPGStats ? target.getRPGStats() : {};
-        const dmg = this.calculateDamage(baseAmount, damageType, sourceStats, targetStats);
+        let adjustedBase = baseAmount;
+        // Safehouse trophy wall: bonus damage vs specific factions
+        if (this.safehouseSystem && target && target.faction) {
+            const boost = this.safehouseSystem.getFactionDamageBoost(target.faction);
+            if (boost > 0) adjustedBase *= (1 + boost);
+        }
+        const dmg = this.calculateDamage(adjustedBase, damageType, sourceStats, targetStats);
         if (target.takeDamage) {
             const dealt = target.takeDamage(dmg.amount, dmg.type, source);
             this.applyStatusEffect(dmg.type, target, source);

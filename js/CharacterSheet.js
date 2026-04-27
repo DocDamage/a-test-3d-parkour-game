@@ -28,6 +28,8 @@ export class CharacterSheet {
 
         this._attributePoints = 0;
         this.progressionSystem = null;
+        this.implantSystem = null;
+        this.safehouseSystem = null;
 
         /** Gear-derived bonuses aggregated from ExoSuitSystem */
         this.gearBonuses = {
@@ -235,10 +237,34 @@ export class CharacterSheet {
     /**
      * Get a single combat stat merged from base + gear + temp bonuses.
      */
+    setImplantSystem(implantSystem) {
+        this.implantSystem = implantSystem;
+    }
+
+    setSafehouseSystem(safehouse) {
+        this.safehouseSystem = safehouse;
+    }
+
     getCombatStat(statName) {
         const gear = this.gearBonuses[statName] || 0;
         const temp = this._getTempBonus(statName);
-        return gear + temp;
+        let implant = 0;
+        if (this.implantSystem) {
+            const bonuses = this.implantSystem.getTotalBonuses();
+            // Map implant bonus keys to gear bonus keys
+            const mapping = {
+                maxHealth: 'maxHealth',
+                meleeDamageMult: 'damageMultiplier',
+                moveSpeedMult: 'moveSpeed',
+                knockbackReduction: 'fallDamageReduction',
+            };
+            for (const [implantKey, gearKey] of Object.entries(mapping)) {
+                if (statName === gearKey && typeof bonuses[implantKey] === 'number') {
+                    implant += bonuses[implantKey];
+                }
+            }
+        }
+        return gear + temp + implant;
     }
 
     /**
@@ -260,6 +286,24 @@ export class CharacterSheet {
         const allKeys = Object.keys(this._defaultGearBonuses());
         for (const key of allKeys) {
             stats[key] = this.getCombatStat(key);
+        }
+
+        // Implant raw bonuses (for systems that query specific implant flags)
+        if (this.implantSystem) {
+            stats._implantBonuses = this.implantSystem.getTotalBonuses();
+            stats._implantDrawbacks = this.implantSystem.getTotalDrawbacks();
+        }
+
+        // Safehouse Hall of Legends: dynasty stat multiplier
+        if (this.safehouseSystem) {
+            const dynastyMul = this.safehouseSystem.getDynastyStatMultiplier();
+            if (dynastyMul > 0) {
+                for (const key of Object.keys(stats)) {
+                    if (typeof stats[key] === 'number') {
+                        stats[key] *= (1 + dynastyMul);
+                    }
+                }
+            }
         }
 
         // Derived compound stats

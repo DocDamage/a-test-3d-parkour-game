@@ -244,6 +244,14 @@ const loyalty = new LoyaltySystem(companion);
 const factions = new FactionSystem(null); // eventBus placeholder
 const territory = new TerritorySystem(world, factions);
 const safehouse = new SafehouseSystem(player, characterSheet, progression, exoSuit, affixSystem);
+characterSheet.setSafehouseSystem(safehouse);
+if (damageSystem) damageSystem.setSafehouseSystem(safehouse);
+// Wire safehouse passive effects
+function _updateSafehousePassives() {
+    const effects = safehouse.getPassiveEffects();
+    player._respawnHPBonus = effects.respawnHPBonus || 0;
+}
+_updateSafehousePassives();
 const bounty = new BountySystem(player, characterSheet, progression, factions, territory);
 const npcSystem = new NPCSystem(world, player, factions);
 const blackout = new BlackoutSystem(world, player, npcSystem, factions, territory);
@@ -252,6 +260,7 @@ const subLevels = new SubLevelSystem(world, player, factions);
 const mastery = new MasterySystem(player, characterSheet);
 const codex = new CodexSystem(player, characterSheet);
 const implants = new ImplantSystem(player, characterSheet);
+characterSheet.setImplantSystem(implants);
 const legacy = new LegacySystem(characterSheet, progression, exoSuit, familiarity);
 const ngPlus = new NewGamePlus(player, world, characterSheet);
 const collapse = new CollapseMode(world, player, characterSheet, exoSuit, archetype);
@@ -303,6 +312,7 @@ if (damageSystem) enemyManager.setDamageSystem(damageSystem);
 const weaponSystem = new WeaponSystem(player, scene, hitboxSystem, projectileManager);
 const weaponModSystem = new WeaponModSystem();
 weaponSystem.setModSystem(weaponModSystem);
+weaponSystem.setFamiliaritySystem(familiarity);
 // Pre-equip demo mods on starter loadout
 weaponModSystem.equipMod(weaponModSystem.generateMod('barrel', 'rare'), WEAPON_SLOTS.PRIMARY, 'barrel');
 weaponModSystem.equipMod(weaponModSystem.generateMod('scope', 'uncommon'), WEAPON_SLOTS.PRIMARY, 'scope');
@@ -424,26 +434,50 @@ combatSystem.onHitbox = (data) => {
 const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
 const enemyHealthBars = []; // tracks EnemyHealthBar instances
 
-// Wire drone death to loot and damage numbers
+// Unified enemy kill handler — wired to both drones and EnemyManager enemies
+function _handleEnemyKilled(enemy, source) {
+    // Progression XP
+    if (progression && typeof progression.addXP === 'function') {
+        const xpBase = enemy.isElite ? 100 : 50;
+        const xpScaled = difficultyTier ? difficultyTier.scaleXP(xpBase) : xpBase;
+        const sourceType = enemy.type || 'enemy_kill';
+        progression.addXP(Math.floor(xpScaled), sourceType);
+    }
+    // Familiarity: track kill for current weapon
+    if (familiarity && weaponSystem) {
+        const w = weaponSystem.getCurrentWeapon();
+        const weaponId = w ? (w.id || w.name || 'melee') : 'melee';
+        familiarity.addKill(weaponId);
+    }
+    // Factions
+    if (factions && enemy && enemy.faction) {
+        factions.onDroneKilled(enemy.faction, enemy.isElite);
+    }
+    // Companion synergy
+    if (companion && typeof companion.triggerSynergy === 'function') {
+        companion.triggerSynergy();
+    }
+    // Nephalem Glory kill streak
+    if (nephalemGlory) nephalemGlory.onKill(enemy);
+    // Apex Rift progress
+    if (apexRift) apexRift.onEnemyKilled(enemy, source);
+    // Legendary powers
+    if (legendaryPowerSystem) legendaryPowerSystem.onEnemyKilled(enemy);
+    // Loot drop with difficulty scaling
+    const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
+    const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId);
+    if (drop) {
+        lootSystem.spawnDrop(drop, enemy.position || (enemy.mesh && enemy.mesh.position));
+        showHint('Loot drops! Walk over items to pick them up.');
+        if (drop.rarity >= 4) showHint('LEGENDARY! Check your gear stats (G key).');
+    }
+}
+
+// Wire drone death
 if (world.drones && world.drones.drones) {
     world.drones.drones.forEach(drone => {
         if (drone && !drone.onDeath) {
-            drone.onDeath = (deadDrone, source) => {
-                // Phase 4: Nephalem Glory kill streak
-                if (nephalemGlory) nephalemGlory.onKill(deadDrone);
-                // Phase 4: Apex Rift progress
-                if (apexRift) apexRift.onEnemyKilled(deadDrone, source);
-                // Legendary powers
-                if (legendaryPowerSystem) legendaryPowerSystem.onEnemyKilled(deadDrone);
-                // Loot drop with difficulty scaling
-                const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
-                const drop = lootSystem.generateDrop(deadDrone.type || 'patrol', deadDrone.isElite, 1.0 + diffLootMult, activeArchetypeId);
-                if (drop) {
-                    lootSystem.spawnDrop(drop, deadDrone.position || deadDrone.mesh.position);
-                    showHint('Loot drops! Walk over items to pick them up.');
-                    if (drop.rarity >= 4) showHint('LEGENDARY! Check your gear stats (G key).');
-                }
-            };
+            drone.onDeath = _handleEnemyKilled;
             drone.onDamageTaken = (amount, type, source) => {
                 const pos = drone.position ? drone.position.clone() : drone.mesh.position.clone();
                 pos.y += 1.0;
@@ -689,22 +723,8 @@ const grappleRelays = new ChainGrappleRelays(scene);
 
 // Drone takedowns
 const droneTakedown = new DroneTakedown(scene);
-droneTakedown.onKill = (drone) => {
-    if (progression && typeof progression.addXP === 'function') {
-        const xpBase = 50;
-        const xpScaled = difficultyTier ? difficultyTier.scaleXP(xpBase) : xpBase;
-        progression.addXP(Math.floor(xpScaled), 'enemy_kill');
-    }
-    if (familiarity && drone && drone.weaponId) {
-        familiarity.addKill(drone.weaponId);
-    }
-    if (factions && drone && drone.faction) {
-        factions.onDroneKilled(drone.faction, drone.isElite);
-    }
-    if (companion && typeof companion.triggerSynergy === 'function') {
-        companion.triggerSynergy();
-    }
-};
+// Wire EnemyManager kills through the same unified handler
+if (enemyManager) enemyManager.setOnDeathCallback(_handleEnemyKilled);
 
 // Power-ups
 const powerUps = new PowerUpSystem(scene, player);

@@ -188,8 +188,9 @@ export class EnemyBase {
         const dist = this.group.position.distanceTo(target.position);
         if (dist > this._attackRange) return false;
 
-        if (damageSystem) {
-            damageSystem.applyDamage(this, target, this._attackDamage, 'kinetic');
+        const ds = damageSystem || this._damageSystem || null;
+        if (ds) {
+            ds.applyDamage(this, target, this._attackDamage, 'kinetic');
         } else if (target.takeDamage) {
             target.takeDamage(this._attackDamage, 'kinetic', this);
         }

@@ -56,12 +56,17 @@ export class WeaponSystem {
         this.fireCooldown = 0;
         this.isReloading = false;
         this.modSystem = null;
+        this.familiaritySystem = null;
 
         this._buildUI();
     }
 
     setModSystem(modSystem) {
         this.modSystem = modSystem;
+    }
+
+    setFamiliaritySystem(fs) {
+        this.familiaritySystem = fs;
     }
 
     _getEffectiveStats() {
@@ -85,6 +90,12 @@ export class WeaponSystem {
             stats.reloadTime /= modStats.reloadSpeedMul; // higher mul = faster = lower time
             stats.clipSize += modStats.clipSizeAdd;
             stats.projectileSpeed *= modStats.projectileSpeedMul;
+        }
+        if (this.familiaritySystem) {
+            const w = this.getCurrentWeapon();
+            const weaponId = w ? (w.id || w.name || 'melee') : 'melee';
+            const fam = this.familiaritySystem.getFamiliarityBonus(weaponId);
+            if (fam) stats.damage *= fam.damageMult;
         }
         return stats;
     }

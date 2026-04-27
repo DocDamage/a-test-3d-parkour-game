@@ -200,7 +200,9 @@ class TurretEnemy extends EnemyBase {
             this.group.lookAt(player.position.x, this.group.position.y, player.position.z);
             if (this.attackCooldown <= 0) {
                 // Turret "projectile" — raycast damage
-                if (player.takeDamage) player.takeDamage(this._attackDamage, 'energy', this);
+                const ds = this._damageSystem || null;
+                if (ds) ds.applyDamage(this, player, this._attackDamage, 'energy');
+                else if (player.takeDamage) player.takeDamage(this._attackDamage, 'energy', this);
                 this.attackCooldown = this._attackCooldownTime;
             }
         } else {
@@ -236,7 +238,9 @@ class SuicideEnemy extends EnemyBase {
             this.group.lookAt(player.position.x, this.group.position.y, player.position.z);
             if (dist < this._attackRange) {
                 // Explode
-                if (player.takeDamage) player.takeDamage(this._attackDamage, 'explosive', this);
+                const ds = this._damageSystem || null;
+                if (ds) ds.applyDamage(this, player, this._attackDamage, 'explosive');
+                else if (player.takeDamage) player.takeDamage(this._attackDamage, 'explosive', this);
                 this.die(this);
             }
         } else {
@@ -454,7 +458,9 @@ class MinelayerEnemy extends EnemyBase {
             const md = m.mesh.position.distanceTo(player.position);
             if (md < 1.5) {
                 // Explode
-                if (player.takeDamage) player.takeDamage(25, 'explosive', this);
+                const ds = this._damageSystem || null;
+                if (ds) ds.applyDamage(this, player, 25, 'explosive');
+                else if (player.takeDamage) player.takeDamage(25, 'explosive', this);
                 this.scene.remove(m.mesh);
                 this._mines.splice(i, 1);
             }
@@ -508,6 +514,11 @@ export class EnemyManager {
         this.player = player;
         this.enemies = [];
         this._damageSystem = null;
+        this._onDeathCb = null;
+    }
+
+    setOnDeathCallback(cb) {
+        this._onDeathCb = cb;
     }
 
     setDamageSystem(ds) {
@@ -538,6 +549,9 @@ export class EnemyManager {
         enemy._allies = this.enemies;
 
         if (this._damageSystem) enemy._damageSystem = this._damageSystem;
+        if (this._onDeathCb) {
+            enemy.onDeath = (e, source) => this._onDeathCb(e, source);
+        }
 
         this.enemies.push(enemy);
         return enemy;

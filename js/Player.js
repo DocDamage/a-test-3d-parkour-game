@@ -128,6 +128,7 @@ export class Player {
         this._staggerImmune = false;
         this._firewallActive = false;
         this._predatorVisionActive = false;
+        this._respawnHPBonus = 0;
         this._critBonusFromPredator = 0;
         this._parryWindow = 0;
         this._parryCooldown = 0;
@@ -2022,6 +2023,15 @@ export class Player {
             return 0;
         }
 
+        // Firewall: while active, attacker takes 15 electric damage on any hit
+        if (this._firewallActive && amount > 0 && source && source.takeDamage) {
+            source.takeDamage(15, 'electric', this);
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.5;
+                this.scene.userData.spawnDamageNumber(pos, 'SHOCK', false, 'electric');
+            }
+        }
+
         // Platform Shield: block frontal damage while grabbing platform edge
         if (this._platformShieldActive && amount > 0) {
             // Block 75% of incoming damage while shielded
@@ -2094,7 +2104,7 @@ export class Player {
 
     respawn() {
         this.isDead = false;
-        this.health = this.maxHealth;
+        this.health = this.maxHealth + this._respawnHPBonus;
         this.state = 'IDLE';
         this.velocity.set(0, 0, 0);
     }
