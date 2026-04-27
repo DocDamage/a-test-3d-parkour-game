@@ -143,6 +143,17 @@ export class Player {
         // Parkour melee callbacks
         this.onSlideTackle = null;
         this.onLedgeTakedown = null;
+        this.onCeilingDrop = null;
+
+        // Ceiling run / magnet boots
+        this.ceilingRunData = null;
+        this.CEILING_ATTACH_RANGE = 2.5;
+        this.CEILING_RUN_SPEED = 4;
+
+        // Platform grab / shield
+        this.platformGrabData = null;
+        this._platformShieldActive = false;
+        this._platformShieldAbsorb = 0;
 
         // RPG system hook
         this.characterSheet = null;
@@ -300,6 +311,24 @@ export class Player {
             const wallRunInfo = this.checkWallRun();
             if (wallRunInfo) {
                 this.startWallRun(wallRunInfo);
+                return;
+            }
+        }
+
+        // Ceiling Run: hold Ctrl near ceiling to attach
+        if (!this.grounded && input.isPressed('ControlLeft') && this.dashTimer <= 0) {
+            const ceilingInfo = this.checkCeilingAbove();
+            if (ceilingInfo) {
+                this.startCeilingRun(ceilingInfo);
+                return;
+            }
+        }
+
+        // Platform Grab: hold E near platform edge
+        if (input.isPressed('KeyE') && this.dashTimer <= 0) {
+            const grabInfo = this.checkPlatformGrab();
+            if (grabInfo) {
+                this.startPlatformGrab(grabInfo);
                 return;
             }
         }
@@ -547,12 +576,19 @@ export class Player {
             case 'GRAPPLE_RETRACT':
                 this.updateGrappleRetract(dt, input);
                 break;
+            case 'CEILING_RUN':
+                this.updateCeilingRun(dt, input);
+                break;
+            case 'PLATFORM_GRAB':
+                this.updatePlatformGrab(dt, input);
+                break;
         }
 
         // Apply gravity (skip special states)
         if (!this.grounded && this.state !== 'CLIMB' && this.state !== 'VAULT' && this.state !== 'HANG' &&
             this.state !== 'GRAPPLE_AIM' && this.state !== 'GRAPPLE_SWING' && this.state !== 'GRAPPLE_RETRACT' &&
-            this.state !== 'DIVE_KICK' && this.state !== 'GROUND_POUND') {
+            this.state !== 'DIVE_KICK' && this.state !== 'GROUND_POUND' &&
+            this.state !== 'CEILING_RUN') {
             this.velocity.y += this.GRAVITY * dt;
             this.velocity.y = Math.max(this.velocity.y, -25);
         }
@@ -1283,6 +1319,163 @@ export class Player {
         }
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  Ceiling Run (Magnet Boots)                                        */
+    /* ------------------------------------------------------------------ */
+
+    checkCeilingAbove() {
+        const origin = this.position.clone().add(new THREE.Vector3(0, this.currentHeight, 0));
+        const ray = new THREE.Ray(origin, new THREE.Vector3(0, 1, 0));
+        let bestY = Infinity;
+        let bestBox = null;
+
+        for (const obj of this.world.collidables) {
+            const box = new THREE.Box3().setFromObject(obj);
+            const hit = new THREE.Vector3();
+            if (ray.intersectBox(box, hit) !== null) {
+                const dist = hit.y - origin.y;
+                if (dist > 0.1 && dist < this.CEILING_ATTACH_RANGE && hit.y < bestY) {
+                    bestY = hit.y;
+                    bestBox = box;
+                }
+            }
+        }
+
+        if (!bestBox) return null;
+        return {
+            y: bestY,
+            normal: new THREE.Vector3(0, -1, 0)
+        };
+    }
+
+    startCeilingRun(info) {
+        this.state = 'CEILING_RUN';
+        this.ceilingRunData = info;
+        this.velocity.set(0, 0, 0);
+        this.position.y = info.y - this.currentHeight - 0.05;
+        this.comboSystem.registerMove('ceilingRun');
+        if (this.audio) this.audio.playClimbGrab();
+    }
+
+    updateCeilingRun(dt, input) {
+        if (!this.ceilingRunData) {
+            this.state = 'FALL';
+            return;
+        }
+
+        // Keep player attached to ceiling
+        this.position.y = this.ceilingRunData.y - this.currentHeight - 0.05;
+
+        // Movement projected onto ceiling plane (inverted controls)
+        const moveDir = this.getMoveDir(input, this.facing);
+        const speed = this.CEILING_RUN_SPEED * this.moveSpeedMultiplier;
+
+        if (moveDir.length() > 0.1) {
+            this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, moveDir.x * speed, dt * 10);
+            this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, moveDir.z * speed, dt * 10);
+        } else {
+            this.velocity.x *= (1 - dt * 8);
+            this.velocity.z *= (1 - dt * 8);
+        }
+
+        this.position.x += this.velocity.x * dt;
+        this.position.z += this.velocity.z * dt;
+
+        // Drop: Space to detach
+        if (input.wasPressed('Space')) {
+            // Ceiling Drop assassination check
+            if (this.onCeilingDrop) {
+                this.onCeilingDrop(this.position.clone(), this.facing);
+            }
+            this.state = 'FALL';
+            this.ceilingRunData = null;
+            this.velocity.y = -2;
+        }
+
+        // Also drop if Ctrl is released and no ceiling nearby
+        if (!input.isPressed('ControlLeft')) {
+            const check = this.checkCeilingAbove();
+            if (!check || Math.abs(check.y - this.ceilingRunData.y) > 0.5) {
+                this.state = 'FALL';
+                this.ceilingRunData = null;
+                this.velocity.y = -2;
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Platform Grab / Shield                                            */
+    /* ------------------------------------------------------------------ */
+
+    checkPlatformGrab() {
+        // Look for a platform edge near the player
+        // Check if player is at the edge of a collidable (falling off or near corner)
+        const probeDirs = [
+            new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing)),
+            new THREE.Vector3(0, -1, 0)
+        ];
+
+        for (const obj of this.world.collidables) {
+            const box = new THREE.Box3().setFromObject(obj);
+            // Player must be near the edge of this box
+            const nearX = Math.abs(this.position.x - box.min.x) < 0.8 || Math.abs(this.position.x - box.max.x) < 0.8;
+            const nearZ = Math.abs(this.position.z - box.min.z) < 0.8 || Math.abs(this.position.z - box.max.z) < 0.8;
+            const nearY = this.position.y >= box.min.y - 0.5 && this.position.y <= box.max.y + 2;
+
+            if ((nearX || nearZ) && nearY) {
+                return {
+                    box,
+                    edgePos: new THREE.Vector3(
+                        THREE.MathUtils.clamp(this.position.x, box.min.x, box.max.x),
+                        box.max.y,
+                        THREE.MathUtils.clamp(this.position.z, box.min.z, box.max.z)
+                    )
+                };
+            }
+        }
+        return null;
+    }
+
+    startPlatformGrab(info) {
+        this.state = 'PLATFORM_GRAB';
+        this.platformGrabData = info;
+        this.velocity.set(0, 0, 0);
+        this.position.copy(info.edgePos);
+        this.position.y -= this.currentHeight * 0.8;
+    }
+
+    updatePlatformGrab(dt, input) {
+        if (!this.platformGrabData) {
+            this.state = 'FALL';
+            this._platformShieldActive = false;
+            return;
+        }
+
+        // Stay at grab position
+        this.position.x = this.platformGrabData.edgePos.x;
+        this.position.z = this.platformGrabData.edgePos.z;
+
+        // Platform Shield: active while E is held
+        this._platformShieldActive = input.isPressed('KeyE');
+
+        // Pull up onto platform
+        if (input.isPressed('KeyW') || input.wasPressed('Space')) {
+            this.state = 'JUMP';
+            this.position.y = this.platformGrabData.edgePos.y + 0.1;
+            this.velocity.y = 5;
+            this.platformGrabData = null;
+            this._platformShieldActive = false;
+            return;
+        }
+
+        // Drop
+        if (input.isPressed('KeyS') || !input.isPressed('KeyE')) {
+            this.state = 'FALL';
+            this.platformGrabData = null;
+            this._platformShieldActive = false;
+        }
+    }
+
     checkAutoVault() {
         const forward = new THREE.Vector3(Math.sin(this.facing), 0, Math.cos(this.facing));
         const origin = this.position.clone().add(new THREE.Vector3(0, 0.6, 0));
@@ -1536,7 +1729,8 @@ export class Player {
     }
 
     checkGround() {
-        if (this.state === 'CLIMB' || this.state === 'VAULT' || this.state === 'HANG' || this.state === 'RAGDOLL') {
+        if (this.state === 'CLIMB' || this.state === 'VAULT' || this.state === 'HANG' || this.state === 'RAGDOLL' ||
+            this.state === 'CEILING_RUN' || this.state === 'PLATFORM_GRAB') {
             this.grounded = false;
             return;
         }
@@ -1826,6 +2020,18 @@ export class Player {
                 this.scene.userData.spawnDamageNumber(pos, 'PARRY', true, 'kinetic');
             }
             return 0;
+        }
+
+        // Platform Shield: block frontal damage while grabbing platform edge
+        if (this._platformShieldActive && amount > 0) {
+            // Block 75% of incoming damage while shielded
+            const blocked = amount * 0.75;
+            amount -= blocked;
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.5;
+                this.scene.userData.spawnDamageNumber(pos, `BLOCKED`, false, 'energy');
+            }
+            if (amount <= 0) return 0;
         }
 
         // Meat Shield: absorb damage from friendly drone

@@ -581,6 +581,26 @@ player.onLedgeTakedown = (pos, facing, hangData) => {
     }
 };
 
+player.onCeilingDrop = (pos, facing) => {
+    // Ceiling Drop: assassinate enemy directly below
+    const allEnemies = [
+        ...(world.drones ? world.drones.drones : []),
+        ...(enemyManager ? enemyManager.enemies : [])
+    ];
+    for (const e of allEnemies) {
+        if (e.isDead || e.team === 'player') continue;
+        const ePos = e.position || (e.mesh && e.mesh.position);
+        if (!ePos) continue;
+        const distXZ = Math.hypot(ePos.x - pos.x, ePos.z - pos.z);
+        const distY = pos.y - ePos.y;
+        if (distXZ < 1.2 && distY > 0 && distY < 5.0) {
+            if (e.takeDamage) e.takeDamage(40, 'kinetic', player);
+            spawnDamageNumber(ePos.clone().add(new THREE.Vector3(0, 1, 0)), 'ASSASSINATED', true, 'kinetic');
+            break;
+        }
+    }
+};
+
 // Hint system
 const _shownHints = new Set();
 function showHint(text) {
