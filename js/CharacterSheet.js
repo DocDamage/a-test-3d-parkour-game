@@ -96,6 +96,30 @@ export class CharacterSheet {
         return true;
     }
 
+    respec() {
+        // Refund all spent attribute points
+        const totalSpent = Object.values(this._stats).reduce((sum, v) => sum + v, 0);
+        const baseTotal = Object.values(this._defaultStats()).reduce((sum, v) => sum + v, 0);
+        const pointsToRefund = totalSpent - baseTotal;
+        if (pointsToRefund <= 0) return false;
+
+        this._attributePoints += pointsToRefund;
+        // Reset stats to defaults
+        const defaults = this._defaultStats();
+        for (const key of Object.keys(this._stats)) {
+            this._stats[key] = defaults[key] || 0;
+        }
+        this._save();
+        return true;
+    }
+
+    _defaultStats() {
+        return {
+            mobility: 0, reflex: 0, synthesis: 0,
+            fortitude: 0, tech: 0, guts: 0
+        };
+    }
+
     _save() {
         try {
             const data = {

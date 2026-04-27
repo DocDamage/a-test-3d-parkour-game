@@ -1218,6 +1218,31 @@ function animate() {
             }
         }
 
+        // Drone Meat Shield: hold E near a hacked/friendly drone = absorb 50 dmg
+        if (activeInput.isPressed('KeyE') && !player.isDead) {
+            const drones = world.drones ? world.drones.drones : [];
+            let shieldDrone = null;
+            for (const drone of drones) {
+                if (drone.isDead || drone.team !== 'player') continue;
+                const pos = drone.position || (drone.mesh && drone.mesh.position);
+                if (pos && pos.distanceTo(player.position) < 2.5) {
+                    shieldDrone = drone;
+                    break;
+                }
+            }
+            if (shieldDrone) {
+                if (!player._meatShield) player._meatShield = 50;
+                // Visual: drone hovers in front of player
+                const front = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(1.2);
+                const targetPos = player.position.clone().add(front);
+                targetPos.y = Math.max(targetPos.y, 1);
+                const sPos = shieldDrone.position || (shieldDrone.mesh && shieldDrone.mesh.position);
+                if (sPos) sPos.lerp(targetPos, 0.1);
+            }
+        } else {
+            player._meatShield = 0;
+        }
+
         // Decoy Afterimage: Shift+Q at max flow = hologram clone
         if (activeInput.wasPressed('KeyQ') && activeInput.isPressed('ShiftLeft') &&
             comboSystem && comboSystem.flowMeter >= 100) {
@@ -1227,6 +1252,16 @@ function animate() {
             // Player becomes briefly invisible
             player.isInvisible = true;
             setTimeout(() => { player.isInvisible = false; }, 3000);
+        }
+
+        // Disk Throw: G key fires a ricocheting disk projectile
+        if (activeInput.wasPressed('KeyG') && projectileManager) {
+            const dir = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing));
+            projectileManager.fireRicochet(
+                player.position.clone().add(new THREE.Vector3(0, 1.2, 0)),
+                dir,
+                { bounces: 3, damage: 15, damageType: 'kinetic', color: 0xccff00 }
+            );
         }
         
         // Advanced drones

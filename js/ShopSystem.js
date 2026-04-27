@@ -204,6 +204,25 @@ export class ShopSystem {
         this._refresh();
     }
 
+    sell(itemId, value) {
+        const p = this._player;
+        if (!value || value <= 0) return false;
+        p.scrap = (p.scrap || 0) + value;
+        this._showMsg(`Sold for ${value} scrap!`);
+        this._refresh();
+        return true;
+    }
+
+    sellGear(gearItem) {
+        if (!gearItem) return false;
+        const rarityValue = {
+            common: 10, magic: 25, rare: 60,
+            legendary: 150, set: 200, ancient: 300, primal: 500
+        };
+        const value = rarityValue[gearItem.rarity] || 10;
+        return this.sell(gearItem.id, value);
+    }
+
     _showMsg(text) {
         const el = document.getElementById('shop-msg');
         if (!el) return;

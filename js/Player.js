@@ -1828,6 +1828,18 @@ export class Player {
             return 0;
         }
 
+        // Meat Shield: absorb damage from friendly drone
+        if (this._meatShield > 0 && amount > 0) {
+            const absorb = Math.min(this._meatShield, amount);
+            this._meatShield -= absorb;
+            amount -= absorb;
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.5;
+                this.scene.userData.spawnDamageNumber(pos, `SHIELD -${Math.round(absorb)}`, false, 'energy');
+            }
+            if (amount <= 0) return 0;
+        }
+
         // Knockback on heavy hits (>20 damage)
         if (amount > 20 && this.state !== 'KNOCKBACK') {
             this.state = 'KNOCKBACK';
