@@ -116,6 +116,9 @@ import { DialogueSystem } from './DialogueSystem.js';
 import { ShopSystem } from './ShopSystem.js';
 import { BottleSystem } from './BottleSystem.js';
 import { OverworldMap } from './OverworldMap.js';
+import { DamageNumbers } from './DamageNumbers.js';
+import { UIManager } from './UIManager.js';
+import { wireEditorUI } from './EditorUI.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -357,33 +360,15 @@ const crystalGolem = new CrystalGolem(scene, world, player, new THREE.Vector3(-2
 crystalGolem.start();
 miniBosses.push(crystalGolem);
 
-// Mini-boss health bar UI
-const miniBossBars = [];
-miniBosses.forEach((mb, i) => {
-    const wrap = document.createElement('div');
-    wrap.id = `miniboss-bar-${i}`;
-    wrap.style.cssText = `position:absolute;top:${50 + i * 24}px;right:16px;width:160px;height:16px;background:rgba(0,0,0,0.5);border-radius:3px;overflow:hidden;z-index:10;`;
-    const fill = document.createElement('div');
-    fill.id = `miniboss-fill-${i}`;
-    fill.style.cssText = 'width:100%;height:100%;background:#ffaa00;transition:width 0.2s;';
-    const label = document.createElement('div');
-    label.textContent = mb.type;
-    label.style.cssText = 'position:absolute;top:0;left:4px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);';
-    wrap.appendChild(fill);
-    wrap.appendChild(label);
-    document.getElementById('ui').appendChild(wrap);
-    miniBossBars.push({ wrap, fill });
+// UIManager — centralized UI panel toggles, updates, and dynamic DOM creation
+const uiManager = new UIManager({
+    player, progression, archetype, origin, characterSheet,
+    heartSystem, dungeonSystem, exoSuit, companion, loyalty,
+    factions, safehouse, bounty, codex, mastery, implants,
+    resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide
 });
-
-// Mana bar UI
-const manaBarWrap = document.createElement('div');
-manaBarWrap.id = 'mana-bar-wrap';
-manaBarWrap.style.cssText = 'position:absolute;bottom:60px;left:50%;transform:translateX(-50%);width:200px;height:8px;background:rgba(0,0,0,0.5);border-radius:4px;overflow:hidden;z-index:10;display:none;';
-const manaBarFill = document.createElement('div');
-manaBarFill.id = 'mana-bar-fill';
-manaBarFill.style.cssText = 'width:0%;height:100%;background:#8844ff;transition:width 0.1s;';
-manaBarWrap.appendChild(manaBarFill);
-document.getElementById('ui').appendChild(manaBarWrap);
+uiManager.createMiniBossBars(miniBosses);
+uiManager.createManaBar();
 
 stickyBomb.onExplode = (data) => {
     if (!hitboxSystem) return;
@@ -845,133 +830,7 @@ document.addEventListener('pointerlockchange', () => {
 /* ============================================================
    EDITOR UI EVENT LISTENERS
    ============================================================ */
-
-// Palette object type buttons
-editorPalette.querySelectorAll('.tool-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        editorPalette.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        levelEditor.setPlacementType(btn.dataset.type);
-        levelEditor.setTool('place');
-        updateEditorToolbar();
-    });
-});
-
-// Toolbar tool buttons
-function updateEditorToolbar() {
-    editorToolbar.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
-    if (levelEditor.tool === 'select') document.getElementById('tool-select').classList.add('active');
-    if (levelEditor.tool === 'place') document.getElementById('tool-place').classList.add('active');
-    if (levelEditor.tool === 'delete') document.getElementById('tool-delete').classList.add('active');
-}
-
-document.getElementById('tool-select').addEventListener('click', () => {
-    levelEditor.setTool('select');
-    updateEditorToolbar();
-});
-document.getElementById('tool-place').addEventListener('click', () => {
-    levelEditor.setTool('place');
-    updateEditorToolbar();
-});
-document.getElementById('tool-delete').addEventListener('click', () => {
-    levelEditor.setTool('delete');
-    updateEditorToolbar();
-});
-
-document.getElementById('editor-export').addEventListener('click', () => {
-    const json = levelEditor.exportLevel();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'parkour-level.json';
-    a.click();
-    URL.revokeObjectURL(url);
-});
-
-document.getElementById('editor-import').addEventListener('click', () => {
-    editorFileInput.click();
-});
-
-editorFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        try {
-            levelEditor.importLevel(ev.target.result);
-        } catch (err) {
-            console.error('Import failed:', err);
-            alert('Failed to import level: ' + err.message);
-        }
-    };
-    reader.readAsText(file);
-    editorFileInput.value = '';
-});
-
-document.getElementById('editor-playtest').addEventListener('click', () => {
-    levelEditor.toggle();
-    editorUI.classList.remove('active');
-    ui.style.display = 'block';
-    crosshair.style.display = 'block';
-    document.body.requestPointerLock();
-});
-
-// Property panel binding
-function updatePropertyPanel() {
-    const props = levelEditor.getSelectedProps();
-    if (!props) {
-        editorProperties.classList.remove('active');
-        return;
-    }
-    editorProperties.classList.add('active');
-    editorPropList.innerHTML = '';
-    
-    Object.entries(props).forEach(([key, value]) => {
-        const row = document.createElement('div');
-        row.className = 'prop-row';
-        const label = document.createElement('label');
-        label.textContent = key;
-        row.appendChild(label);
-        
-        if (key === 'color') {
-            const input = document.createElement('input');
-            input.type = 'color';
-            input.value = typeof value === 'number' ? '#' + value.toString(16).padStart(6, '0') : value;
-            input.addEventListener('input', (e) => {
-                levelEditor.setSelectedProp(key, parseInt(e.target.value.replace('#', ''), 16));
-            });
-            row.appendChild(input);
-        } else if (typeof value === 'boolean') {
-            const input = document.createElement('input');
-            input.type = 'checkbox';
-            input.checked = value;
-            input.addEventListener('change', (e) => {
-                levelEditor.setSelectedProp(key, e.target.checked);
-            });
-            row.appendChild(input);
-        } else if (typeof value === 'number') {
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.step = '0.1';
-            input.value = value;
-            input.addEventListener('input', (e) => {
-                const v = parseFloat(e.target.value);
-                if (!isNaN(v)) levelEditor.setSelectedProp(key, v);
-            });
-            row.appendChild(input);
-        } else {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = value;
-            input.addEventListener('input', (e) => {
-                levelEditor.setSelectedProp(key, e.target.value);
-            });
-            row.appendChild(input);
-        }
-        editorPropList.appendChild(row);
-    });
-}
+const updatePropertyPanel = wireEditorUI(levelEditor, editorUI, ui, crosshair, editorPalette, editorProperties, editorPropList, editorToolbar, editorFileInput);
 
 /* ============================================================
    BOSS FIGHT UI
@@ -998,32 +857,9 @@ const presets = ['day', 'night', 'neon'];
 let presetIndex = 0;
 
 // Damage number floating text system
-const damageNumbers = [];
+const damageNumbers = new DamageNumbers(camera);
 function spawnDamageNumber(position, amount, isCrit, damageType) {
-    const div = document.createElement('div');
-    div.style.position = 'fixed';
-    div.style.left = '50%';
-    div.style.top = '50%';
-    div.style.transform = 'translate(-50%, -50%)';
-    div.style.color = isCrit ? '#ffaa00' : '#ffffff';
-    div.style.fontWeight = 'bold';
-    div.style.fontSize = isCrit ? '24px' : '16px';
-    div.style.textShadow = '0 1px 4px rgba(0,0,0,0.8)';
-    div.style.pointerEvents = 'none';
-    div.style.zIndex = '100';
-    div.style.transition = 'opacity 0.5s';
-    div.textContent = amount;
-    document.body.appendChild(div);
-    
-    // Project 3D position to screen
-    const vec = position.clone();
-    vec.project(camera);
-    const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
-    div.style.left = x + 'px';
-    div.style.top = y + 'px';
-    
-    damageNumbers.push({ div, life: 0.8, vy: -30 });
+    damageNumbers.spawn(position, amount, isCrit, damageType);
 }
 
 // Settings panel wiring
@@ -1203,101 +1039,8 @@ function animate() {
             challenges.reportEvent('climbCancel');
         }
         
-        // Passive tree toggle (P)
-        if (activeInput.wasPressed('KeyP') && !activeInput.isPressed('ShiftLeft')) {
-            const pt = document.getElementById('passive-tree');
-            if (pt) {
-                const showing = pt.style.display === 'block';
-                pt.style.display = showing ? 'none' : 'block';
-                if (!showing && passiveTree) passiveTree._renderUI();
-            }
-        }
-
-        // Character panel toggle (Shift+P)
-        if (activeInput.wasPressed('KeyP') && activeInput.isPressed('ShiftLeft')) {
-            const cp = document.getElementById('character-panel');
-            cp.style.display = (cp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Gear panel toggle
-        if (activeInput.wasPressed('KeyG')) {
-            const gp = document.getElementById('gear-panel');
-            if (gp) gp.style.display = (gp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Companion panel toggle (U for Buddy)
-        if (activeInput.wasPressed('KeyU')) {
-            const comp = document.getElementById('companion-panel');
-            if (comp) comp.style.display = (comp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Faction panel toggle (guarded: not when dialogue/shop/dungeon is active)
-        if (activeInput.wasPressed('KeyF') && !activeInput.isPressed('ShiftLeft')
-            && !dialogueSystem.isOpen && !shop.isOpen && !dungeonSystem.nearbyDungeonId) {
-            const fp = document.getElementById('faction-panel');
-            if (fp) fp.style.display = (fp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Safehouse panel toggle (H for Hub)
-        if (activeInput.wasPressed('KeyH')) {
-            const sp = document.getElementById('safehouse-panel');
-            if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Bounty panel toggle
-        if (activeInput.wasPressed('KeyJ')) {
-            const bp = document.getElementById('bounty-panel');
-            if (bp) bp.style.display = (bp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Codex panel toggle
-        if (activeInput.wasPressed('KeyK')) {
-            const cop = document.getElementById('codex-panel');
-            if (cop) cop.style.display = (cop.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Mastery panel toggle
-        if (activeInput.wasPressed('KeyL')) {
-            const mp = document.getElementById('mastery-panel');
-            if (mp) mp.style.display = (mp.style.display === 'block') ? 'none' : 'block';
-        }
-        
-        // Implants panel toggle
-        if (activeInput.wasPressed('KeyN')) {
-            const ip = document.getElementById('implants-panel');
-            if (ip) ip.style.display = (ip.style.display === 'block') ? 'none' : 'block';
-        }
-
-        // Key Items panel toggle (I)
-        if (activeInput.wasPressed('KeyI')) {
-            const ki = document.getElementById('keyitem-panel');
-            if (ki) {
-                const showing = ki.style.display === 'block';
-                ki.style.display = showing ? 'none' : 'block';
-                if (!showing && keyItems) {
-                    // Refresh collected state
-                    keyItems.getAllItems().forEach(item => {
-                        const row = document.getElementById('ki-' + item.id);
-                        if (row) {
-                            if (item.collected) row.classList.add('found');
-                            else row.classList.remove('found');
-                        }
-                    });
-                }
-            }
-        }
-
-        // Settings panel toggle (O)
-        if (activeInput.wasPressed('KeyO') && !activeInput.isPressed('ShiftLeft')) {
-            const sp = document.getElementById('settings-panel');
-            if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
-        }
-
-        // Rising Tide toggle (Shift+O)
-        if (activeInput.wasPressed('KeyO') && activeInput.isPressed('ShiftLeft')) {
-            if (risingTide.active) risingTide.stop();
-            else risingTide.start();
-        }
+        // Panel toggles (delegated to UIManager)
+        if (uiManager) uiManager.handleInput(activeInput);
 
         // Speedrun IL hotkeys
         if (activeInput.wasPressed('Digit1')) speedrunILs.startIL('Rooftop');
@@ -1564,232 +1307,15 @@ function animate() {
         if (skillSystem) skillSystem.update(finalDt);
         if (skillBarUI) skillBarUI.update();
         
-        // === BOSS FIGHT UPDATE ===
-        if (bossFight.isActive()) {
-            bossFight.update(finalDt);
-            // Update boss HUD
-            const health = bossFight.getBossHealth();
-            const maxHealth = bossFight.getBossMaxHealth();
-            const pct = maxHealth > 0 ? (health / maxHealth) * 100 : 0;
-            bossHealthFill.style.width = pct + '%';
-            if (bossFight.currentPhase === 1) bossPhaseLabel.textContent = 'Phase 1: Ground Supremacy';
-            else if (bossFight.currentPhase === 2) bossPhaseLabel.textContent = 'Phase 2: Aerial Dominance';
-            else if (bossFight.currentPhase === 3) bossPhaseLabel.textContent = 'Phase 3: Overclocked Fury';
-            
-            // Check for victory
-            if (bossFight.bossState === 'defeated' && bossVictory.style.display !== 'block') {
-                bossVictory.style.display = 'block';
-                bossHUD.style.display = 'none';
-                document.getElementById('boss-time').textContent = 'Time: ' + bossFight.getFightTime();
-                document.getElementById('boss-hits').textContent = 'Hits Taken: ' + bossFight.hitsTaken;
-                document.getElementById('boss-grade').textContent = bossFight.getGrade();
-                // Unlock achievement
-                challenges.unlock('firstBossKill');
-            }
-        }
-        
-        // Update UI
-        stateDisplay.textContent = player.getStateDisplay();
-        speedDisplay.textContent = player.getSpeed();
-        
-        // Update Zelda-style heart containers
-        if (heartSystem) heartSystem.renderHearts('heart-container-row');
-
-        // Update sector key counter
-        const sectorKeyEl = document.getElementById('sector-key-count');
-        if (sectorKeyEl && dungeonSystem) {
-            sectorKeyEl.textContent = dungeonSystem.getSectorKeyCount() + ' / 7';
-        }
-        if (levelDisplay) {
-            levelDisplay.textContent = progression.getLevel();
-        }
-        if (xpDisplay) {
-            const pct = progression.getXPToNext() > 0
-                ? Math.floor((progression.getXP() / progression.getXPToNext()) * 100)
-                : 100;
-            xpDisplay.textContent = pct + '%';
-        }
-        if (apDisplay) {
-            apDisplay.textContent = characterSheet.getAttributePoints();
-        }
-        
-        // Update gear panel
-        const gp = document.getElementById('gear-panel');
-        if (gp && gp.style.display === 'block' && exoSuit) {
-            const equipped = exoSuit.getAllEquipped ? exoSuit.getAllEquipped() : {};
-            const slots = ['frame', 'boots', 'gloves', 'optics'];
-            slots.forEach(slot => {
-                const el = document.getElementById('gear-' + slot);
-                if (el) {
-                    const item = equipped[slot];
-                    if (item) {
-                        el.textContent = item.name || item.id || 'Equipped';
-                        el.classList.remove('empty');
-                    } else {
-                        el.textContent = 'Empty';
-                        el.classList.add('empty');
-                    }
-                }
-            });
-            const gsEl = document.getElementById('gear-score');
-            if (gsEl) gsEl.textContent = exoSuit.getGearScore ? exoSuit.getGearScore() : 0;
-        }
-        
-        // Update companion panel
-        const compPanel = document.getElementById('companion-panel');
-        if (compPanel && compPanel.style.display === 'block' && companion && loyalty) {
-            const modeEl = document.getElementById('companion-mode');
-            const trustEl = document.getElementById('companion-trust');
-            const tierEl = document.getElementById('companion-tier');
-            if (modeEl) modeEl.textContent = companion.getMode ? companion.getMode() : '-';
-            if (trustEl) trustEl.textContent = loyalty.getTrust ? loyalty.getTrust() : '-';
-            if (tierEl) tierEl.textContent = loyalty.getTier ? loyalty.getTier() : '-';
-        }
-        
-        // Update damage numbers
-        for (let i = damageNumbers.length - 1; i >= 0; i--) {
-            const dn = damageNumbers[i];
-            dn.life -= dt;
-            const rect = dn.div.getBoundingClientRect();
-            dn.div.style.top = (rect.top + dn.vy * dt) + 'px';
-            if (dn.life <= 0.3) dn.div.style.opacity = dn.life / 0.3;
-            if (dn.life <= 0) {
-                dn.div.remove();
-                damageNumbers.splice(i, 1);
-            }
-        }
-        
-        // Update faction panel
-        const fp = document.getElementById('faction-panel');
-        if (fp && fp.style.display === 'block' && factions) {
-            const facs = ['vanguard', 'synapse', 'hollow'];
-            facs.forEach(f => {
-                const rep = factions.getReputation ? factions.getReputation(f) : 0;
-                const tier = factions.getTier ? factions.getTier(f) : 'neutral';
-                const fillEl = document.getElementById('faction-' + f + '-fill');
-                const tierEl = document.getElementById('faction-' + f + '-tier');
-                if (fillEl) {
-                    const pct = ((rep + 100) / 200) * 100;
-                    fillEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
-                }
-                if (tierEl) tierEl.textContent = tier.charAt(0).toUpperCase() + tier.slice(1);
-            });
-        }
-        
-        // Update safehouse panel
-        const sp = document.getElementById('safehouse-panel');
-        if (sp && sp.style.display === 'block' && safehouse) {
-            const upgContainer = document.getElementById('safehouse-upgrades');
-            if (upgContainer && safehouse.getAllUpgrades) {
-                const upgrades = safehouse.getAllUpgrades();
-                upgContainer.innerHTML = upgrades.map(u => {
-                    return `<div class="sh-upgrade"><span class="name">${u.name}</span><span class="level">Lv${u.currentLevel}/${u.maxLevel}</span><br/><span style="color:#888;">${u.description}</span></div>`;
-                }).join('');
-            }
-        }
-        
-        // Update bounty panel
-        const bp = document.getElementById('bounty-panel');
-        if (bp && bp.style.display === 'block' && bounty) {
-            const rankEl = document.getElementById('bounty-rank');
-            const contractsEl = document.getElementById('bounty-contracts');
-            if (rankEl && bounty.getRunnerRank) rankEl.textContent = 'Rank: ' + bounty.getRunnerRank();
-            if (contractsEl && bounty.getActiveContracts) {
-                const contracts = bounty.getActiveContracts();
-                contractsEl.innerHTML = contracts.slice(0, 3).map(c => {
-                    return `<div class="bounty-contract"><strong>${c.targetType}</strong> in ${c.sectorId}<br/>Reward: ${c.reward}</div>`;
-                }).join('') || '<div class="bounty-contract">No active contracts</div>';
-            }
-        }
-        
-        // Update codex panel
-        const cop = document.getElementById('codex-panel');
-        if (cop && cop.style.display === 'block' && codex) {
-            const entriesEl = document.getElementById('codex-entries');
-            if (entriesEl && codex.getAllEntries) {
-                const entries = codex.getAllEntries();
-                entriesEl.innerHTML = entries.map(e => {
-                    const cls = e.unlocked ? 'codex-entry unlocked' : 'codex-entry locked';
-                    return `<div class="${cls}">${e.unlocked ? e.title : '???'}</div>`;
-                }).join('');
-            }
-        }
-        
-        // Update mastery panel
-        const mp = document.getElementById('mastery-panel');
-        if (mp && mp.style.display === 'block' && mastery) {
-            const movesEl = document.getElementById('mastery-moves');
-            if (movesEl && mastery.getMasteryOverview) {
-                const overview = mastery.getMasteryOverview();
-                movesEl.innerHTML = overview.map(m => {
-                    return `<div class="mastery-row"><span>${m.name}</span><span>Lv${m.level}</span></div>`;
-                }).join('');
-            }
-        }
-        
-        // Update implants panel
-        const ip = document.getElementById('implants-panel');
-        if (ip && ip.style.display === 'block' && implants) {
-            const slots = ['neural', 'muscular', 'ocular', 'skeletal'];
-            slots.forEach(s => {
-                const el = document.getElementById('implant-' + s);
-                if (el && implants.getImplant) {
-                    const imp = implants.getImplant(s);
-                    el.textContent = imp ? (imp.name || imp.id) : 'Empty';
-                }
-            });
-        }
-        
-        // Update character panel
-        const cp = document.getElementById('character-panel');
-        if (cp && cp.style.display === 'block') {
-            const lvlEl = document.getElementById('char-level');
-            const xpFill = document.getElementById('char-xp-fill');
-            if (lvlEl && progression) {
-                lvlEl.textContent = progression.getLevel ? progression.getLevel() : (progression.level ?? 1);
-                const xpVal = progression.getXP ? progression.getXP() : (progression.xp ?? 0);
-                const xpNext = progression.getXPToNext ? progression.getXPToNext() : (progression.maxXp ?? 1);
-                const xpPct = xpNext > 0 ? (xpVal / xpNext * 100) : 100;
-                xpFill.style.width = Math.max(0, Math.min(100, xpPct)) + '%';
-            }
-            const stats = player.getRPGStats();
-            const statMap = { mob: 'char-mob', ref: 'char-ref', syn: 'char-syn', for: 'char-for', tec: 'char-tec', gut: 'char-gut' };
-            for (const [key, id] of Object.entries(statMap)) {
-                const el = document.getElementById(id);
-                if (el) el.textContent = stats[key] ?? 10;
-            }
-            const archEl = document.getElementById('char-archetype');
-            const origEl = document.getElementById('char-origin');
-            if (archEl && archetype) archEl.textContent = archetype.currentArchetype ?? archetype.name ?? '-';
-            if (origEl && origin) origEl.textContent = origin.currentOrigin ?? origin.name ?? '-';
-            const resFill = document.getElementById('char-resource-fill');
-            if (resFill && characterSheet) {
-                const res = archetype ? archetype.getResourceValue() : 0;
-                const maxRes = archetype ? archetype.getResourceMax() : 100;
-                resFill.style.width = (maxRes > 0 ? (res / maxRes * 100) : 0) + '%';
-            }
+        // Boss fight + all panel updates (delegated to UIManager)
+        if (uiManager) {
+            uiManager.updateBossHUD(bossFight, challenges);
+            uiManager.update(dt);
+            uiManager.updateMiniBossBars(miniBosses);
         }
 
-        // Update mana bar
-        const manaWrap = document.getElementById('mana-bar-wrap');
-        if (manaWrap && resourceSystem && resourceSystem.type === 'mana') {
-            manaWrap.style.display = 'block';
-            const manaFill = document.getElementById('mana-bar-fill');
-            if (manaFill) manaFill.style.width = resourceSystem.getPercent() + '%';
-        } else if (manaWrap) {
-            manaWrap.style.display = 'none';
-        }
-
-        // Update mini-boss health bars
-        miniBosses.forEach((mb, i) => {
-            const bar = miniBossBars[i];
-            if (!bar || !bar.fill) return;
-            if (mb.isDead) { bar.wrap.style.display = 'none'; return; }
-            bar.wrap.style.display = 'block';
-            const pct = mb.getHealthPercent() * 100;
-            bar.fill.style.width = pct + '%';
-            bar.fill.style.background = mb.currentPhase === 2 ? '#ff3333' : '#ffaa00';
-        });
+        // Damage numbers
+        if (damageNumbers) damageNumbers.update(dt);
 
         // Inventory quick-use (keys 6-9)
         if (activeInput.wasPressed('Digit6')) inventorySystem.useItem('health_potion');
