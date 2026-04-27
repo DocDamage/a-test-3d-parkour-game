@@ -128,6 +128,8 @@ export class WeaponSystem {
         if (this.fireCooldown > 0) return false;
         const w = this.getCurrentWeapon();
         if (!w) return false;
+        // Delegate to weapon object if it has its own state
+        if (w.canFire && typeof w.canFire === 'function') return w.canFire();
         if (w.type === 'melee') return true;
         const ammo = this.ammo[w.ammoType];
         return ammo && ammo.clip > 0;
@@ -138,12 +140,26 @@ export class WeaponSystem {
         const w = this.getCurrentWeapon();
         if (!w) return false;
 
-        if (w.type === 'melee') {
+        let result = null;
+        if (w.fire && typeof w.fire === 'function') {
+            result = w.fire(origin, direction);
+        } else if (w.type === 'melee') {
             this._fireMelee(w, origin, direction);
         } else if (w.type === 'projectile') {
             this._fireProjectile(w, origin, direction);
         } else if (w.type === 'hitscan') {
             this._fireHitscan(w, origin, direction);
+        }
+
+        // Handle rich weapon return values (shotgun, melee, sticky)
+        if (result) {
+            if (result.type === 'shotgun' && result.projectiles) {
+                for (const p of result.projectiles) this._fireProjectile(p, p.origin, p.direction);
+            } else if (result.type === 'melee') {
+                this._fireMelee(result, origin, direction);
+            } else if (result.type === 'projectile') {
+                this._fireProjectile(result, origin, direction);
+            }
         }
 
         // Consume ammo
@@ -152,7 +168,7 @@ export class WeaponSystem {
             if (ammo) ammo.clip--;
         }
 
-        this.fireCooldown = w.fireRate ? (1 / w.fireRate) : 0.2;
+        this.fireCooldown = w.fireRate ? (1 / w.fireRate) : (w.attackSpeed ? (1 / w.attackSpeed) : 0.2);
         this._updateUI();
         return true;
     }
@@ -160,6 +176,11 @@ export class WeaponSystem {
     startReload() {
         const w = this.getCurrentWeapon();
         if (!w || w.type === 'melee' || this.isReloading) return false;
+        if (w.reload && typeof w.reload === 'function') {
+            const did = w.reload();
+            if (did) { this.isReloading = true; this.reloadTimer = w.reloadTime || 1.5; }
+            return did;
+        }
         const ammo = this.ammo[w.ammoType];
         if (!ammo || ammo.reserve <= 0 || ammo.clip >= w.clipSize) return false;
 
@@ -181,19 +202,23 @@ export class WeaponSystem {
             }
         }
 
+        // Update active weapon visual / cooldowns
+        const w = this.getCurrentWeapon();
+        if (w && w.update && typeof w.update === 'function') w.update(dt);
+
         // Input: scroll wheel cycles
         if (input && input.wasPressed && input.wasPressed('ScrollUp')) this.cycleSlot(-1);
         if (input && input.wasPressed && input.wasPressed('ScrollDown')) this.cycleSlot(1);
 
-        // Input: number keys switch slots
-        if (input && input.wasPressed) {
+        // Input: number keys switch slots (skip if speedrun IL digits are in use)
+        if (input && input.wasPressed && !document.getElementById('speedrun-panel')) {
             if (input.wasPressed('Digit1')) this.switchSlot(WEAPON_SLOTS.MELEE);
             if (input.wasPressed('Digit2')) this.switchSlot(WEAPON_SLOTS.SIDEARM);
             if (input.wasPressed('Digit3')) this.switchSlot(WEAPON_SLOTS.PRIMARY);
             if (input.wasPressed('Digit4')) this.switchSlot(WEAPON_SLOTS.HEAVY);
             if (input.wasPressed('Digit5')) this.switchSlot(WEAPON_SLOTS.THROWABLE);
-            if (input.wasPressed('KeyR')) this.startReload();
         }
+        if (input && input.wasPressed && input.wasPressed('KeyR')) this.startReload();
     }
 
     /* ------------------------------------------------------------------ */

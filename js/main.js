@@ -37,6 +37,11 @@ import { EnemyManager } from './EnemyManager.js';
 import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
 import { ArenaMode } from './ArenaMode.js';
 import { BossFabricator } from './bosses/BossFabricator.js';
+import { PipeWrench } from './weapons/PipeWrench.js';
+import { SemiAutoPistol } from './weapons/SemiAutoPistol.js';
+import { AssaultRifle } from './weapons/AssaultRifle.js';
+import { Shotgun } from './weapons/Shotgun.js';
+import { StickyBomb } from './weapons/StickyBomb.js';
 import { ConsequenceSystem } from './ConsequenceSystem.js';
 import { DebtSystem } from './DebtSystem.js';
 import { wireSkillCallbacks } from './SkillCallbacks.js';
@@ -224,7 +229,7 @@ const legacy = new LegacySystem(characterSheet, progression, exoSuit, familiarit
 const ngPlus = new NewGamePlus(player, world, characterSheet);
 const collapse = new CollapseMode(world, player, characterSheet, exoSuit, archetype);
 const consequences = new ConsequenceSystem();
-const debt = new DebtSystem(player, enemyManager);
+// debt instantiated after enemyManager below
 
 // Skill system (Phase 2)
 const activeArchetypeId = savedArchetype || 'traceur';
@@ -258,6 +263,44 @@ const staminaSystem = new StaminaSystem(player);
 player.staminaSystem = staminaSystem;
 const combatSystem = new CombatSystem(player, hitboxSystem, damageSystem, camera, audio);
 const statusEffectSystem = new StatusEffectSystem();
+
+// Enemy manager + new combat subsystems (instantiated after combatSystem exists)
+const enemyManager = new EnemyManager(scene, world, player);
+if (damageSystem) enemyManager.setDamageSystem(damageSystem);
+
+// Weapon system: equip starter loadout
+const weaponSystem = new WeaponSystem(player, scene, hitboxSystem, projectileManager);
+const pipeWrench = new PipeWrench(scene, player);
+const semiAutoPistol = new SemiAutoPistol(scene, player);
+const assaultRifle = new AssaultRifle(scene, player);
+const shotgun = new Shotgun(scene, player);
+const stickyBomb = new StickyBomb(scene, player);
+
+weaponSystem.equip(pipeWrench, WEAPON_SLOTS.MELEE);
+weaponSystem.equip(semiAutoPistol, WEAPON_SLOTS.SIDEARM);
+weaponSystem.equip(assaultRifle, WEAPON_SLOTS.PRIMARY);
+weaponSystem.equip(shotgun, WEAPON_SLOTS.HEAVY);
+weaponSystem.equip(stickyBomb, WEAPON_SLOTS.THROWABLE);
+weaponSystem.switchSlot(WEAPON_SLOTS.MELEE);
+
+stickyBomb.onExplode = (data) => {
+    if (!hitboxSystem) return;
+    const hb = new Hitbox(
+        { position: data.position }, 'explosion',
+        { type: 'sphere', radius: data.radius },
+        new THREE.Vector3(0, 0, 0), 0.3
+    );
+    hb.damage = data.damage; hb.team = 'player';
+    hitboxSystem.registerHitbox(hb);
+    if (particleEffects) particleEffects.explosion(data.position.clone(), 0xff3300, 20);
+};
+
+// Arena mode
+const arenaMode = new ArenaMode(scene, world, player, enemyManager, bossFight);
+
+// Debt system (now that enemyManager exists)
+const debt = new DebtSystem(player, enemyManager);
+
 combatSystem.onHitbox = (data) => {
     const hb = new Hitbox(data.owner, data.type, data.shape, data.offset, data.duration, (hitbox, target) => {
         if (target && target.takeDamage) {
