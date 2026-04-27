@@ -76,11 +76,13 @@ import { FootIK } from './FootIK.js';
 import { ProceduralAnimation } from './ProceduralAnimation.js';
 import LevelEditor from './LevelEditor.js';
 import BossFight from './BossFight.js';
+import RiftGuardian from './RiftGuardian.js';
 import { CharacterSheet } from './CharacterSheet.js';
 import { ProgressionSystem } from './ProgressionSystem.js';
 import { ArchetypeSystem } from './ArchetypeSystem.js';
 import { OriginSystem } from './OriginSystem.js';
 import { ExoSuitSystem, SLOTS } from './ExoSuitSystem.js';
+import { InventoryStash } from './InventoryStash.js';
 import { AffixSystem, RARITY } from './AffixSystem.js';
 import { FamiliaritySystem } from './FamiliaritySystem.js';
 import { CompanionDrone, COMPANION_MODES } from './CompanionDrone.js';
@@ -122,6 +124,7 @@ import { DialogueSystem } from './DialogueSystem.js';
 import { ShopSystem } from './ShopSystem.js';
 import { BottleSystem } from './BottleSystem.js';
 import { OverworldMap } from './OverworldMap.js';
+import { SaveSystem } from './SaveSystem.js';
 import { DamageNumbers } from './DamageNumbers.js';
 import { UIManager } from './UIManager.js';
 import { wireEditorUI } from './EditorUI.js';
@@ -210,6 +213,9 @@ const audio = new AudioManager(scene, world);
 // Player first (camera controller wired after tpc is created)
 const player = new Player(scene, world, camera, audio, null);
 
+// Unified save system (instantiated early; registrations happen after subsystems exist)
+const saveSystem = new SaveSystem();
+
 // RPG Phase 1 systems
 const characterSheet = new CharacterSheet(player);
 characterSheet._load();
@@ -237,6 +243,7 @@ if (savedArchetype) {
 const exoSuit = new ExoSuitSystem(player, characterSheet);
 exoSuit._load();
 exoSuit.onEquip = showLootToast;
+const inventoryStash = new InventoryStash(player, exoSuit, characterSheet);
 const affixSystem = new AffixSystem();
 const familiarity = new FamiliaritySystem();
 const companion = new CompanionDrone(scene, player, null); // eventBus placeholder
@@ -317,6 +324,118 @@ weaponSystem.setFamiliaritySystem(familiarity);
 weaponModSystem.equipMod(weaponModSystem.generateMod('barrel', 'rare'), WEAPON_SLOTS.PRIMARY, 'barrel');
 weaponModSystem.equipMod(weaponModSystem.generateMod('scope', 'uncommon'), WEAPON_SLOTS.PRIMARY, 'scope');
 weaponModSystem.equipMod(weaponModSystem.generateMod('grip', 'common'), WEAPON_SLOTS.SIDEARM, 'grip');
+
+// Register subsystems with unified SaveSystem
+saveSystem.register('characterSheet',
+    () => ({
+        stats: { ...characterSheet._stats },
+        attributePoints: characterSheet._attributePoints,
+        tempBonuses: Array.from(characterSheet._tempBonuses.entries()).map(([k, v]) => ({ key: k, ...v }))
+    }),
+    (data) => {
+        if (!data) return;
+        if (data.stats) characterSheet._stats = { ...characterSheet._stats, ...data.stats };
+        if (data.attributePoints !== undefined) characterSheet._attributePoints = data.attributePoints;
+        if (Array.isArray(data.tempBonuses)) {
+            characterSheet._tempBonuses.clear();
+            for (const tb of data.tempBonuses) {
+                const { key, ...rest } = tb;
+                characterSheet._tempBonuses.set(key, rest);
+            }
+        }
+    }
+);
+
+saveSystem.register('exoSuit',
+    () => {
+        const data = {};
+        for (const slot of Object.keys(exoSuit.equipped)) {
+            data[slot] = exoSuit.equipped[slot] ? { ...exoSuit.equipped[slot] } : null;
+        }
+        return data;
+    },
+    (data) => {
+        if (!data) return;
+        for (const slot of Object.keys(exoSuit.equipped)) {
+            exoSuit.equipped[slot] = data[slot] || null;
+        }
+        if (exoSuit._syncGearBonuses) exoSuit._syncGearBonuses();
+    }
+);
+
+saveSystem.register('weaponModSystem',
+    () => {
+        const raw = {};
+        for (const [weaponSlot, slotMap] of weaponModSystem.equipped) {
+            raw[weaponSlot] = {};
+            for (const [modSlot, mod] of slotMap) {
+                raw[weaponSlot][modSlot] = mod;
+            }
+        }
+        return raw;
+    },
+    (data) => {
+        if (!data) return;
+        weaponModSystem.equipped.clear();
+        for (const [weaponSlot, slotData] of Object.entries(data)) {
+            const slotMap = new Map();
+            for (const [modSlot, mod] of Object.entries(slotData)) {
+                slotMap.set(modSlot, mod);
+            }
+            weaponModSystem.equipped.set(Number(weaponSlot) || weaponSlot, slotMap);
+        }
+    }
+);
+
+saveSystem.register('progression',
+    () => ({
+        level: progression._level,
+        xp: progression._xp,
+        totalXPEarned: progression._totalXPEarned,
+        xpSources: progression._xpSources
+    }),
+    (data) => {
+        if (!data) return;
+        progression._level = data.level ?? 1;
+        progression._xp = data.xp ?? 0;
+        progression._totalXPEarned = data.totalXPEarned ?? 0;
+        progression._xpToNext = progression._xpForLevel(progression._level);
+        if (data.xpSources) progression._xpSources = { ...progression._xpSources, ...data.xpSources };
+    }
+);
+
+saveSystem.register('familiarity',
+    () => familiarity.serialize(),
+    (data) => familiarity.deserialize(data)
+);
+
+saveSystem.register('implants',
+    () => implants.serialize(),
+    (data) => implants.deserialize(data)
+);
+
+saveSystem.register('safehouse',
+    () => safehouse.serialize(),
+    (data) => safehouse.deserialize(data)
+);
+
+saveSystem.register('passiveTree',
+    () => passiveTree.serialize(),
+    (data) => passiveTree.deserialize(data)
+);
+
+saveSystem.register('origin',
+    () => ({ origin: origin.currentOrigin }),
+    (data) => {
+        if (data && data.origin) origin.setOrigin(data.origin);
+    }
+);
+
+// Auto-load existing unified save (overrides piecemeal localStorage loads)
+if (saveSystem.hasSave()) {
+    saveSystem.load();
+}
+
 const pipeWrench = new PipeWrench(scene, player);
 const semiAutoPistol = new SemiAutoPistol(scene, player);
 const assaultRifle = new AssaultRifle(scene, player);
@@ -387,10 +506,27 @@ const uiManager = new UIManager({
     player, progression, archetype, origin, characterSheet,
     heartSystem, dungeonSystem, exoSuit, companion, loyalty,
     factions, safehouse, bounty, codex, mastery, implants,
-    resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide
+    resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide,
+    inventoryStash
 });
 uiManager.createMiniBossBars(miniBosses);
 uiManager.createManaBar();
+
+// Stash panel button wiring
+(function wireStashPanel() {
+    const stashPanel = document.getElementById('stash-panel');
+    if (!stashPanel || !inventoryStash) return;
+    stashPanel.addEventListener('click', (e) => {
+        if (e.target.classList.contains('stash-equip')) {
+            const idx = parseInt(e.target.dataset.index, 10);
+            inventoryStash.equipFromStash(idx);
+        }
+        if (e.target.classList.contains('stash-scrap')) {
+            const idx = parseInt(e.target.dataset.index, 10);
+            inventoryStash.scrapItem(idx);
+        }
+    });
+})();
 
 stickyBomb.onExplode = (data) => {
     if (!hitboxSystem) return;
@@ -467,9 +603,16 @@ function _handleEnemyKilled(enemy, source) {
     const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
     const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId);
     if (drop) {
-        lootSystem.spawnDrop(drop, enemy.position || (enemy.mesh && enemy.mesh.position));
+        if (drop.type === 'gear') {
+            const acquired = inventoryStash.acquireItem(drop.itemData);
+            if (acquired) {
+                showLootToast(drop.itemData);
+                if (drop.rarity >= 4) showHint('LEGENDARY! Check your stash (I key).');
+            }
+        } else {
+            lootSystem.spawnDrop(drop, enemy.position || (enemy.mesh && enemy.mesh.position));
+        }
         showHint('Loot drops! Walk over items to pick them up.');
-        if (drop.rarity >= 4) showHint('LEGENDARY! Check your gear stats (G key).');
     }
 }
 
@@ -790,6 +933,7 @@ const challenges = new ChallengeSystem(scene, player);
 
 // Boss Fight (needs directorMode, bulletTime, challenges)
 const bossFight = new BossFight(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
+const riftGuardian = new RiftGuardian(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
 
 // Phase 8: Boss Roster
 const bosses = [];
@@ -802,7 +946,7 @@ bosses.push(bossFabricator, bossWarden, bossLeviathan, bossSwarmQueen, bossArchi
 
 // Phase 4: Endgame systems
 const difficultyTier = new DifficultyTierSystem(challenges);
-const apexRift = new ApexRiftSystem(scene, world, player, bossFight, challenges, lootSystem, difficultyTier, enemyManager);
+const apexRift = new ApexRiftSystem(scene, world, player, riftGuardian, challenges, lootSystem, difficultyTier, enemyManager);
 const nephalemGlory = new NephalemGlory(player, challenges);
 
 // ── Zelda-style systems ────────────────────────────────────────────────────
@@ -1025,10 +1169,15 @@ function spawnDamageNumber(position, amount, isCrit, damageType) {
             else assistMode.restorePlayer(player);
         });
     }
+    const saveBtn = document.getElementById('btn-save-game');
+    if (saveBtn) saveBtn.addEventListener('click', () => saveSystem.save());
+    const loadBtn = document.getElementById('btn-load-game');
+    if (loadBtn) loadBtn.addEventListener('click', () => saveSystem.load());
 })();
 
 // Game loop
 const clock = new THREE.Clock();
+let autoSaveTimer = 0;
 
 function animate() {
     requestAnimationFrame(animate);
@@ -1113,6 +1262,13 @@ function animate() {
         
         tpc.update(dt, mouseDelta, world);
         
+        // Auto-save every 30 seconds
+        autoSaveTimer += dt;
+        if (autoSaveTimer >= 30) {
+            saveSystem.save();
+            autoSaveTimer = 0;
+        }
+
         // Overclock / Heat (compute early for finalDt) — gated by key item
         const timeScale = player.overclockUnlocked !== false ? overclock.update(dt, activeInput) : 1.0;
         const slowMo = droneTakedown.update(dt, player, activeInput, world.drones.drones);
@@ -1369,7 +1525,7 @@ function animate() {
 
         // RPG systems update
         if (archetype) archetype.update(dt);
-        if (progression) progression.update(dt);
+        // ProgressionSystem has no update() method
         if (companion) companion.update(finalDt, player, world, world.drones ? world.drones.drones : []);
         if (territory) territory.update(finalDt);
         if (loyalty && typeof loyalty.update === 'function') loyalty.update(finalDt);

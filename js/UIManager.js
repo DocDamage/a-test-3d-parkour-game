@@ -54,6 +54,26 @@ export class UIManager {
     handleInput(activeInput) {
         const d = this.deps;
 
+        if (activeInput.wasPressed('KeyI') && !activeInput.isPressed('ShiftLeft')) {
+            const sp = document.getElementById('stash-panel');
+            if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
+        }
+        if (activeInput.wasPressed('KeyI') && activeInput.isPressed('ShiftLeft')) {
+            const ki = document.getElementById('keyitem-panel');
+            if (ki) {
+                const showing = ki.style.display === 'block';
+                ki.style.display = showing ? 'none' : 'block';
+                if (!showing && d.keyItems) {
+                    d.keyItems.getAllItems().forEach(item => {
+                        const row = document.getElementById('ki-' + item.id);
+                        if (row) {
+                            if (item.collected) row.classList.add('found');
+                            else row.classList.remove('found');
+                        }
+                    });
+                }
+            }
+        }
         if (activeInput.wasPressed('KeyP') && !activeInput.isPressed('ShiftLeft')) {
             const pt = document.getElementById('passive-tree');
             if (pt) {
@@ -101,22 +121,6 @@ export class UIManager {
             const ip = document.getElementById('implants-panel');
             if (ip) ip.style.display = (ip.style.display === 'block') ? 'none' : 'block';
         }
-        if (activeInput.wasPressed('KeyI')) {
-            const ki = document.getElementById('keyitem-panel');
-            if (ki) {
-                const showing = ki.style.display === 'block';
-                ki.style.display = showing ? 'none' : 'block';
-                if (!showing && d.keyItems) {
-                    d.keyItems.getAllItems().forEach(item => {
-                        const row = document.getElementById('ki-' + item.id);
-                        if (row) {
-                            if (item.collected) row.classList.add('found');
-                            else row.classList.remove('found');
-                        }
-                    });
-                }
-            }
-        }
         if (activeInput.wasPressed('KeyO') && !activeInput.isPressed('ShiftLeft')) {
             const sp = document.getElementById('settings-panel');
             if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
@@ -137,6 +141,7 @@ export class UIManager {
         const d = this.deps;
         this._updateBasicHUD(d);
         this._updateGearPanel(d);
+        this._updateStashPanel(d);
         this._updateCompanionPanel(d);
         this._updateFactionPanel(d);
         this._updateSafehousePanel(d);
@@ -225,6 +230,31 @@ export class UIManager {
         });
         const gsEl = document.getElementById('gear-score');
         if (gsEl) gsEl.textContent = d.exoSuit.getGearScore ? d.exoSuit.getGearScore() : 0;
+    }
+
+    _updateStashPanel(d) {
+        const sp = document.getElementById('stash-panel');
+        if (!sp || sp.style.display !== 'block' || !d.inventoryStash) return;
+        const list = document.getElementById('stash-list');
+        const countEl = document.getElementById('stash-count');
+        if (countEl) countEl.textContent = `${d.inventoryStash.stash.length} / ${d.inventoryStash.maxSize}`;
+        if (!list) return;
+        const stash = d.inventoryStash.getStash();
+        if (stash.length === 0) {
+            list.innerHTML = '<div style="color:#666;font-size:12px;text-align:center;padding:12px 0;">Stash is empty</div>';
+            return;
+        }
+        const rarityColors = { 1: '#aaa', 2: '#4488ff', 3: '#ffaa00', 4: '#ff8800', 5: '#00ff44', 6: '#ff4444', 7: '#ff00ff' };
+        list.innerHTML = stash.map((item, i) => {
+            const color = rarityColors[item.rarity] || '#fff';
+            const slot = item.slot || 'gear';
+            return `<div class="stash-item">
+                <span class="stash-name" style="color:${color};">${item.name || 'Unknown Item'}</span>
+                <span class="stash-slot">${slot}</span>
+                <button class="stash-equip" data-index="${i}">Equip</button>
+                <button class="stash-scrap" data-index="${i}">Scrap</button>
+            </div>`;
+        }).join('');
     }
 
     _updateCompanionPanel(d) {
@@ -326,7 +356,11 @@ export class UIManager {
         }
         const archEl = document.getElementById('char-archetype');
         const origEl = document.getElementById('char-origin');
-        if (archEl && d.archetype) archEl.textContent = d.archetype.currentArchetype ?? d.archetype.name ?? '-';
+        if (archEl && d.archetype) {
+            const primaryKey = d.archetype.getPrimaryArchetype ? d.archetype.getPrimaryArchetype() : null;
+            const primaryData = primaryKey && d.archetype.getArchetypeData ? d.archetype.getArchetypeData(primaryKey) : null;
+            archEl.textContent = primaryData ? primaryData.name : '-';
+        }
         if (origEl && d.origin) origEl.textContent = d.origin.currentOrigin ?? d.origin.name ?? '-';
         const resFill = document.getElementById('char-resource-fill');
         if (resFill && d.characterSheet) {

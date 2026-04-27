@@ -160,6 +160,12 @@ export class Player {
         this.characterSheet = null;
         this.staminaSystem = null;
 
+        // Death rewind snapshots
+        this._rewindBuffer = [];
+        this._rewindSnapshotTimer = 0;
+        this.REWIND_SNAPSHOT_INTERVAL = 0.5;
+        this.REWIND_WINDOW = 3.0;
+
         // Visuals
         this.mesh = this.createMesh();
         this.shadow = this.createShadow();
@@ -626,6 +632,23 @@ export class Player {
         // Track safe position for respawn
         if (this.grounded && ['IDLE', 'WALK', 'SPRINT', 'CROUCH'].includes(this.state)) {
             this.lastSafePosition.copy(this.position);
+        }
+
+        // Death rewind snapshot ring buffer
+        if (!this.isDead) {
+            this._rewindSnapshotTimer -= dt;
+            if (this._rewindSnapshotTimer <= 0) {
+                this._rewindSnapshotTimer = this.REWIND_SNAPSHOT_INTERVAL;
+                this._rewindBuffer.push({
+                    position: this.position.clone(),
+                    health: this.health,
+                    time: performance.now()
+                });
+            }
+            const cutoff = performance.now() - this.REWIND_WINDOW * 1000;
+            while (this._rewindBuffer.length > 0 && this._rewindBuffer[0].time < cutoff) {
+                this._rewindBuffer.shift();
+            }
         }
 
         // Update trajectory prediction
@@ -2056,6 +2079,16 @@ export class Player {
             if (amount <= 0) return 0;
         }
 
+        // Stagger immunity: resist kinetic and explosive damage
+        if (this._staggerImmune && amount > 0 && (type === 'kinetic' || type === 'explosive')) {
+            amount *= 0.5;
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.8;
+                this.scene.userData.spawnDamageNumber(pos, 'RESIST', false, type);
+            }
+            if (amount <= 0) return 0;
+        }
+
         // Knockback on heavy hits (>20 damage)
         if (amount > 20 && this.state !== 'KNOCKBACK') {
             this.state = 'KNOCKBACK';
@@ -2097,6 +2130,37 @@ export class Player {
     }
 
     die() {
+        // Adrenal Valve death rewind
+        const stats = this.getRPGStats();
+        const implantBonuses = stats._implantBonuses || {};
+        if (implantBonuses.deathRewind) {
+            const threshold = implantBonuses.deathRewindThreshold || 0.10;
+            const cutoff = performance.now() - this.REWIND_WINDOW * 1000;
+            let validSnapshot = null;
+            for (let i = this._rewindBuffer.length - 1; i >= 0; i--) {
+                const snap = this._rewindBuffer[i];
+                if (snap.time < cutoff) continue;
+                if (snap.health > this.maxHealth * threshold) {
+                    validSnapshot = snap;
+                    break;
+                }
+            }
+            if (validSnapshot) {
+                this.position.copy(validSnapshot.position);
+                this.health = Math.min(this.maxHealth, validSnapshot.health);
+                this.velocity.set(0, 0, 0);
+                this.state = 'IDLE';
+                this.isDead = false;
+                this.isInvincible = true;
+                setTimeout(() => { this.isInvincible = false; }, 1000);
+                if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                    const pos = this.position.clone(); pos.y += 1.8;
+                    this.scene.userData.spawnDamageNumber(pos, 'REWIND', true, 'energy');
+                }
+                return;
+            }
+        }
+
         this.isDead = true;
         this.state = 'RAGDOLL';
         // death handled by caller/main.js

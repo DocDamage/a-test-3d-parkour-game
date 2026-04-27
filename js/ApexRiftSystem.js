@@ -127,6 +127,11 @@ export class ApexRiftSystem {
 
     this.elapsed += dt;
 
+    // Update guardian boss fight if active
+    if (this.guardianSpawned && this.bossFight && typeof this.bossFight.update === 'function') {
+      this.bossFight.update(dt);
+    }
+
     // Time limit fail
     if (this.elapsed >= this.timeLimit && !this.guardianDefeated) {
       this.endRift(false);

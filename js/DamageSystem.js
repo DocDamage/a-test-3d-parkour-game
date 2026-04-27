@@ -71,9 +71,18 @@ export class DamageSystem {
             amount *= (1 + damageMultiplier);
         }
 
+        // Dodge roll
+        const dodgeChance = targetStats.dodgeChance ?? 0;
+        if (dodgeChance > 0 && Math.random() < dodgeChance) {
+            return { amount: 0, isCrit: false, type: damageType, dodged: true };
+        }
+
         // Critical hits
-        const critChance = sourceStats.critChance ?? 0;
+        let critChance = sourceStats.critChance ?? 0;
         const critDamage = sourceStats.critDamage ?? 1.5;
+        if (sourceStats._critBonusFromPredator > 0) {
+            critChance += sourceStats._critBonusFromPredator;
+        }
         const crit = this.rollCrit(critChance, critDamage);
         if (crit.isCrit) {
             amount *= crit.finalMultiplier;
@@ -124,6 +133,14 @@ export class DamageSystem {
             if (boost > 0) adjustedBase *= (1 + boost);
         }
         const dmg = this.calculateDamage(adjustedBase, damageType, sourceStats, targetStats);
+        if (dmg.dodged) {
+            if (target.scene && target.scene.userData && target.scene.userData.spawnDamageNumber) {
+                const pos = target.position.clone();
+                pos.y += 1.8;
+                target.scene.userData.spawnDamageNumber(pos, 'DODGE', false, damageType);
+            }
+            return 0;
+        }
         if (target.takeDamage) {
             const dealt = target.takeDamage(dmg.amount, dmg.type, source);
             this.applyStatusEffect(dmg.type, target, source);
