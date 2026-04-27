@@ -19,7 +19,8 @@ export const RESOURCE_TYPES = {
   operative: 'focus',
   saboteur: 'chaos',
   specimen: 'fury',
-  netrunner: 'charge'
+  netrunner: 'charge',
+  mage: 'mana'
 };
 
 /**
@@ -448,6 +449,91 @@ export const ACTIVE_SKILLS = {
         signal_boost: { name: 'Signal Boost', effect: 'Duration 12s. Drones gain +100% attack speed.' }
       }
     }
+  },
+
+  mage: {
+    arcane_bolt: {
+      id: 'arcane_bolt',
+      name: 'Arcane Bolt',
+      slot: 'LMB',
+      category: 'generator',
+      baseDamage: 18,
+      damageType: DAMAGE_TYPES.MAGIC,
+      cooldown: 0,
+      resourceCost: 0,
+      resourceGen: 12,
+      range: 20,
+      description: 'Rapid magic missile. Generates Mana.',
+      runes: {
+        split: { name: 'Split', effect: 'Fires 2 additional bolts at 50% damage.' },
+        pierce: { name: 'Pierce', effect: 'Bolts pierce through 2 enemies.' },
+        overcharge: { name: 'Overcharge', effect: 'Every 4th bolt deals 2× damage and costs no Mana.' }
+      }
+    },
+    fireball: {
+      id: 'fireball',
+      name: 'Fireball',
+      slot: 'RMB',
+      category: 'spender',
+      baseDamage: 70,
+      damageType: DAMAGE_TYPES.MAGIC,
+      cooldown: 4.0,
+      resourceCost: 30,
+      description: 'Exploding fire orb. 3m radius. Ignites surfaces.',
+      runes: {
+        meteor: { name: 'Meteor', effect: 'Larger explosion (5m). +40% damage.' },
+        napalm: { name: 'Napalm', effect: 'Ground burns for 5s (15 damage/s).' },
+        cluster: { name: 'Cluster', effect: 'Splits into 3 smaller fireballs on impact.' }
+      }
+    },
+    frost_armor: {
+      id: 'frost_armor',
+      name: 'Frost Armor',
+      slot: 'Q',
+      category: 'utility',
+      baseDamage: 0,
+      damageType: null,
+      cooldown: 12.0,
+      resourceCost: 25,
+      description: 'Ice shield absorbs 25% max HP damage. Melee attackers are slowed.',
+      runes: {
+        reflect: { name: 'Reflect', effect: 'Shield reflects 30% of blocked damage.' },
+        nova: { name: 'Nova', effect: 'When shield breaks, 4m freeze nova.' },
+        permanence: { name: 'Permanence', effect: 'Shield lasts 2× longer.' }
+      }
+    },
+    lightning_chain: {
+      id: 'lightning_chain',
+      name: 'Lightning Chain',
+      slot: 'E',
+      category: 'defense',
+      baseDamage: 45,
+      damageType: DAMAGE_TYPES.ELECTRIC,
+      cooldown: 8.0,
+      resourceCost: 35,
+      description: 'Chain lightning hits 4 enemies. +20% damage per bounce.',
+      runes: {
+        storm: { name: 'Storm', effect: 'Hits 6 enemies. +30% damage per bounce.' },
+        paralyze: { name: 'Paralyze', effect: 'Final target is stunned for 1.5s.' },
+        conduit: { name: 'Conduit', effect: 'If cast while grounded, refunds 50% Mana.' }
+      }
+    },
+    void_rift: {
+      id: 'void_rift',
+      name: 'Void Rift',
+      slot: 'R',
+      category: 'ultimate',
+      baseDamage: 120,
+      damageType: DAMAGE_TYPES.MAGIC,
+      cooldown: 30.0,
+      resourceCost: 80,
+      description: 'Open a void portal that pulls enemies in and detonates after 3s.',
+      runes: {
+        implosion: { name: 'Implosion', effect: 'Pull radius +50%. Damage +30%.' },
+        exile: { name: 'Exile', effect: 'Enemies below 15% HP are instantly killed.' },
+        remnant: { name: 'Remnant', effect: 'Leaves a persistent zone that drains Mana from enemies.' }
+      }
+    }
   }
 };
 
@@ -519,6 +605,19 @@ export const PASSIVE_TREES = {
     { id: 'net_8', name: 'Charge Pool', description: 'Max Charge +20 per rank.', maxRank: 3, requires: [], bonuses: { maxCharge: 20 } },
     { id: 'net_9', name: 'Swarm Intelligence', description: 'Swarm Override duration +2s per rank.', maxRank: 3, requires: ['net_4'], bonuses: { swarmDuration: 2.0 } },
     { id: 'net_10', name: 'Synapse Overclocker', description: 'Set bonus node: EMP Pulse overcharges next 3 skills.', maxRank: 1, requires: ['net_5'], bonuses: { synapseBonus: 1 } }
+  ],
+
+  mage: [
+    { id: 'mage_1', name: 'Arcane Intuition', description: '+8% magic damage per rank.', maxRank: 5, requires: [], bonuses: { magicDamage: 0.08 } },
+    { id: 'mage_2', name: 'Meditation', description: '+3% mana regen per rank.', maxRank: 5, requires: [], bonuses: { manaRegen: 0.03 } },
+    { id: 'mage_3', name: 'Pyromancer', description: 'Fireball radius +0.5m per rank.', maxRank: 3, requires: ['mage_1'], bonuses: { fireballRadius: 0.5 } },
+    { id: 'mage_4', name: 'Cryomancer', description: 'Frost Armor absorption +5% per rank.', maxRank: 3, requires: ['mage_2'], bonuses: { frostArmorAbsorb: 0.05 } },
+    { id: 'mage_5', name: 'Stormcaller', description: 'Lightning Chain bounces to +1 enemy per rank.', maxRank: 3, requires: ['mage_1', 'mage_2'], bonuses: { lightningBounces: 1 } },
+    { id: 'mage_6', name: 'Void Touched', description: 'Void Rift duration +0.5s per rank.', maxRank: 3, requires: ['mage_1'], bonuses: { voidRiftDuration: 0.5 } },
+    { id: 'mage_7', name: 'Spellweaver', description: 'Arcane Bolt has 20% chance to fire an extra bolt.', maxRank: 1, requires: ['mage_1'], bonuses: { arcaneBoltExtra: 0.20 } },
+    { id: 'mage_8', name: 'Mana Pool', description: 'Max Mana +25 per rank.', maxRank: 3, requires: [], bonuses: { maxMana: 25 } },
+    { id: 'mage_9', name: 'Elementalist', description: 'Elemental spells deal +10% damage per rank.', maxRank: 3, requires: ['mage_3', 'mage_4'], bonuses: { elementalDamage: 0.10 } },
+    { id: 'mage_10', name: 'Archmage', description: 'Set bonus node: Below 50% Mana, spells cost 50% less.', maxRank: 1, requires: ['mage_5'], bonuses: { archmageBonus: 1 } }
   ]
 };
 

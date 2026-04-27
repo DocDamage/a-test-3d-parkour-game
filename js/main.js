@@ -42,6 +42,10 @@ import { SemiAutoPistol } from './weapons/SemiAutoPistol.js';
 import { AssaultRifle } from './weapons/AssaultRifle.js';
 import { Shotgun } from './weapons/Shotgun.js';
 import { StickyBomb } from './weapons/StickyBomb.js';
+import { StaffOfEmbers } from './weapons/StaffOfEmbers.js';
+import { VoidWand } from './weapons/VoidWand.js';
+import { CryoGauntlet } from './weapons/CryoGauntlet.js';
+import { MagicSystem } from './MagicSystem.js';
 import { ConsequenceSystem } from './ConsequenceSystem.js';
 import { DebtSystem } from './DebtSystem.js';
 import { wireSkillCallbacks } from './SkillCallbacks.js';
@@ -233,7 +237,11 @@ const consequences = new ConsequenceSystem();
 
 // Skill system (Phase 2)
 const activeArchetypeId = savedArchetype || 'traceur';
+player._archetypeId = activeArchetypeId;
 const resourceSystem = new ResourceSystem(activeArchetypeId);
+if (activeArchetypeId === 'mage') {
+    resourceSystem.setMaxResource(120);
+}
 const skillSystem = new SkillSystem(player, resourceSystem, activeArchetypeId);
 
 // Assign default loadout for archetype
@@ -282,6 +290,28 @@ weaponSystem.equip(assaultRifle, WEAPON_SLOTS.PRIMARY);
 weaponSystem.equip(shotgun, WEAPON_SLOTS.HEAVY);
 weaponSystem.equip(stickyBomb, WEAPON_SLOTS.THROWABLE);
 weaponSystem.switchSlot(WEAPON_SLOTS.MELEE);
+
+// Magic weapons
+const staffOfEmbers = new StaffOfEmbers(scene, player);
+const voidWand = new VoidWand(scene, player);
+const cryoGauntlet = new CryoGauntlet(scene, player);
+weaponSystem.equip(staffOfEmbers, WEAPON_SLOTS.PRIMARY);
+weaponSystem.equip(voidWand, WEAPON_SLOTS.SIDEARM);
+weaponSystem.equip(cryoGauntlet, WEAPON_SLOTS.MELEE);
+
+// Magic system
+const magicSystem = new MagicSystem(player, resourceSystem, scene);
+player.magicSystem = magicSystem;
+
+// Mana bar UI
+const manaBarWrap = document.createElement('div');
+manaBarWrap.id = 'mana-bar-wrap';
+manaBarWrap.style.cssText = 'position:absolute;bottom:60px;left:50%;transform:translateX(-50%);width:200px;height:8px;background:rgba(0,0,0,0.5);border-radius:4px;overflow:hidden;z-index:10;display:none;';
+const manaBarFill = document.createElement('div');
+manaBarFill.id = 'mana-bar-fill';
+manaBarFill.style.cssText = 'width:0%;height:100%;background:#8844ff;transition:width 0.1s;';
+manaBarWrap.appendChild(manaBarFill);
+document.getElementById('ui').appendChild(manaBarWrap);
 
 stickyBomb.onExplode = (data) => {
     if (!hitboxSystem) return;
@@ -365,6 +395,10 @@ if (world.drones) {
 
 // Player damage numbers + Nephalem Glory streak break
 player.onDamageTaken = (amount, type, source) => {
+    // Frost armor absorption
+    if (magicSystem && player._frostArmorAbsorb > 0) {
+        amount = magicSystem.absorbDamage(amount);
+    }
     const pos = player.position.clone();
     pos.y += 1.5;
     spawnDamageNumber(pos, Math.ceil(amount), false, type);
@@ -1305,6 +1339,7 @@ function animate() {
         staminaSystem.update(finalDt, player);
         combatSystem.update(finalDt, activeInput);
         statusEffectSystem.update(finalDt);
+        if (magicSystem) magicSystem.update(finalDt);
         
         // Speedrun ILs
         speedrunILs.update(finalDt);
@@ -1660,6 +1695,16 @@ function animate() {
                 const maxRes = archetype ? archetype.getResourceMax() : 100;
                 resFill.style.width = (maxRes > 0 ? (res / maxRes * 100) : 0) + '%';
             }
+        }
+
+        // Update mana bar
+        const manaWrap = document.getElementById('mana-bar-wrap');
+        if (manaWrap && resourceSystem && resourceSystem.type === 'mana') {
+            manaWrap.style.display = 'block';
+            const manaFill = document.getElementById('mana-bar-fill');
+            if (manaFill) manaFill.style.width = resourceSystem.getPercent() + '%';
+        } else if (manaWrap) {
+            manaWrap.style.display = 'none';
         }
         
         // Time freeze from power-up

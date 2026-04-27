@@ -8,7 +8,8 @@ export const RESOURCE_TYPES = {
   FOCUS: 'focus',
   CHAOS: 'chaos',
   FURY: 'fury',
-  CHARGE: 'charge'
+  CHARGE: 'charge',
+  MANA: 'mana'
 };
 
 export class ResourceSystem {
@@ -29,7 +30,8 @@ export class ResourceSystem {
       operative: RESOURCE_TYPES.FOCUS,
       saboteur: RESOURCE_TYPES.CHAOS,
       specimen: RESOURCE_TYPES.FURY,
-      netrunner: RESOURCE_TYPES.CHARGE
+      netrunner: RESOURCE_TYPES.CHARGE,
+      mage: RESOURCE_TYPES.MANA
     };
     return map[archetypeId] || RESOURCE_TYPES.MOMENTUM;
   }
@@ -94,7 +96,8 @@ export class ResourceSystem {
       focus: 'Focus',
       chaos: 'Chaos',
       fury: 'Fury',
-      charge: 'Charge'
+      charge: 'Charge',
+      mana: 'Mana'
     };
     return names[this.type] || 'Resource';
   }
@@ -108,7 +111,8 @@ export class ResourceSystem {
       focus: '#00ccff',
       chaos: '#ff3333',
       fury: '#ff0066',
-      charge: '#aa66ff'
+      charge: '#aa66ff',
+      mana: '#8844ff'
     };
     return colors[this.type] || '#ffffff';
   }

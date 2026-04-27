@@ -12,7 +12,8 @@ export const ARCHETYPES = {
     OPERATIVE: 'operative',
     SABOTEUR: 'saboteur',
     SPECIMEN: 'specimen',
-    NETRUNNER: 'netrunner'
+    NETRUNNER: 'netrunner',
+    MAGE: 'mage'
 };
 
 const ARCHETYPE_DATA = {
@@ -68,6 +69,15 @@ const ARCHETYPE_DATA = {
         droneControlGain: 5,  // per second per controlled drone
         capstoneCost: 80,
         capstoneDuration: 10
+    },
+    [ARCHETYPES.MAGE]: {
+        name: 'Mage',
+        description: 'Reality is merely a suggestion. Bend the elements to your will.',
+        resource: 'mana',
+        resourceMax: 120,
+        spellCastGain: 5,      // per spell cast
+        capstoneCost: 80,
+        capstoneDuration: 10   // Mana Surge duration
     }
 };
 
@@ -356,6 +366,14 @@ export class ArchetypeSystem {
                 }
                 break;
             }
+            case ARCHETYPES.MAGE: {
+                // Mana regenerates passively via ResourceSystem.update()
+                // Mage gets bonus regen during Mana Surge
+                if (this._manaSurgeTimer > 0) {
+                    this._changeResource(slot, 15 * dt);
+                }
+                break;
+            }
         }
     }
 
@@ -365,6 +383,7 @@ export class ArchetypeSystem {
         this._berserkTimer = Math.max(0, this._berserkTimer - dt);
         this._swarmOverrideTimer = Math.max(0, this._swarmOverrideTimer - dt);
         this._ghostBulletTimer = Math.max(0, this._ghostBulletTimer - dt);
+        this._manaSurgeTimer = Math.max(0, this._manaSurgeTimer - dt);
 
         if (this._ghostBulletTimer <= 0) {
             this._ghostBulletReady = false;
@@ -384,6 +403,7 @@ export class ArchetypeSystem {
             case ARCHETYPES.SABOTEUR:  return this._zeroCooldownTimer > 0;
             case ARCHETYPES.SPECIMEN:  return this._berserkTimer > 0;
             case ARCHETYPES.NETRUNNER: return this._swarmOverrideTimer > 0;
+            case ARCHETYPES.MAGE:      return this._manaSurgeTimer > 0;
             default: return false;
         }
     }
@@ -424,6 +444,9 @@ export class ArchetypeSystem {
             case ARCHETYPES.NETRUNNER:
                 this._swarmOverrideTimer = data.capstoneDuration;
                 break;
+            case ARCHETYPES.MAGE:
+                this._manaSurgeTimer = data.capstoneDuration;
+                break;
         }
 
         return true;
@@ -459,6 +482,10 @@ export class ArchetypeSystem {
         return this._swarmOverrideTimer > 0;
     }
 
+    isManaSurgeActive() {
+        return this._manaSurgeTimer > 0;
+    }
+
     getCapstoneTimeRemaining(capstoneKey) {
         switch (capstoneKey) {
             case ARCHETYPES.TRACEUR:   return this._infiniteWallrunTimer;
@@ -466,6 +493,7 @@ export class ArchetypeSystem {
             case ARCHETYPES.SABOTEUR:  return this._zeroCooldownTimer;
             case ARCHETYPES.SPECIMEN:  return this._berserkTimer;
             case ARCHETYPES.NETRUNNER: return this._swarmOverrideTimer;
+            case ARCHETYPES.MAGE:      return this._manaSurgeTimer;
             default: return 0;
         }
     }
@@ -479,6 +507,7 @@ export class ArchetypeSystem {
         this._swarmOverrideTimer = 0;
         this._ghostBulletTimer = 0;
         this._ghostBulletReady = false;
+        this._manaSurgeTimer = 0;
         this._groundedTimer = 0;
         this._lastState = null;
         this._controllingDrones = 0;

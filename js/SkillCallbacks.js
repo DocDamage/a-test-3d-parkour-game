@@ -528,4 +528,131 @@ export function wireSkillCallbacks(ctx) {
             particleEffects.explosion(pos.clone(), 0xaa66ff, 8);
         }
     });
+
+    // ------------------------------------------------------------------
+    // Mage callbacks
+    // ------------------------------------------------------------------
+    skillSystem.onExecute('arcane_bolt', (skill, targetPos, p) => {
+        const dir = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing));
+        const origin = p.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+        projectileManager.fire(origin, dir, {
+            speed: 55, range: 20, radius: 0.12, damage: skill.finalDamage || 18,
+            damageType: 'magic', color: 0xaa44ff,
+            onHit: (target) => {
+                if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 18, 'magic', p);
+                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
+                spawnDamageNumber(tPos, Math.round(skill.finalDamage || 18), false, 'magic');
+            }
+        });
+    });
+
+    skillSystem.onExecute('fireball', (skill, targetPos, p) => {
+        const start = p.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+        const dir = new THREE.Vector3(Math.sin(p.facing), 0.1, Math.cos(p.facing)).normalize();
+        const end = start.clone().add(dir.multiplyScalar(18));
+        let t = 0;
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0xff4400 })
+        );
+        mesh.position.copy(start);
+        scene.add(mesh);
+        const duration = 1.2;
+        const timer = setInterval(() => {
+            t += 0.05;
+            const frac = Math.min(1, t / duration);
+            mesh.position.lerpVectors(start, end, frac);
+            mesh.position.y += Math.sin(frac * Math.PI) * 1.5;
+            if (frac >= 1) {
+                clearInterval(timer);
+                scene.remove(mesh);
+                mesh.geometry.dispose(); mesh.material.dispose();
+                particleEffects.explosion(mesh.position.clone(), 0xff4400, 30);
+                const hitbox = new Hitbox(
+                    { position: mesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3,
+                    (hb, target) => {
+                        if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 70, 'magic', p);
+                        const tp = target.position || (target.mesh && target.mesh.position) || mesh.position;
+                        spawnDamageNumber(tp, Math.round(skill.finalDamage || 70), false, 'magic');
+                    }
+                );
+                hitbox.damage = skill.finalDamage || 70;
+                hitbox.team = 'player';
+                hitboxSystem.registerHitbox(hitbox);
+            }
+        }, 50);
+    });
+
+    skillSystem.onExecute('frost_armor', (skill, targetPos, p) => {
+        const absorb = Math.floor((p.maxHealth || 100) * 0.25);
+        p._frostArmorAbsorb = absorb;
+        const geo = new THREE.SphereGeometry(1.0, 16, 16);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.3, wireframe: true });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(p.position);
+        scene.add(mesh);
+        const interval = setInterval(() => { mesh.position.copy(p.position); }, 16);
+        setTimeout(() => {
+            clearInterval(interval);
+            p._frostArmorAbsorb = 0;
+            scene.remove(mesh);
+            geo.dispose(); mat.dispose();
+        }, 6000);
+    });
+
+    skillSystem.onExecute('lightning_chain', (skill, targetPos, p) => {
+        projectileManager.fireChainLightning(p.position.clone().add(new THREE.Vector3(0, 1, 0)), null, {
+            maxChains: 4, jumpRange: 8, damage: skill.finalDamage || 45,
+            damageType: 'electric', color: 0xffff00,
+            onHit: (target, dmg) => {
+                if (target && target.takeDamage) target.takeDamage(dmg, 'electric', p);
+                const tPos = target.position || (target.mesh && target.mesh.position) || p.position;
+                spawnDamageNumber(tPos, Math.round(dmg), false, 'electric');
+            }
+        });
+    });
+
+    skillSystem.onExecute('void_rift', (skill, targetPos, p) => {
+        const riftPos = p.position.clone().add(new THREE.Vector3(Math.sin(p.facing) * 4, 0.5, Math.cos(p.facing) * 4));
+        const geo = new THREE.RingGeometry(0.5, 1.5, 32);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x440088, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(riftPos);
+        mesh.rotation.x = -Math.PI / 2;
+        scene.add(mesh);
+        let life = 3.0;
+        const pullInterval = setInterval(() => {
+            const drones = world.drones ? world.drones.drones : [];
+            for (const drone of drones) {
+                const pos = drone.position || (drone.mesh && drone.mesh.position);
+                if (!pos || pos.distanceTo(riftPos) > 6) continue;
+                const pullDir = riftPos.clone().sub(pos).normalize();
+                if (drone.group) drone.group.position.addScaledVector(pullDir, 3 * 0.05);
+            }
+        }, 50);
+        const anim = () => {
+            life -= 0.016;
+            mesh.rotation.z += 0.05;
+            mat.opacity = Math.max(0, life / 3.0 * 0.7);
+            if (life > 0) requestAnimationFrame(anim);
+            else {
+                clearInterval(pullInterval);
+                scene.remove(mesh);
+                geo.dispose(); mat.dispose();
+                particleEffects.explosion(riftPos.clone(), 0x440088, 35);
+                const hitbox = new Hitbox(
+                    { position: riftPos }, 'explosion', { type: 'sphere', radius: 5 }, new THREE.Vector3(0, 0, 0), 0.4,
+                    (hb, target) => {
+                        if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 120, 'magic', p);
+                        const tp = target.position || (target.mesh && target.mesh.position) || riftPos;
+                        spawnDamageNumber(tp, Math.round(skill.finalDamage || 120), false, 'magic');
+                    }
+                );
+                hitbox.damage = skill.finalDamage || 120;
+                hitbox.team = 'player';
+                hitboxSystem.registerHitbox(hitbox);
+            }
+        };
+        anim();
+    });
 }

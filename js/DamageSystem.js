@@ -8,7 +8,8 @@ export const DAMAGE_TYPES = {
     ENERGY: 'energy',
     EXPLOSIVE: 'explosive',
     ELECTRIC: 'electric',
-    FREEZE: 'freeze'
+    FREEZE: 'freeze',
+    MAGIC: 'magic'
 };
 
 export class DamageSystem {
@@ -48,6 +49,12 @@ export class DamageSystem {
                 break;
             case DAMAGE_TYPES.FREEZE:
                 // Freeze applies slow / stun stacks — handled by applyStatusEffect
+                break;
+            case DAMAGE_TYPES.MAGIC:
+                // Magic bypasses armor but is blocked by ward
+                if (targetStats.magicWard > 0) {
+                    amount *= 0.25;
+                }
                 break;
             default:
                 break;
@@ -142,6 +149,9 @@ export class DamageSystem {
                 case DAMAGE_TYPES.ENERGY:
                     this.statusEffectSystem.applyEffect(target, 'burning', 5.0, { dmg: 5, source });
                     break;
+                case DAMAGE_TYPES.MAGIC:
+                    this.statusEffectSystem.applyEffect(target, 'magicked', 4.0, { dmg: 3, source });
+                    break;
                 default:
                     break;
             }
@@ -189,6 +199,8 @@ export class DamageSystem {
                 return '#00ccff';
             case DAMAGE_TYPES.FREEZE:
                 return '#88ccff';
+            case DAMAGE_TYPES.MAGIC:
+                return '#aa44ff';
             default:
                 return '#ffffff';
         }
