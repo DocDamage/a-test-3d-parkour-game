@@ -1296,6 +1296,17 @@ function animate() {
         if (mastery) mastery.update && mastery.update(finalDt, player);
         if (subLevels) subLevels.update && subLevels.update(finalDt, player);
         if (collapse) collapse.update && collapse.update(finalDt, player);
+        if (safehouse) safehouse.update && safehouse.update(finalDt);
+        if (bounty) bounty.update && bounty.update(finalDt, player);
+        if (codex) codex.update && codex.update(finalDt, player);
+        if (implants) implants.update && implants.update(finalDt, player);
+        if (legacy) legacy.update && legacy.update(finalDt);
+        if (ngPlus) ngPlus.update && ngPlus.update(finalDt);
+        if (consequences) consequences.update && consequences.update(finalDt);
+        if (debt) debt.update && debt.update(finalDt);
+        if (shop) shop.update && shop.update(finalDt);
+        if (factions) factions.update && factions.update(finalDt);
+        if (familiarity) familiarity.update && familiarity.update(finalDt);
         if (apexRift) apexRift.update(finalDt);
         if (nephalemGlory) nephalemGlory.update(finalDt);
         if (legendaryPowerSystem) legendaryPowerSystem.update(finalDt);
