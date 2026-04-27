@@ -46,6 +46,10 @@ import { StaffOfEmbers } from './weapons/StaffOfEmbers.js';
 import { VoidWand } from './weapons/VoidWand.js';
 import { CryoGauntlet } from './weapons/CryoGauntlet.js';
 import { MagicSystem } from './MagicSystem.js';
+import { Gatekeeper } from './minibosses/Gatekeeper.js';
+import { RiftStalker } from './minibosses/RiftStalker.js';
+import { ForgeHound } from './minibosses/ForgeHound.js';
+import { CrystalGolem } from './minibosses/CrystalGolem.js';
 import { ConsequenceSystem } from './ConsequenceSystem.js';
 import { DebtSystem } from './DebtSystem.js';
 import { wireSkillCallbacks } from './SkillCallbacks.js';
@@ -302,6 +306,42 @@ weaponSystem.equip(cryoGauntlet, WEAPON_SLOTS.MELEE);
 // Magic system
 const magicSystem = new MagicSystem(player, resourceSystem, scene);
 player.magicSystem = magicSystem;
+
+// Mini-bosses
+const miniBosses = [];
+const gatekeeper = new Gatekeeper(scene, world, player, new THREE.Vector3(15, 0, 15));
+gatekeeper.start();
+miniBosses.push(gatekeeper);
+
+const riftStalker = new RiftStalker(scene, world, player, new THREE.Vector3(-15, 0, -15));
+riftStalker.start();
+miniBosses.push(riftStalker);
+
+const forgeHound = new ForgeHound(scene, world, player, new THREE.Vector3(20, 0, -10));
+forgeHound.start();
+miniBosses.push(forgeHound);
+
+const crystalGolem = new CrystalGolem(scene, world, player, new THREE.Vector3(-20, 0, 10));
+crystalGolem.start();
+miniBosses.push(crystalGolem);
+
+// Mini-boss health bar UI
+const miniBossBars = [];
+miniBosses.forEach((mb, i) => {
+    const wrap = document.createElement('div');
+    wrap.id = `miniboss-bar-${i}`;
+    wrap.style.cssText = `position:absolute;top:${50 + i * 24}px;right:16px;width:160px;height:16px;background:rgba(0,0,0,0.5);border-radius:3px;overflow:hidden;z-index:10;`;
+    const fill = document.createElement('div');
+    fill.id = `miniboss-fill-${i}`;
+    fill.style.cssText = 'width:100%;height:100%;background:#ffaa00;transition:width 0.2s;';
+    const label = document.createElement('div');
+    label.textContent = mb.type;
+    label.style.cssText = 'position:absolute;top:0;left:4px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);';
+    wrap.appendChild(fill);
+    wrap.appendChild(label);
+    document.getElementById('ui').appendChild(wrap);
+    miniBossBars.push({ wrap, fill });
+});
 
 // Mana bar UI
 const manaBarWrap = document.createElement('div');
@@ -1271,6 +1311,7 @@ function animate() {
         world.drones.update(finalDt);
         enemyManager.update(finalDt);
         enemyManager.clearDead();
+        miniBosses.forEach(mb => mb.update(finalDt));
         weaponSystem.update(finalDt, activeInput);
         arenaMode.update(finalDt);
         
@@ -1706,6 +1747,17 @@ function animate() {
         } else if (manaWrap) {
             manaWrap.style.display = 'none';
         }
+
+        // Update mini-boss health bars
+        miniBosses.forEach((mb, i) => {
+            const bar = miniBossBars[i];
+            if (!bar || !bar.fill) return;
+            if (mb.isDead) { bar.wrap.style.display = 'none'; return; }
+            bar.wrap.style.display = 'block';
+            const pct = mb.getHealthPercent() * 100;
+            bar.fill.style.width = pct + '%';
+            bar.fill.style.background = mb.currentPhase === 2 ? '#ff3333' : '#ffaa00';
+        });
         
         // Time freeze from power-up
         let renderDt = finalDt;
