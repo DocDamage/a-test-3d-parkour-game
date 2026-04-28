@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vertical Parkour ARPG</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffaa00">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; background: #0a0a14; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
@@ -1802,7 +1804,32 @@
             outline-offset: 3px !important;
             box-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
         }
+
+        /* ─── Accessibility System CSS ───────────────────── */
+        :root { --apex-ui-scale: 1; --apex-high-contrast: 0; --apex-reduced-motion: 0; --apex-dyslexia-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        html { font-size: calc(100% * var(--apex-ui-scale)); }
+        .apex-high-contrast * { border-color: #fff !important; }
+        .apex-high-contrast #ui, .apex-high-contrast #settings-panel, .apex-high-contrast #pause-menu {
+            border: 2px solid #fff !important; background: rgba(0,0,0,0.95) !important;
+        }
+        .apex-high-contrast .settings-row { border-bottom: 1px solid #fff !important; }
+        .apex-reduced-motion *, .apex-reduced-motion *::before, .apex-reduced-motion *::after {
+            animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+        .apex-dyslexia, .apex-dyslexia * { font-family: var(--apex-dyslexia-font) !important; }
+        .controller-prompt {
+            display: inline-block; background: rgba(255,255,255,0.15); color: #ffaa00;
+            padding: 1px 6px; border-radius: 4px; font-size: 0.85em; font-weight: bold; margin: 0 2px;
+        }
+        .controller-prompt.prompt-ps { color: #00a8ff; }
+        .controller-prompt.prompt-switch { color: #ff3b30; }
     </style>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
     <script type="importmap">
     {
         "imports": {
@@ -2704,9 +2731,68 @@
         </div>
         <div class="settings-section">
             <h3>Accessibility</h3>
+            <div class="settings-row">
+                <span>Colorblind</span>
+                <select id="set-colorblind" style="background:#1a1a22;border:1px solid #444;color:#ddd;padding:3px 6px;border-radius:3px;font-size:12px;">
+                    <option value="none">None</option>
+                    <option value="deuteranopia">Deuteranopia</option>
+                    <option value="protanopia">Protanopia</option>
+                    <option value="tritanopia">Tritanopia</option>
+                    <option value="achromatopsia">Achromatopsia</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <span>UI Scale</span>
+                <input type="range" id="set-ui-scale" min="0.75" max="1.5" step="0.05" value="1.0">
+            </div>
+            <div class="settings-row"><label><input type="checkbox" id="set-high-contrast"> High Contrast</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-reduced-motion"> Reduced Motion</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-subtitles"> Subtitles</label></div>
+            <div class="settings-row">
+                <span>Subtitle Size</span>
+                <select id="set-subtitle-size" style="background:#1a1a22;border:1px solid #444;color:#ddd;padding:3px 6px;border-radius:3px;font-size:12px;">
+                    <option value="small">Small</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="large">Large</option>
+                </select>
+            </div>
+            <div class="settings-row"><label><input type="checkbox" id="set-subtitle-bg" checked> Subtitle Background</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-screen-reader"> Screen Reader Support</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-toggle-sprint"> Toggle Sprint</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-sticky-targeting"> Sticky Targeting</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-pause-damage"> Pause on Damage</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-sound-viz"> Sound Visualization</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-epilepsy"> Photosensitive Mode</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-dyslexia"> Dyslexia-Friendly Font</label></div>
             <div class="settings-row"><label><input type="checkbox" id="set-assist-jump"> Assist Jump</label></div>
             <div class="settings-row"><label><input type="checkbox" id="set-assist-grapple"> Assist Grapple</label></div>
             <div class="settings-row"><label><input type="checkbox" id="set-assist-aim"> Assist Aim</label></div>
+        </div>
+        <div class="settings-section">
+            <h3>Controller</h3>
+            <div class="settings-row">
+                <span>Stick Deadzone</span>
+                <input type="range" id="set-deadzone" min="0.01" max="0.5" step="0.01" value="0.15">
+            </div>
+            <div class="settings-row">
+                <span>Trigger Threshold</span>
+                <input type="range" id="set-trigger-threshold" min="0" max="1" step="0.05" value="0.1">
+            </div>
+            <div class="settings-row"><label><input type="checkbox" id="set-gyro"> Gyro Aiming</label></div>
+            <div class="settings-row">
+                <span>Gyro Sensitivity</span>
+                <input type="range" id="set-gyro-sens" min="0.1" max="5" step="0.1" value="1.0">
+            </div>
+            <div class="settings-row">
+                <span>Button Prompts</span>
+                <select id="set-prompts" style="background:#1a1a22;border:1px solid #444;color:#ddd;padding:3px 6px;border-radius:3px;font-size:12px;">
+                    <option value="auto">Auto-Detect</option>
+                    <option value="xbox">Xbox</option>
+                    <option value="ps">PlayStation</option>
+                    <option value="switch">Nintendo Switch</option>
+                </select>
+            </div>
+            <div class="settings-row"><label><input type="checkbox" id="set-haptics"> Controller Vibration</label></div>
         </div>
         <div class="settings-section">
             <h3>Input</h3>
@@ -2714,14 +2800,32 @@
                 <span>Camera Sensitivity</span>
                 <input type="range" id="set-sensitivity" min="0.5" max="5" step="0.1" value="2.5">
             </div>
-            <div class="settings-row"><label><input type="checkbox" id="set-haptics"> Controller Vibration</label></div>
             <div class="settings-row"><label><input type="checkbox" id="set-touch"> Touch Controls</label></div>
+        </div>
+        <div class="settings-section">
+            <h3>Language</h3>
+            <div class="settings-row">
+                <span>Language</span>
+                <select id="set-language" style="background:#1a1a22;border:1px solid #444;color:#ddd;padding:3px 6px;border-radius:3px;font-size:12px;">
+                    <option value="en">English</option>
+                </select>
+            </div>
         </div>
         <div class="settings-section">
             <h3>Game</h3>
             <div class="settings-row">
                 <button id="btn-save-game" style="padding:6px 14px;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:13px;cursor:pointer;">Save Game</button>
                 <button id="btn-load-game" style="padding:6px 14px;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:13px;cursor:pointer;">Load Game</button>
+            </div>
+        </div>
+        <div class="settings-section">
+            <h3>Build Code</h3>
+            <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+                <input type="text" id="build-code-input" placeholder="Paste build code…" style="background:#1a1a22;border:1px solid #444;color:#ddd;padding:6px 10px;border-radius:4px;font-size:12px;width:100%;box-sizing:border-box;">
+                <div style="display:flex;gap:6px;">
+                    <button id="btn-import-build" style="flex:1;padding:6px 0;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:12px;cursor:pointer;">Import Build</button>
+                    <button id="btn-export-build" style="flex:1;padding:6px 0;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:12px;cursor:pointer;">Export Build</button>
+                </div>
             </div>
         </div>
         <div class="settings-section">

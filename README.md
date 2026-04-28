@@ -1,11 +1,24 @@
 # Vertical Parkour ARPG
 
-A browser-based **Vertical Parkour ARPG** built with **Three.js r160** (ES modules). No build step — serve the files and play.
+A browser-based **Vertical Parkour ARPG** built with **Three.js r160** (ES modules). No build step — serve the files and play. Installable as a PWA.
 
 > **Core Identity:** Movement is combat. Parkour, melee, guns, magic/powers, and exo-suit abilities chain together through vertical combat arenas.
 
 > **Play now:** `python -m http.server 8080` → `http://localhost:8080`
 > **Dev mode:** append `#dev` to the URL for verbose console logging.
+> **Install:** Add to home screen via your browser's PWA install prompt.
+
+---
+
+## What's New
+
+- **Full Modern Controller Support** — gyro aiming, per-device deadzone & trigger thresholds, hot-swap, adaptive trigger API stub, auto-detected button prompts (Xbox / PlayStation / Switch).
+- **Accessibility Suite** — 4 colorblind modes, UI scaling, high contrast, reduced motion, subtitle system, screen reader support, toggle sprint, sticky targeting, pause-on-damage, sound visualization, photosensitive mode, dyslexia-friendly font.
+- **Internationalization** — i18n framework with `en.json` catalog; `Intl` date/number formatting; ready for additional locales.
+- **Build Codes** — export/import full character builds as shareable short strings.
+- **Seasonal Events** — 7 rotating weekly global modifiers based on real-world date.
+- **PWA** — offline-capable via service worker; fullscreen display; installable on desktop and mobile.
+- **Combat Polish** — aim assist with distance falloff, directional damage indicators, sound visualization arcs.
 
 ---
 
@@ -25,7 +38,7 @@ Start → Parkour/Combat → Kill Enemies → Loot/XP → Upgrade Build → Save
 - **Enemies, Bosses, Arena, Rift** — content exists to test the loop
 
 ### 1. Character Creation
-On first launch you choose an **Origin** (background story that grants passive stat bonuses) and a **Primary Archetype** (Drifter, Ghost, Brawler, Technician — each with a unique skill tree). Choices persist in `localStorage` and carry through New Game+.
+On first launch you choose an **Origin** (background story that grants passive stat bonuses) and a **Primary Archetype** (Traceur, Operative, Saboteur, Specimen, Netrunner, Mage — each with a unique skill tree). Choices persist in `localStorage` and carry through New Game+.
 
 ### 2. Explore the Warehouse
 The core 80×80m warehouse is your playground — climb walls, vault obstacles, wall-run, and grapple through 7 themed zones (Rooftop, Underground Tunnel, Vertical Shaft, Water Treatment, Freezer Section, Server Room, Hangar Bay). Collect **Data Chips** (scrap currency) and **Heart Piece** collectibles. Interact with **NPCs** for dialogue, bounties, and shop access.
@@ -86,8 +99,8 @@ The **Legacy System** carries heirloom stats and dynasty bonuses from retired ru
 
 #### Character Building
 - **CharacterSheet** — 6 core stats: MOB (mobility), REF (reflexes / parry window), SYN (synergy / tech), FOR (fortitude / HP), TEC (tech / weapons), GUT (resilience). Stats derive crit chance, crit damage, parry window, stamina, and more.
-- **ArchetypeSystem** — 4 archetypes (Drifter, Ghost, Brawler, Technician) each with unique passive bonuses and skill tree paths.
-- **OriginSystem** — 6 origins granting flat stat bonuses and world-interaction modifiers.
+- **ArchetypeSystem** — 6 archetypes (Traceur, Operative, Saboteur, Specimen, Netrunner, Mage) each with unique passive bonuses, resource type, and skill tree paths.
+- **OriginSystem** — 4 origins granting flat stat bonuses and world-interaction modifiers.
 - **ProgressionSystem** — XP → level-up → attribute points. Level-up toast shown in HUD.
 - **PassiveTree** — spendable point tree keyed to archetype (`P`).
 - **ImplantSystem** — slot-based permanent stat augmentations (`M`).
@@ -96,7 +109,7 @@ The **Legacy System** carries heirloom stats and dynasty bonuses from retired ru
 - **LegacySystem** — cross-NG+ heirloom stats and dynasty bonus applied to all CharacterSheet stat lookups.
 
 #### Gear & Inventory
-- **ExoSuitSystem** — helmet, chest, gloves, boots; each item has base stats + up to 4 random affixes (from AffixSystem) (`G`).
+- **ExoSuitSystem** — helmet, chest, gloves, boots, optics, shoulders, greaves; each item has base stats + up to 4 random affixes (from AffixSystem) (`G`).
 - **InventoryStash** — persistent off-character gear storage (`I`).
 - **LegendaryPowerSystem** — unique effects: Aegis Field (parry-granted damage shield), Loot Beacon (auto-pickup radius), and more.
 - **WeaponSystem** — 5 weapon slots (Melee, Sidearm, Primary, Heavy, Throwable); starter: energy sword + SMG.
@@ -149,6 +162,8 @@ All drones: vision cones with LOS, stealth break on `player.isInvisible`, EMP-di
 - **NephalemGlory** — kill-streak tier power: T1 (+25% dmg / +10% spd), T2 (+60% / +25%), T3 (+100% / +50%) with particle trail.
 - **DamageNumbers** — floating color-coded damage labels.
 - **Stamina** (`StaminaSystem`) — sprint and skills consume stamina; `canSprint()` gates sprint entry.
+- **AimAssist** — controller magnetism toward nearest enemy within configurable cone; strength scales inversely with distance.
+- **DirectionalDamageIndicator** — red chevrons at screen edge pointing to off-screen attackers.
 
 #### Boss Fight: The Overseer
 Circular arena, 3 phases:
@@ -172,6 +187,19 @@ SkillSystem: 4 active slots mapped to `RMB`, `E`, `R`, `Q`. ~40 skills per arche
 | DifficultyTierSystem | Always | `Shift+T` selector |
 
 **New Game+ corruption modifiers:** static_field (EMP bursts), rapid_respawn (30s drone revival), director_watches (all drones elite), gravity_shifts (periodic upward impulse), and more stacking per NG+ tier.
+
+### Seasonal Events
+Real-world weekly rotation (7 modifiers):
+- **Low Gravity** — 1.5× jump height, reduced fall damage.
+- **Electric Storm** — bonus lightning damage, drones attack 30% faster.
+- **Dense Air** — 20% slower movement, doubled wall-run duration.
+- **Golden Age** — doubled shard drops, 25% shop discount.
+- **Hazard Pay** — doubled environmental damage, increased loot quality.
+- **Ghost Protocol** — halved drone detection, doubled melee damage.
+- **Overdrive** — halved overclock cooldown, doubled energy drain.
+
+### Build Codes
+Export your full character build (archetype, origin, stats, passives, skills, gear, implants, weapons) as a short shareable code. Paste a code in Settings → Build Code to import another player's build.
 
 ### Dungeons & Puzzles
 - **DungeonSystem** — multi-room dungeons with locked doors, mini-bosses, and boss rooms.
@@ -216,6 +244,7 @@ All audio procedurally synthesised via **Web Audio API** — no external files.
 - Singleton `AudioContext` shared across all systems (no duplicate contexts).
 - 3D positional audio via `THREE.AudioListener` attached to the camera.
 - Dynamic ambience, surface-aware footsteps, jump, land, climb, slide, vault, grapple, UI SFX.
+- Subtitle system with speaker names and priority queue for all audio events.
 
 ### Photo & Cinematic
 - **Photo Mode** (`F12`) — free-orbit camera, depth-of-field, 5 filter presets. Pauses game.
@@ -226,18 +255,35 @@ Full in-browser 3D editor. 14 object types, live properties panel, undo, export/
 
 ### Accessibility
 - **Assist Mode** (`Shift+P`) — extended coyote time, auto-vault, halved knockback, slower drones and Rising Tide.
-- **Haptics toggle** — settings panel checkbox; controller rumble on hard landings and hits.
-- **Full gamepad** — Xbox / PS / Switch Pro; keyboard + gamepad are OR-merged so both work simultaneously.
+- **Colorblind Modes** — Deuteranopia, Protanopia, Tritanopia, Achromatopsia via SVG `<feColorMatrix>` filters on the canvas.
+- **UI Scale** — 75%–150% via CSS custom property.
+- **High Contrast** — white borders, opaque backgrounds on all panels.
+- **Reduced Motion** — disables animations and transitions.
+- **Subtitle System** — speaker names, 3 sizes, optional background, `aria-live` region.
+- **Screen Reader Support** — toggles `aria-live` on level-up, save, and death toasts.
+- **Motor Accessibility** — toggle sprint, sticky targeting, pause-on-damage (0.5s freeze), sound visualization (directional arcs), dyslexia-friendly font.
+- **Photosensitive Mode** — auto-disables bloom, film grain, and chromatic aberration.
+
+### Controller Support
+- **Full modern gamepad** — Xbox, PlayStation (DualSense/DualShock), Switch Pro.
+- **Gyro Aiming** — reads `Gamepad.pose.orientation` when enabled; configurable sensitivity.
+- **Per-device Deadzone** — left/right stick deadzone stored per `gamepad.id`.
+- **Trigger Thresholds** — analog trigger activation point configurable 0.0–1.0.
+- **Hot-swap** — unplug one controller, plug in another mid-session without restart.
+- **Adaptive Triggers** — API stub for PS5 DualSense resistance via WebHID (future-ready).
+- **Button Prompts** — auto-detects controller type; shows Xbox/PlayStation/Switch glyphs in UI.
+- **Haptics** — rumble on hard landings, hits, and shoulder bashes; toggle in settings.
 - **Touch controls** — left-side joystick (movement), right-side swipe (camera look).
 
 ### Infrastructure
 - **GameContext** (`js/GameContext.js`) — DI container with topological sort, circular dependency detection, event bus, and per-system `.update()` dispatch. Enables clean NG+ re-initialization.
 - **SaveSystem** — serialize/deserialize all subsystems to `localStorage`.
-- **InputManager** — edge detection (`wasPressed`), key consumption (`consumeKey`), synthetic mouse delta injection (`addMouseDelta`).
+- **InputManager** — edge detection (`wasPressed`), key consumption (`consumeKey`), synthetic mouse delta injection (`addMouseDelta`), scroll wheel weapon switching.
 - **KeyBindings / KeybindingsUI** — runtime-remappable key bindings with settings panel.
 - **Loading progress text** — `#loading-progress` sub-element updates: "Initializing renderer..." → "Building world..." → "Creating player..." → "Ready!".
 - **WebGL 2 guard** — shows a clear error message before Three.js fails if WebGL 2 is absent.
 - **Dev mode** (`#dev`) — enables `__DEV__` console warnings in all error catch blocks.
+- **PWA** — `manifest.json` + `sw.js` for offline cache and installability.
 
 ---
 
@@ -291,16 +337,16 @@ Full in-browser 3D editor. 14 object types, live properties panel, undo, export/
 |-------|--------|
 | Left Stick | Move |
 | Right Stick | Look |
-| A / Cross | Jump / Grab |
-| B / Circle | Slide / Crouch |
-| X / Square | Air Dash |
-| Y / Triangle | Drop |
-| LB / L1 | Sprint |
-| RB / R1 | Takedown |
-| LT / L2 | Grapple Aim |
-| RT / R2 | Overclock |
-| L3 | Magnet Boots |
-| R3 | Day / Night |
+| A / Cross / B (Switch) | Jump / Grab |
+| B / Circle / A (Switch) | Slide / Crouch |
+| X / Square / Y (Switch) | Air Dash |
+| Y / Triangle / X (Switch) | Drop |
+| LB / L1 / L | Sprint |
+| RB / R1 / R | Takedown |
+| LT / L2 / ZL | Grapple Aim |
+| RT / R2 / ZR | Overclock |
+| L3 / L Stick | Magnet Boots |
+| R3 / R Stick | Day / Night |
 
 ### Level Editor
 
@@ -327,7 +373,7 @@ Full in-browser 3D editor. 14 object types, live properties panel, undo, export/
 ## Architecture
 
 ```
-index.html              — UI panels, canvas, importmap, CSS
+index.html              — UI panels, canvas, importmap, CSS, PWA manifest link
 js/main.js              — Renderer/scene setup, system creation, loop startup
 js/GameDirector.js      — Gameplay orchestration: start, pause, death, save, release gating
 js/GameContext.js       — DI container: register, topological sort, event bus
@@ -335,9 +381,17 @@ js/Player.js            — 16-state parkour controller (~1700 lines)
 js/World.js             — Warehouse geometry, zones, collectibles, hazards
 js/ThirdPersonCamera.js — Orbit + collision-avoiding follow camera
 js/InputManager.js      — Keyboard/mouse, edge detection, key consumption
-js/GamepadController.js — Gamepad API, dead zones, OR-merged with keyboard, rumble
+js/GamepadController.js — Gamepad API: gyro, dead zones, hot-swap, trigger thresholds, rumble
 js/PostProcessing.js    — EffectComposer chain + day/night transitions
 js/AudioManager.js      — Procedural Web Audio synthesis, shared AudioContext
+js/SubtitleSystem.js    — Closed captions for all audio events
+js/AccessibilityManager.js — Colorblind, UI scale, high contrast, reduced motion, motor aids
+js/AimAssist.js         — Controller magnetism toward nearest enemy
+js/DirectionalDamageIndicator.js — Screen-edge damage direction chevrons
+js/I18n.js              — i18n with interpolation, pluralization, Intl formatting
+js/BuildCodeSystem.js   — Encode/decode full character builds to shareable strings
+js/SeasonSystem.js      — Real-world weekly rotation of global gameplay modifiers
+js/ControllerPrompts.js — Auto-detect controller type for button glyphs
 ```
 
 ### Module Map
@@ -346,13 +400,15 @@ Traversal:    GrapplingHook, ZiplineNetwork, ChainGrappleRelays, MagnetBoots
               OverclockSystem, BulletTime, AdvancedMovement, RunnerVision
 Combat:       CombatSystem, DamageSystem, HitboxSystem, StatusEffectSystem
               WeaponSystem, WeaponLoadout, WeaponLoadoutUI, WeaponModSystem
-              DroneTakedown, ComboSystem, NephalemGlory
+              DroneTakedown, ComboSystem, NephalemGlory, AimAssist
+              DirectionalDamageIndicator
 Enemies:      DroneAI, AdvancedDrones, EnemyManager, EnemyBase, EnemyHealthBar
               BossFight, RiftGuardian, MiniBossBase
 RPG:          CharacterSheet, ProgressionSystem, ArchetypeSystem, OriginSystem
               PassiveTree, SkillSystem, SkillData, SkillCallbacks, SkillBarUI
               ExoSuitSystem, AffixSystem, ImplantSystem, LegendaryPowerSystem
               MasterySystem, CodexSystem, FamiliaritySystem
+              BuildCodeSystem, SeasonSystem
 Inventory:    InventorySystem, InventoryStash, LootSystem, ResourceSystem
               BottleSystem, WeaponModSystem, KeyItemSystem
 Economy:      ShopSystem, DebtSystem, BountySystem
@@ -369,7 +425,9 @@ Content:      DungeonSystem, PuzzleRoom, SafehouseSystem, OverworldMap
 Visual:       ParticleEffects, GodRays, LensFlare, FootIK, ProceduralAnimation
               DamageNumbers, PhotoMode, DirectorMode
 UI:           UIManager, MenuNavigator, HintSystem, SettingsUI, KeybindingsUI
-              EditorUI, LevelEditor
+              EditorUI, LevelEditor, I18n, SubtitleSystem, AccessibilityManager
+              ControllerPrompts
+Platform:     manifest.json, sw.js
 ```
 
 ---
@@ -427,6 +485,17 @@ scripts/check.sh    # Unix
 ```
 
 Import via Level Editor (`Ctrl+O`) or `levelEditor.importLevel(jsonString)`.
+
+---
+
+## Localization
+
+The game ships with an `en.json` catalog. To add a new locale:
+
+1. Copy `locales/en.json` to `locales/<lang>.json`.
+2. Translate all values.
+3. Add the language code to the `<select id="set-language">` dropdown in `index.html`.
+4. The I18n module will auto-detect the user's browser language on first boot.
 
 ---
 

@@ -124,9 +124,22 @@ import { MenuNavigator } from './MenuNavigator.js';
 import { wireEditorUI } from './EditorUI.js';
 import { GameContext } from './GameContext.js';
 import { GameDirector } from './GameDirector.js';
+import { i18n } from './I18n.js';
+import { controllerPrompts } from './ControllerPrompts.js';
+import { SubtitleSystem } from './SubtitleSystem.js';
+import { AccessibilityManager } from './AccessibilityManager.js';
+import { AimAssist } from './AimAssist.js';
+import { DirectionalDamageIndicator } from './DirectionalDamageIndicator.js';
+import { BuildCodeSystem } from './BuildCodeSystem.js';
+import { SeasonSystem } from './SeasonSystem.js';
 
 const __DEV__ = window.location.hash === '#dev';
 window.__DEV__ = __DEV__;
+
+// Init i18n early so modules can reference it
+i18n.init(['en']).then(() => i18n.applyDOM());
+window.i18n = i18n;
+window.controllerPrompts = controllerPrompts;
 
 import { DEFAULT_SETTINGS, wireSettings } from './SettingsUI.js';
 import { wireKeybindings } from './KeybindingsUI.js';
@@ -176,6 +189,16 @@ ctx.register('renderer', [], () => renderer);
 const postProcessing = new PostProcessing(renderer, scene, camera);
 ctx.register('postProcessing', ['scene', 'camera', 'renderer'], () => postProcessing);
 
+// Accessibility manager (needs postProcessing for epilepsy safe mode)
+const accessibilityManager = new AccessibilityManager(postProcessing);
+window.accessibilityManager = accessibilityManager;
+ctx.register('accessibilityManager', ['postProcessing'], () => accessibilityManager);
+
+// Subtitle system
+const subtitleSystem = new SubtitleSystem();
+window.subtitleSystem = subtitleSystem;
+ctx.register('subtitleSystem', [], () => subtitleSystem);
+
 // Lighting
 const { ambient, sun, fill, pointLights, lensFlare } = setupLighting(scene, camera, postProcessing);
 ctx.register('ambientLight', [], () => ambient);
@@ -200,6 +223,19 @@ ctx.register('audio', ['scene', 'world'], () => audio);
 setLoadProgress('Creating player...');
 const player = new Player(scene, world, camera, audio, null);
 ctx.register('player', ['scene', 'world', 'camera', 'audio'], () => player);
+
+// Combat polish systems
+const aimAssist = new AimAssist(player, camera);
+window.aimAssist = aimAssist;
+ctx.register('aimAssist', ['player', 'camera'], () => aimAssist);
+
+const directionalDamageIndicator = new DirectionalDamageIndicator();
+ctx.register('directionalDamageIndicator', [], () => directionalDamageIndicator);
+
+// Season system (real-world date rotations)
+const seasonSystem = new SeasonSystem(player);
+ctx.register('seasonSystem', ['player'], () => seasonSystem);
+seasonSystem.apply();
 
 // Unified save system
 const saveSystem = new SaveSystem();
@@ -512,6 +548,35 @@ const weaponLoadoutUI = new WeaponLoadoutUI(weaponSystem);
     });
 })();
 
+// Build Code System
+const buildCodeSystem = new BuildCodeSystem(characterSheet, archetype, origin, passiveTree, skillSystem, exoSuit, weaponSystem, implants);
+ctx.register('buildCodeSystem', ['characterSheet', 'archetype', 'origin', 'passiveTree', 'skillSystem', 'exoSuit', 'weaponSystem', 'implants'], () => buildCodeSystem);
+(function wireBuildCode() {
+    const importBtn = document.getElementById('btn-import-build');
+    const exportBtn = document.getElementById('btn-export-build');
+    const input = document.getElementById('build-code-input');
+    if (importBtn) {
+        importBtn.addEventListener('click', () => {
+            const code = input ? input.value.trim() : '';
+            const result = buildCodeSystem.importBuild(code);
+            if (result.success) {
+                if (input) input.value = '';
+                showHint('Build imported successfully!');
+            } else {
+                showHint('Invalid build code.');
+            }
+        });
+    }
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const code = buildCodeSystem.exportBuild();
+            if (input) input.value = code;
+            navigator.clipboard.writeText(code).catch(() => {});
+            showHint('Build code copied to clipboard!');
+        });
+    }
+})();
+
 stickyBomb.onExplode = (data) => {
     if (!hitboxSystem) return;
     const hb = new Hitbox(
@@ -607,6 +672,22 @@ player.onDamageTaken = (amount, type, source) => {
     if (nephalemGlory) nephalemGlory.onDamageTaken();
     if (gamepad && gamepad.rumble) gamepad.rumble(0.3, 0.7, 100);
     if (legendaryPowerSystem) legendaryPowerSystem.onTakeFatalDamage();
+
+    // Directional damage indicator
+    if (source && source.position && directionalDamageIndicator) {
+        const dir = DirectionalDamageIndicator.getDirection(source.position, player.position, player.facing);
+        directionalDamageIndicator.trigger(dir);
+    }
+
+    // Pause on damage accessibility feature
+    if (accessibilityManager && accessibilityManager.settings.pauseOnDamage) {
+        accessibilityManager.triggerPauseOnDamage();
+    }
+
+    // Sound visualization
+    if (accessibilityManager && source && source.position) {
+        accessibilityManager.addSoundViz(source.position, 'damage', 1.0);
+    }
 };
 
 player.onJump = (isDoubleJump) => {
@@ -826,6 +907,7 @@ const procAnim = new ProceduralAnimation(scene, player, world);
 
 // Gamepad controller
 const gamepad = new GamepadController();
+window.gamepadController = gamepad;
 // M4: give gamepad access to keyboard so both inputs can be active simultaneously
 gamepad.setKeyboardInput(input);
 
@@ -1249,6 +1331,44 @@ let settings = { ...DEFAULT_SETTINGS };
 window.settingsStore = settings;
 
 wireSettings(settings, { postProcessing, audio, assistMode, player, touchControls, saveSystem });
+
+// Load new settings into their respective systems
+if (accessibilityManager) {
+    accessibilityManager.load({
+        colorblindMode: settings.colorblindMode,
+        uiScale: settings.uiScale,
+        highContrast: settings.highContrast,
+        reducedMotion: settings.reducedMotion,
+        subtitles: settings.subtitles,
+        subtitleSize: settings.subtitleSize,
+        subtitleBackground: settings.subtitleBackground,
+        screenReader: settings.screenReader,
+        toggleSprint: settings.toggleSprint,
+        stickyTargeting: settings.stickyTargeting,
+        pauseOnDamage: settings.pauseOnDamage,
+        soundVisualization: settings.soundVisualization,
+        epilepsySafe: settings.epilepsySafe,
+        dyslexiaFont: settings.dyslexiaFont,
+    });
+    if (subtitleSystem) {
+        subtitleSystem.setEnabled(settings.subtitles);
+        subtitleSystem.setSize(settings.subtitleSize);
+        subtitleSystem.setBackground(settings.subtitleBackground);
+    }
+}
+if (gamepad) {
+    gamepad.setDeadZone(settings.gamepadDeadzone ?? 0.15);
+    gamepad.setTriggerThreshold(settings.triggerThreshold ?? 0.1);
+    gamepad.setGyroEnabled(settings.gyroAim ?? false);
+    gamepad.setGyroSensitivity(settings.gyroSensitivity ?? 1.0);
+}
+if (controllerPrompts) {
+    controllerPrompts.setSet(settings.promptSet ?? 'auto');
+}
+if (aimAssist) {
+    aimAssist.setEnabled(settings.assistAim ?? false);
+}
+
 const keybindingsGamepadCheck = wireKeybindings(gamepad);
 
 // Wire Save/Load buttons with confirmation dialogs (C2)
@@ -1504,8 +1624,30 @@ function animate() {
             return;
         }
         
+        // Apply aim assist before camera update
+        const allEnemies = [
+            ...(enemyManager ? enemyManager.enemies : []),
+            ...(world.drones ? world.drones.drones : [])
+        ];
+        if (aimAssist && aimAssist.enabled) {
+            const assisted = aimAssist.apply(mouseDelta.dx, mouseDelta.dy, allEnemies, dt);
+            mouseDelta.dx = assisted.dx;
+            mouseDelta.dy = assisted.dy;
+        }
+
         tpc.update(dt, mouseDelta, world);
         
+        // Accessibility: pause-on-damage time dilation
+        if (accessibilityManager && accessibilityManager.updatePauseOnDamage(dt)) {
+            dt *= 0.1;
+        }
+
+        // Update subtitle system
+        if (subtitleSystem) subtitleSystem.update(dt);
+
+        // Update directional damage indicators
+        if (directionalDamageIndicator) directionalDamageIndicator.update(dt);
+
         // Track playtime and auto-save every 30 seconds
         saveSystem.tickPlaytime(dt);
         gameDirector.update(dt, finalDt);

@@ -18,6 +18,26 @@ export const DEFAULT_SETTINGS = {
     assistAim: false,
     hapticsEnabled: true,
     touchControls: false,
+    colorblindMode: 'none',
+    uiScale: 1.0,
+    highContrast: false,
+    reducedMotion: false,
+    subtitles: false,
+    subtitleSize: 'medium',
+    subtitleBackground: true,
+    screenReader: false,
+    toggleSprint: false,
+    stickyTargeting: false,
+    pauseOnDamage: false,
+    soundVisualization: false,
+    epilepsySafe: false,
+    dyslexiaFont: false,
+    gamepadDeadzone: 0.15,
+    triggerThreshold: 0.1,
+    gyroAim: false,
+    gyroSensitivity: 1.0,
+    promptSet: 'auto',
+    language: 'en',
 };
 
 export function wireSettings(settings, deps) {
@@ -58,6 +78,53 @@ export function wireSettings(settings, deps) {
         if (hapticsToggle) vals.hapticsEnabled = hapticsToggle.checked;
         const touchCb = document.getElementById('set-touch');
         if (touchCb) vals.touchControls = touchCb.checked;
+
+        // New accessibility settings
+        const cbMode = document.getElementById('set-colorblind');
+        if (cbMode) vals.colorblindMode = cbMode.value;
+        const uiScale = document.getElementById('set-ui-scale');
+        if (uiScale) vals.uiScale = parseFloat(uiScale.value);
+        const hc = document.getElementById('set-high-contrast');
+        if (hc) vals.highContrast = hc.checked;
+        const rm = document.getElementById('set-reduced-motion');
+        if (rm) vals.reducedMotion = rm.checked;
+        const sub = document.getElementById('set-subtitles');
+        if (sub) vals.subtitles = sub.checked;
+        const subSize = document.getElementById('set-subtitle-size');
+        if (subSize) vals.subtitleSize = subSize.value;
+        const subBg = document.getElementById('set-subtitle-bg');
+        if (subBg) vals.subtitleBackground = subBg.checked;
+        const sr = document.getElementById('set-screen-reader');
+        if (sr) vals.screenReader = sr.checked;
+        const ts = document.getElementById('set-toggle-sprint');
+        if (ts) vals.toggleSprint = ts.checked;
+        const st = document.getElementById('set-sticky-targeting');
+        if (st) vals.stickyTargeting = st.checked;
+        const pod = document.getElementById('set-pause-damage');
+        if (pod) vals.pauseOnDamage = pod.checked;
+        const sv = document.getElementById('set-sound-viz');
+        if (sv) vals.soundVisualization = sv.checked;
+        const ep = document.getElementById('set-epilepsy');
+        if (ep) vals.epilepsySafe = ep.checked;
+        const df = document.getElementById('set-dyslexia');
+        if (df) vals.dyslexiaFont = df.checked;
+
+        // New controller settings
+        const dz = document.getElementById('set-deadzone');
+        if (dz) vals.gamepadDeadzone = parseFloat(dz.value);
+        const tt = document.getElementById('set-trigger-threshold');
+        if (tt) vals.triggerThreshold = parseFloat(tt.value);
+        const gyro = document.getElementById('set-gyro');
+        if (gyro) vals.gyroAim = gyro.checked;
+        const gyroSens = document.getElementById('set-gyro-sens');
+        if (gyroSens) vals.gyroSensitivity = parseFloat(gyroSens.value);
+        const prompts = document.getElementById('set-prompts');
+        if (prompts) vals.promptSet = prompts.value;
+
+        // Language
+        const lang = document.getElementById('set-language');
+        if (lang) vals.language = lang.value;
+
         return vals;
     }
 
@@ -145,6 +212,53 @@ export function wireSettings(settings, deps) {
             touchCb.checked = s.touchControls;
             if (touchControls) touchControls.setEnabled(s.touchControls);
         }
+
+        // New accessibility
+        const cbMode = document.getElementById('set-colorblind');
+        if (cbMode && s.colorblindMode !== undefined) cbMode.value = s.colorblindMode;
+        const uiScale = document.getElementById('set-ui-scale');
+        if (uiScale && s.uiScale !== undefined) uiScale.value = s.uiScale;
+        const hc = document.getElementById('set-high-contrast');
+        if (hc && s.highContrast !== undefined) hc.checked = s.highContrast;
+        const rm = document.getElementById('set-reduced-motion');
+        if (rm && s.reducedMotion !== undefined) rm.checked = s.reducedMotion;
+        const sub = document.getElementById('set-subtitles');
+        if (sub && s.subtitles !== undefined) sub.checked = s.subtitles;
+        const subSize = document.getElementById('set-subtitle-size');
+        if (subSize && s.subtitleSize !== undefined) subSize.value = s.subtitleSize;
+        const subBg = document.getElementById('set-subtitle-bg');
+        if (subBg && s.subtitleBackground !== undefined) subBg.checked = s.subtitleBackground;
+        const sr = document.getElementById('set-screen-reader');
+        if (sr && s.screenReader !== undefined) sr.checked = s.screenReader;
+        const ts = document.getElementById('set-toggle-sprint');
+        if (ts && s.toggleSprint !== undefined) ts.checked = s.toggleSprint;
+        const st = document.getElementById('set-sticky-targeting');
+        if (st && s.stickyTargeting !== undefined) st.checked = s.stickyTargeting;
+        const pod = document.getElementById('set-pause-damage');
+        if (pod && s.pauseOnDamage !== undefined) pod.checked = s.pauseOnDamage;
+        const sv = document.getElementById('set-sound-viz');
+        if (sv && s.soundVisualization !== undefined) sv.checked = s.soundVisualization;
+        const ep = document.getElementById('set-epilepsy');
+        if (ep && s.epilepsySafe !== undefined) ep.checked = s.epilepsySafe;
+        const df = document.getElementById('set-dyslexia');
+        if (df && s.dyslexiaFont !== undefined) df.checked = s.dyslexiaFont;
+
+        // New controller
+        const dz = document.getElementById('set-deadzone');
+        if (dz && s.gamepadDeadzone !== undefined) dz.value = s.gamepadDeadzone;
+        const tt = document.getElementById('set-trigger-threshold');
+        if (tt && s.triggerThreshold !== undefined) tt.value = s.triggerThreshold;
+        const gyro = document.getElementById('set-gyro');
+        if (gyro && s.gyroAim !== undefined) gyro.checked = s.gyroAim;
+        const gyroSens = document.getElementById('set-gyro-sens');
+        if (gyroSens && s.gyroSensitivity !== undefined) gyroSens.value = s.gyroSensitivity;
+        const prompts = document.getElementById('set-prompts');
+        if (prompts && s.promptSet !== undefined) prompts.value = s.promptSet;
+
+        // Language
+        const lang = document.getElementById('set-language');
+        if (lang && s.language !== undefined) lang.value = s.language;
+
         return settings;
     }
 
@@ -302,4 +416,93 @@ export function wireSettings(settings, deps) {
             if (sp) sp.style.display = 'none';
         });
     }
+
+    // ── New accessibility / controller / language listeners ──
+    function _wireToggle(id, key, callback) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', (e) => {
+                settings[key] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+                if (callback) callback(settings[key]);
+                saveSettings();
+            });
+        }
+    }
+    function _wireInput(id, key, callback) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                settings[key] = v;
+                if (callback) callback(v);
+                saveSettings();
+            });
+        }
+    }
+
+    _wireToggle('set-colorblind', 'colorblindMode', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('colorblindMode', v);
+    });
+    _wireInput('set-ui-scale', 'uiScale', (v) => {
+        document.documentElement.style.fontSize = `calc(100% * ${v})`;
+        if (window.accessibilityManager) window.accessibilityManager.set('uiScale', v);
+    });
+    _wireToggle('set-high-contrast', 'highContrast', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('highContrast', v);
+    });
+    _wireToggle('set-reduced-motion', 'reducedMotion', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('reducedMotion', v);
+    });
+    _wireToggle('set-subtitles', 'subtitles', (v) => {
+        if (window.subtitleSystem) window.subtitleSystem.setEnabled(v);
+    });
+    _wireToggle('set-subtitle-size', 'subtitleSize', (v) => {
+        if (window.subtitleSystem) window.subtitleSystem.setSize(v);
+    });
+    _wireToggle('set-subtitle-bg', 'subtitleBackground', (v) => {
+        if (window.subtitleSystem) window.subtitleSystem.setBackground(v);
+    });
+    _wireToggle('set-screen-reader', 'screenReader', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('screenReader', v);
+    });
+    _wireToggle('set-toggle-sprint', 'toggleSprint', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('toggleSprint', v);
+    });
+    _wireToggle('set-sticky-targeting', 'stickyTargeting', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('stickyTargeting', v);
+    });
+    _wireToggle('set-pause-damage', 'pauseOnDamage', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('pauseOnDamage', v);
+    });
+    _wireToggle('set-sound-viz', 'soundVisualization', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('soundVisualization', v);
+    });
+    _wireToggle('set-epilepsy', 'epilepsySafe', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('epilepsySafe', v);
+    });
+    _wireToggle('set-dyslexia', 'dyslexiaFont', (v) => {
+        if (window.accessibilityManager) window.accessibilityManager.set('dyslexiaFont', v);
+    });
+
+    // Controller
+    _wireInput('set-deadzone', 'gamepadDeadzone', (v) => {
+        if (window.gamepadController) window.gamepadController.setDeadZone(v);
+    });
+    _wireInput('set-trigger-threshold', 'triggerThreshold', (v) => {
+        if (window.gamepadController) window.gamepadController.setTriggerThreshold(v);
+    });
+    _wireToggle('set-gyro', 'gyroAim', (v) => {
+        if (window.gamepadController) window.gamepadController.setGyroEnabled(v);
+    });
+    _wireInput('set-gyro-sens', 'gyroSensitivity', (v) => {
+        if (window.gamepadController) window.gamepadController.setGyroSensitivity(v);
+    });
+    _wireToggle('set-prompts', 'promptSet', (v) => {
+        if (window.controllerPrompts) window.controllerPrompts.setSet(v);
+    });
+
+    // Language
+    _wireToggle('set-language', 'language', (v) => {
+        if (window.i18n) window.i18n.setLocale(v);
+    });
 }
