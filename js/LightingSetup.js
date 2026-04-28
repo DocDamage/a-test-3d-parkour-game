@@ -2,8 +2,12 @@ import * as THREE from 'three';
 import { LensFlare } from './LensFlare.js';
 
 export function setupLighting(scene, camera, postProcessing) {
-    const ambient = new THREE.AmbientLight(0x404060, 0.6);
+    const ambient = new THREE.AmbientLight(0x404060, 0.35);
     scene.add(ambient);
+
+    // Sky-to-ground gradient ambient: cool blue-purple sky, dark warm-brown ground
+    const hemiLight = new THREE.HemisphereLight(0x1a2045, 0x200f05, 0.55);
+    scene.add(hemiLight);
 
     const sun = new THREE.DirectionalLight(0xffaa55, 1.2);
     sun.position.set(25, 40, 15);
@@ -22,6 +26,11 @@ export function setupLighting(scene, camera, postProcessing) {
     const fill = new THREE.DirectionalLight(0x5577ff, 0.25);
     fill.position.set(-15, 10, -15);
     scene.add(fill);
+
+    // Cool blue rim light from behind for depth and material separation
+    const rim = new THREE.DirectionalLight(0x2244aa, 0.2);
+    rim.position.set(-8, 3, -28);
+    scene.add(rim);
 
     const pointLights = [];
     const lightDefs = [
@@ -52,5 +61,5 @@ export function setupLighting(scene, camera, postProcessing) {
     lensFlare.addFlare(new THREE.Vector3(0, 6, -20), 0xffcc00, 2);
     lensFlare.addFlare(new THREE.Vector3(23, 3, 10), 0xff3333, 1.5);
 
-    return { ambient, sun, fill, pointLights, lensFlare };
+    return { ambient, hemiLight, sun, fill, rim, pointLights, lensFlare };
 }

@@ -154,6 +154,53 @@ const VignetteShader = {
 	`
 };
 
+/** Cinematic colour-grading: contrast, saturation boost, and cool-shadow / warm-highlight split toning. */
+const ColorGradingShader = {
+	name: 'ColorGradingShader',
+	uniforms: {
+		tDiffuse:      { value: null },
+		contrast:      { value: 1.1 },
+		saturation:    { value: 1.15 },
+		shadowTint:    { value: new THREE.Vector3(0.00, 0.02, 0.05) },
+		highlightTint: { value: new THREE.Vector3(0.05, 0.02, 0.00) }
+	},
+	vertexShader: /* glsl */`
+		varying vec2 vUv;
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`,
+	fragmentShader: /* glsl */`
+		uniform sampler2D tDiffuse;
+		uniform float contrast;
+		uniform float saturation;
+		uniform vec3 shadowTint;
+		uniform vec3 highlightTint;
+		varying vec2 vUv;
+
+		void main() {
+			vec4 tex = texture2D(tDiffuse, vUv);
+			vec3 c = tex.rgb;
+
+			// Saturation
+			float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+			c = mix(vec3(lum), c, saturation);
+
+			// Contrast (pivot at 0.5)
+			c = (c - 0.5) * contrast + 0.5;
+
+			// Split toning
+			float shadow    = clamp(1.0 - lum * 2.5, 0.0, 1.0);
+			float highlight = clamp(lum * 2.5 - 1.5, 0.0, 1.0);
+			c += shadowTint    * shadow;
+			c += highlightTint * highlight;
+
+			gl_FragColor = vec4(clamp(c, 0.0, 1.0), tex.a);
+		}
+	`
+};
+
 /**
  * Full-screen colour-filter pass used by Photo Mode.
  * mode: 0=off, 1=grayscale, 2=sepia, 3=invert, 4=cyberpunk, 5=overexposed
@@ -245,9 +292,9 @@ export class PostProcessing {
 		this.bloomEnabled      = true;
 		this.saoEnabled        = true;
 		this.motionBlurEnabled = true;
-		this.filmGrainEnabled  = false;
-		this.chromaticAberrationEnabled = false;
-		this.vignetteEnabled   = false;
+		this.filmGrainEnabled  = true;
+		this.chromaticAberrationEnabled = true;
+		this.vignetteEnabled   = true;
 
 		/* ---------- composer ---------- */
 		this.composer = new EffectComposer(renderer);
@@ -275,9 +322,9 @@ export class PostProcessing {
 		// 3. UnrealBloomPass
 		this.bloomPass = new UnrealBloomPass(
 			new THREE.Vector2(this.width, this.height),
-			0.4,   // strength
-			0.5,   // radius
-			0.85   // threshold
+			0.62,  // strength
+			0.65,  // radius
+			0.72   // threshold
 		);
 		this.composer.addPass(this.bloomPass);
 
@@ -289,21 +336,25 @@ export class PostProcessing {
 		// 5. Film Grain
 		this.filmGrainPass = new ShaderPass(FilmGrainShader);
 		this.filmGrainPass.uniforms.time.value = 0.0;
-		this.filmGrainPass.uniforms.strength.value = 0.05;
-		this.filmGrainPass.enabled = false;
+		this.filmGrainPass.uniforms.strength.value = 0.022;
+		this.filmGrainPass.enabled = true;
 		this.composer.addPass(this.filmGrainPass);
 
 		// 6. Chromatic Aberration
 		this.chromaticAberrationPass = new ShaderPass(ChromaticAberrationShader);
-		this.chromaticAberrationPass.uniforms.strength.value = 0.005;
-		this.chromaticAberrationPass.enabled = false;
+		this.chromaticAberrationPass.uniforms.strength.value = 0.003;
+		this.chromaticAberrationPass.enabled = true;
 		this.composer.addPass(this.chromaticAberrationPass);
 
 		// 7. Vignette
 		this.vignettePass = new ShaderPass(VignetteShader);
-		this.vignettePass.uniforms.strength.value = 1.5;
-		this.vignettePass.enabled = false;
+		this.vignettePass.uniforms.strength.value = 1.2;
+		this.vignettePass.enabled = true;
 		this.composer.addPass(this.vignettePass);
+
+		// 7.5. Colour grading (always on — contrast, saturation, split toning)
+		this.colorGradingPass = new ShaderPass(ColorGradingShader);
+		this.composer.addPass(this.colorGradingPass);
 
 		// 8. Photo-mode filter pass
 		this.filterPass = new ShaderPass(FilterShader);

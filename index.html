@@ -6,7 +6,7 @@
     <title>Warehouse Parkour Playground</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { overflow: hidden; background: #0a0a14; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
         canvas { display: block; }
         
         #ui {
@@ -14,9 +14,13 @@
             top: 20px;
             left: 20px;
             color: white;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(4, 4, 18, 0.72);
+            backdrop-filter: blur(10px) saturate(160%);
+            -webkit-backdrop-filter: blur(10px) saturate(160%);
             padding: 20px;
             border-radius: 10px;
+            border: 1px solid rgba(255, 170, 0, 0.1);
+            border-left: 2px solid rgba(255, 170, 0, 0.5);
             user-select: none;
             pointer-events: none;
             z-index: 10;
@@ -116,7 +120,9 @@
         #death-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.78);
+            backdrop-filter: blur(6px) saturate(60%);
+            -webkit-backdrop-filter: blur(6px) saturate(60%);
             display: none;
             flex-direction: column;
             align-items: center;
@@ -235,19 +241,45 @@
             position: fixed;
             top: 50%;
             left: 50%;
-            width: 4px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 50%;
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 10;
+            width: 18px;
+            height: 18px;
+            background: none;
+            border-radius: 0;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.72);
+            filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+        }
+        /* horizontal gap-crosshair: left segment + right segment via box-shadow */
+        #crosshair::before {
+            width: 7px;
+            height: 1px;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            box-shadow: 11px 0 0 rgba(255, 255, 255, 0.72);
+        }
+        /* vertical gap-crosshair: top segment + bottom segment via box-shadow */
+        #crosshair::after {
+            width: 1px;
+            height: 7px;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            box-shadow: 0 11px 0 rgba(255, 255, 255, 0.72);
         }
 
         #start-screen {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.76);
+            backdrop-filter: blur(8px) saturate(80%);
+            -webkit-backdrop-filter: blur(8px) saturate(80%);
             display: flex;
             flex-direction: column;
             align-items: center;

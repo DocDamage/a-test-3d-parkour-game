@@ -34,9 +34,9 @@ export class World {
     createFloor() {
         const floorGeo = new THREE.PlaneGeometry(80, 80);
         const floorMat = new THREE.MeshStandardMaterial({
-            color: 0x333340,
-            roughness: 0.95,
-            metalness: 0.05
+            color: 0x2d2d3a,
+            roughness: 0.82,
+            metalness: 0.12
         });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
@@ -66,9 +66,9 @@ export class World {
 
     createWalls() {
         const wallMat = new THREE.MeshStandardMaterial({
-            color: 0x4a4a55,
-            roughness: 0.85,
-            metalness: 0.15
+            color: 0x3e3e4e,
+            roughness: 0.72,
+            metalness: 0.28
         });
         const wallHeight = 10;
         const wallThick = 1;
@@ -94,7 +94,7 @@ export class World {
         });
 
         // Ceiling beams
-        const beamMat = new THREE.MeshStandardMaterial({ color: 0x2a2a35 });
+        const beamMat = new THREE.MeshStandardMaterial({ color: 0x1e1e28, roughness: 0.22, metalness: 0.75 });
         for (let i = -35; i <= 35; i += 10) {
             const beam = new THREE.Mesh(
                 new THREE.BoxGeometry(80, 0.6, 0.8),
@@ -511,10 +511,15 @@ export class World {
         tex.repeat.set(size[0] / 2, size[2] / 2);
 
         const geo = new THREE.PlaneGeometry(size[0], size[2]);
-        const mat = new THREE.MeshBasicMaterial({
+        const mat = new THREE.MeshStandardMaterial({
             map: tex,
+            emissiveMap: tex,
+            emissive: new THREE.Color(0x553300),
+            emissiveIntensity: 0.35,
+            roughness: 0.9,
+            metalness: 0.0,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.9
         });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = -Math.PI / 2;
