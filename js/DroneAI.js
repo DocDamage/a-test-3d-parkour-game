@@ -433,6 +433,9 @@ class Drone {
     die(source) {
         this.isDead = true;
         this.state = 'DEAD';
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('drone_explosion', this.group ? this.group.position : null);
+        }
         if (this.onDeath) this.onDeath(this, source);
         setTimeout(() => { if (this.group) this.group.visible = false; }, 2000);
     }

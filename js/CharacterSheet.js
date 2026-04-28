@@ -74,7 +74,7 @@ export class CharacterSheet {
     getStat(statName) {
         const raw = this._stats[statName];
         if (raw === undefined) {
-            console.warn(`CharacterSheet: unknown stat "${statName}"`);
+            window.__DEV__ && console.warn(`CharacterSheet: unknown stat "${statName}"`);
             return 0;
         }
         return this._applySoftCap(raw);
@@ -88,7 +88,7 @@ export class CharacterSheet {
     grantAttributePoints(amount) { this._attributePoints += amount; this._save(); }
     spendAttributePoint(statName) {
         if (this._stats[statName] === undefined) {
-            console.warn(`CharacterSheet: cannot spend point on unknown stat "${statName}"`);
+            window.__DEV__ && console.warn(`CharacterSheet: cannot spend point on unknown stat "${statName}"`);
             return false;
         }
         if (this._attributePoints <= 0) return false;

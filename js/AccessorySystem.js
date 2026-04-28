@@ -40,7 +40,7 @@ export class AccessorySystem {
 
   equip(item) {
     if (!item || !VALID_ACCESSORY_SLOTS.has(item.slot)) {
-      console.warn('AccessorySystem: invalid item or slot', item);
+      window.__DEV__ && console.warn('AccessorySystem: invalid item or slot', item);
       return false;
     }
     const prev = this.equipped[item.slot];

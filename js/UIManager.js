@@ -69,6 +69,7 @@ export class UIManager {
                 sp.style.display = showing ? 'none' : 'block';
                 if (!showing) this._panelDirty.stash = true;
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyI') && activeInput.isPressed('ShiftLeft')) {
             const ki = document.getElementById('keyitem-panel');
@@ -85,6 +86,7 @@ export class UIManager {
                     });
                 }
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyP') && !activeInput.isPressed('ShiftLeft')) {
             const pt = document.getElementById('passive-tree');
@@ -93,18 +95,22 @@ export class UIManager {
                 pt.style.display = showing ? 'none' : 'block';
                 if (!showing && d.passiveTree) d.passiveTree._renderUI();
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyP') && activeInput.isPressed('ShiftLeft')) {
             const cp = document.getElementById('character-panel');
             if (cp) cp.style.display = (cp.style.display === 'block') ? 'none' : 'block';
+            return true;
         }
         if (activeInput.wasPressed('KeyG')) {
             const gp = document.getElementById('gear-panel');
             if (gp) gp.style.display = (gp.style.display === 'block') ? 'none' : 'block';
+            return true;
         }
         if (activeInput.wasPressed('KeyU')) {
             const comp = document.getElementById('companion-panel');
             if (comp) comp.style.display = (comp.style.display === 'block') ? 'none' : 'block';
+            return true;
         }
         // F key faction panel toggle is now handled by main.js unified KeyF dispatcher
         if (activeInput.wasPressed('KeyH')) {
@@ -114,6 +120,7 @@ export class UIManager {
                 sp.style.display = showing ? 'none' : 'block';
                 if (!showing) this._panelDirty.safehouse = true;
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyJ')) {
             const bp = document.getElementById('bounty-panel');
@@ -122,6 +129,7 @@ export class UIManager {
                 bp.style.display = showing ? 'none' : 'block';
                 if (!showing) this._panelDirty.bounty = true;
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyK')) {
             const cop = document.getElementById('codex-panel');
@@ -130,6 +138,7 @@ export class UIManager {
                 cop.style.display = showing ? 'none' : 'block';
                 if (!showing) this._panelDirty.codex = true;
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyL')) {
             const mp = document.getElementById('mastery-panel');
@@ -138,14 +147,26 @@ export class UIManager {
                 mp.style.display = showing ? 'none' : 'block';
                 if (!showing) this._panelDirty.mastery = true;
             }
+            return true;
         }
         if (activeInput.wasPressed('KeyM')) {
             const ip = document.getElementById('implants-panel');
             if (ip) ip.style.display = (ip.style.display === 'block') ? 'none' : 'block';
+            return true;
+        }
+        if (activeInput.wasPressed('KeyB')) {
+            const ip = document.getElementById('inventory-panel');
+            if (ip) {
+                const showing = ip.style.display === 'block';
+                ip.style.display = showing ? 'none' : 'block';
+                if (!showing) this._updateInventoryPanel();
+            }
+            return true;
         }
         if (activeInput.wasPressed('KeyO') && !activeInput.isPressed('ShiftLeft')) {
             const sp = document.getElementById('settings-panel');
             if (sp) sp.style.display = (sp.style.display === 'block') ? 'none' : 'block';
+            return true;
         }
         if (activeInput.wasPressed('KeyO') && activeInput.isPressed('ShiftLeft')) {
             if (d.risingTide) {
@@ -153,6 +174,16 @@ export class UIManager {
                 else d.risingTide.start();
             }
         }
+        return false;
+    }
+
+    closeAllPanels() {
+        const ids = ['settings-panel','stash-panel','shop-panel','inventory-panel','passive-tree-panel','codex-panel','mastery-panel','faction-panel','character-sheet-panel','safehouse-upgrades','bounty-contracts','rift-result-overlay','difficulty-popup'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        this._panelState = {};
     }
 
     /* ------------------------------------------------------------------ */
@@ -172,6 +203,7 @@ export class UIManager {
         this._updateMasteryPanel(d);
         this._updateImplantsPanel(d);
         this._updateCharacterPanel(d);
+        this._updateInventoryPanel();
         this._updateManaBar(d);
     }
 
@@ -314,9 +346,14 @@ export class UIManager {
         this._panelDirty.safehouse = false;
         const upgContainer = document.getElementById('safehouse-upgrades');
         if (upgContainer && d.safehouse.getAllUpgrades) {
-            upgContainer.innerHTML = d.safehouse.getAllUpgrades().map(u =>
-                `<div class="sh-upgrade"><span class="name">${u.name}</span><span class="level">Lv${u.currentLevel}/${u.maxLevel}</span><br/><span style="color:#888;">${u.description}</span></div>`
-            ).join('');
+            const upgrades = d.safehouse.getAllUpgrades();
+            if (!upgrades.length) {
+                upgContainer.innerHTML = '<p class="empty-state">No upgrades available.</p>';
+            } else {
+                upgContainer.innerHTML = upgrades.map(u =>
+                    `<div class="sh-upgrade"><span class="name">${u.name}</span><span class="level">Lv${u.currentLevel}/${u.maxLevel}</span><br/><span style="color:#888;">${u.description}</span></div>`
+                ).join('');
+            }
         }
     }
 
@@ -335,6 +372,14 @@ export class UIManager {
         }
     }
 
+    refreshBountyPanel() {
+        this._panelDirty = this._panelDirty || {};
+        this._panelDirty.bounty = true;
+        if (document.getElementById('bounty-contracts') && document.getElementById('bounty-contracts').style.display !== 'none') {
+            this._updateBountyPanel(this.deps);
+        }
+    }
+
     _updateCodexPanel(d) {
         const cop = document.getElementById('codex-panel');
         if (!cop || cop.style.display !== 'block' || !d.codex) return;
@@ -342,10 +387,15 @@ export class UIManager {
         this._panelDirty.codex = false;
         const entriesEl = document.getElementById('codex-entries');
         if (entriesEl && d.codex.getAllEntries) {
-            entriesEl.innerHTML = d.codex.getAllEntries().map(e => {
-                const cls = e.unlocked ? 'codex-entry unlocked' : 'codex-entry locked';
-                return `<div class="${cls}">${e.unlocked ? e.title : '???'}</div>`;
-            }).join('');
+            const entries = d.codex.getAllEntries();
+            if (!entries.length) {
+                entriesEl.innerHTML = '<p class="empty-state">No entries discovered yet.</p>';
+            } else {
+                entriesEl.innerHTML = entries.map(e => {
+                    const cls = e.unlocked ? 'codex-entry unlocked' : 'codex-entry locked';
+                    return `<div class="${cls}">${e.unlocked ? e.title : '???'}</div>`;
+                }).join('');
+            }
         }
     }
 
@@ -356,9 +406,14 @@ export class UIManager {
         this._panelDirty.mastery = false;
         const movesEl = document.getElementById('mastery-moves');
         if (movesEl && d.mastery.getMasteryOverview) {
-            movesEl.innerHTML = d.mastery.getMasteryOverview().map(m =>
-                `<div class="mastery-row"><span>${m.name}</span><span>Lv${m.level}</span></div>`
-            ).join('');
+            const moves = d.mastery.getMasteryOverview();
+            if (!moves.length) {
+                movesEl.innerHTML = '<p class="empty-state">No mastery moves learned yet.</p>';
+            } else {
+                movesEl.innerHTML = moves.map(m =>
+                    `<div class="mastery-row"><span>${m.name}</span><span>Lv${m.level}</span></div>`
+                ).join('');
+            }
         }
     }
 
@@ -369,6 +424,17 @@ export class UIManager {
             const el = document.getElementById('implant-' + s);
             if (el && d.implants.getImplant) el.textContent = d.implants.getImplant(s)?.name || d.implants.getImplant(s)?.id || 'Empty';
         });
+    }
+
+    _updateInventoryPanel() {
+        const container = document.getElementById('inventory-list');
+        if (!container) return;
+        const items = this.inventorySystem ? this.inventorySystem.getItems() : [];
+        if (!items || !items.length) {
+            container.innerHTML = '<p class="empty-state">Inventory is empty.</p>';
+            return;
+        }
+        container.innerHTML = items.map((item, i) => `<div class="inventory-item">${item.name || 'Item'} x${item.quantity || 1}</div>`).join('');
     }
 
     _updateCharacterPanel(d) {
@@ -413,6 +479,16 @@ export class UIManager {
             if (manaFill) manaFill.style.width = d.resourceSystem.getPercent() + '%';
         } else {
             manaWrap.style.display = 'none';
+        }
+    }
+
+    showLevelUp(level, points) {
+        const toast = document.getElementById('levelup-toast');
+        const msg = document.getElementById('levelup-msg');
+        if (toast && msg) {
+            msg.textContent = `Level ${level}! Attribute points: ${points}`;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
     }
 }

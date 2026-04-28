@@ -138,6 +138,9 @@ export class EnemyBase {
     die(source = null) {
         this.isDead = true;
         this.state = 'DEAD';
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('enemy_death', this.position);
+        }
         if (this.onDeath) this.onDeath(this, source);
         setTimeout(() => { if (this.group) this.group.visible = false; }, 2000);
     }

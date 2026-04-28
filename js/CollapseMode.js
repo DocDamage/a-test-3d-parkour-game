@@ -140,7 +140,7 @@ export class CollapseMode {
 
   startRun() {
     if (!this._unlocked) {
-      console.warn('CollapseMode: not unlocked');
+      window.__DEV__ && console.warn('CollapseMode: not unlocked');
       return false;
     }
 
@@ -168,7 +168,7 @@ export class CollapseMode {
    */
   endRun(success) {
     if (!this._inRun) {
-      console.warn('CollapseMode: no active run to end');
+      window.__DEV__ && console.warn('CollapseMode: no active run to end');
       return null;
     }
 
@@ -223,12 +223,12 @@ export class CollapseMode {
 
   chooseUpgrade(upgrade) {
     if (!this._inRun) {
-      console.warn('CollapseMode: cannot choose upgrade outside of a run');
+      window.__DEV__ && console.warn('CollapseMode: cannot choose upgrade outside of a run');
       return false;
     }
 
     if (!upgrade || !upgrade.id) {
-      console.warn('CollapseMode: invalid upgrade');
+      window.__DEV__ && console.warn('CollapseMode: invalid upgrade');
       return false;
     }
 

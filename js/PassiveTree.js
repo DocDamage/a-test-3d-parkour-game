@@ -101,11 +101,14 @@ export class PassiveTree {
 
     _load() {
         try {
-            const allTrees = JSON.parse(localStorage.getItem('apex_passives') || '{}');
-            if (allTrees[this.archetypeId]) {
-                this.deserialize(allTrees[this.archetypeId]);
+            const saved = localStorage.getItem('apex_passives');
+            if (saved) {
+                const allTrees = JSON.parse(saved);
+                if (allTrees[this.archetypeId]) {
+                    this.deserialize(allTrees[this.archetypeId]);
+                }
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) { if (window.__DEV__) console.warn(e); }
     }
 
     _renderUI() {

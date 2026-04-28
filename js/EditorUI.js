@@ -59,8 +59,8 @@ export function wireEditorUI(levelEditor, editorUI, ui, crosshair, editorPalette
             try {
                 levelEditor.importLevel(ev.target.result);
             } catch (err) {
-                console.error('Import failed:', err);
-                alert('Failed to import level: ' + err.message);
+                window.__DEV__ && console.warn('Failed to import level:', err);
+                if (window.__DEV__) window.alert('Failed to import level: ' + err.message);
             }
         };
         reader.readAsText(file);

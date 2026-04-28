@@ -295,6 +295,7 @@ export class SkillSystem {
    * Reset all cooldowns (for debug / checkpoint / ultimate effects).
    */
   resetAllCooldowns() {
+    if (!window.__DEV__) return;
     this.cooldowns.clear();
     for (const [skillId, max] of this._getAllChargeSkills()) {
       this.charges.set(skillId, max);

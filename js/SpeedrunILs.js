@@ -52,7 +52,7 @@ export class SpeedrunILs {
     startIL(zoneName) {
         const zone = ZONES[zoneName];
         if (!zone) {
-            console.warn(`SpeedrunILs: unknown zone "${zoneName}"`);
+            window.__DEV__ && console.warn(`SpeedrunILs: unknown zone "${zoneName}"`);
             return;
         }
 
@@ -242,7 +242,7 @@ export class SpeedrunILs {
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Triggers (visualised only in debug)                               */
+    /*  Zone end triggers                                                   */
     /* ------------------------------------------------------------------ */
 
     _buildTriggers() {

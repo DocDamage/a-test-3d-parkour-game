@@ -259,7 +259,7 @@ export class BountySystem {
     acceptContract(contractId) {
         const idx = this._boardContracts.findIndex(c => c.id === contractId);
         if (idx === -1) {
-            console.warn(`BountySystem: contract ${contractId} not found on board.`);
+            window.__DEV__ && console.warn(`BountySystem: contract ${contractId} not found on board.`);
             return false;
         }
 
@@ -268,12 +268,12 @@ export class BountySystem {
         const requiredRankIdx = RUNNER_RANKS.findIndex(r => r.key === contract.rankRequired);
 
         if (requiredRankIdx === -1) {
-            console.warn(`BountySystem: unknown rank requirement ${contract.rankRequired}.`);
+            window.__DEV__ && console.warn(`BountySystem: unknown rank requirement ${contract.rankRequired}.`);
             return false;
         }
 
         if (playerRankIdx < requiredRankIdx) {
-            console.warn(`BountySystem: rank too low to accept ${contractId}.`);
+            window.__DEV__ && console.warn(`BountySystem: rank too low to accept ${contractId}.`);
             return false;
         }
 
@@ -349,7 +349,7 @@ export class BountySystem {
     abandonContract(contractId) {
         const idx = this._acceptedContracts.findIndex(c => c.id === contractId);
         if (idx === -1) {
-            console.warn(`BountySystem: contract ${contractId} not found.`);
+            window.__DEV__ && console.warn(`BountySystem: contract ${contractId} not found.`);
             return false;
         }
 
@@ -510,7 +510,7 @@ export class BountySystem {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.serialize()));
         } catch (e) {
-            console.warn('BountySystem: save failed', e);
+            window.__DEV__ && console.warn('BountySystem: save failed', e);
         }
     }
 
@@ -521,7 +521,7 @@ export class BountySystem {
                 this.deserialize(JSON.parse(raw));
             }
         } catch (e) {
-            console.warn('BountySystem: load failed', e);
+            window.__DEV__ && console.warn('BountySystem: load failed', e);
         }
     }
 }

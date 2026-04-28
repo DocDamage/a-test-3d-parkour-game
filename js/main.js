@@ -22,8 +22,12 @@ import { HologramPlatforms } from './HologramPlatforms.js';
 import { StructuralCollapse } from './StructuralCollapse.js';
 import { RisingTide } from './RisingTide.js';
 import { ParticleEffects } from './ParticleEffects.js';
-import { LensFlare } from './LensFlare.js';
+import { setupLighting } from './LightingSetup.js';
+import { setupWeaponLoadout } from './WeaponLoadout.js';
+import { createHintSystem } from './HintSystem.js';
 import { GamepadController } from './GamepadController.js';
+import { keyBindings } from './KeyBindings.js';
+import { TouchControls } from './TouchControls.js';
 import { AdvancedMovement } from './AdvancedMovement.js';
 import { InteractiveEnvironment } from './InteractiveEnvironment.js';
 import { SniperDrone, SwarmDrone, HunterDrone } from './AdvancedDrones.js';
@@ -43,19 +47,6 @@ import { BossWarden } from './bosses/BossWarden.js';
 import { BossLeviathan } from './bosses/BossLeviathan.js';
 import { BossSwarmQueen } from './bosses/BossSwarmQueen.js';
 import { BossArchitect } from './bosses/BossArchitect.js';
-import { PipeWrench } from './weapons/PipeWrench.js';
-import { SemiAutoPistol } from './weapons/SemiAutoPistol.js';
-import { AssaultRifle } from './weapons/AssaultRifle.js';
-import { Shotgun } from './weapons/Shotgun.js';
-import { StickyBomb } from './weapons/StickyBomb.js';
-import { StaffOfEmbers } from './weapons/StaffOfEmbers.js';
-import { VoidWand } from './weapons/VoidWand.js';
-import { CryoGauntlet } from './weapons/CryoGauntlet.js';
-import { SniperRifle } from './weapons/SniperRifle.js';
-import { SubMachineGun } from './weapons/SubMachineGun.js';
-import { RocketLauncher } from './weapons/RocketLauncher.js';
-import { Flamethrower } from './weapons/Flamethrower.js';
-import { PlasmaRifle } from './weapons/PlasmaRifle.js';
 import { EnergySword } from './weapons/EnergySword.js';
 import { Crossbow } from './weapons/Crossbow.js';
 import { GrenadeLauncher } from './weapons/GrenadeLauncher.js';
@@ -127,7 +118,14 @@ import { OverworldMap } from './OverworldMap.js';
 import { SaveSystem } from './SaveSystem.js';
 import { DamageNumbers } from './DamageNumbers.js';
 import { UIManager } from './UIManager.js';
+import { MenuNavigator } from './MenuNavigator.js';
 import { wireEditorUI } from './EditorUI.js';
+
+const __DEV__ = window.location.hash === '#dev';
+window.__DEV__ = __DEV__;
+
+import { DEFAULT_SETTINGS, wireSettings } from './SettingsUI.js';
+import { wireKeybindings } from './KeybindingsUI.js';
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -147,61 +145,7 @@ document.body.appendChild(renderer.domElement);
 const postProcessing = new PostProcessing(renderer, scene, camera);
 
 // Lighting
-const ambient = new THREE.AmbientLight(0x404060, 0.6);
-scene.add(ambient);
-
-const sun = new THREE.DirectionalLight(0xffaa55, 1.2);
-sun.position.set(25, 40, 15);
-sun.castShadow = true;
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 100;
-sun.shadow.camera.left = -50;
-sun.shadow.camera.right = 50;
-sun.shadow.camera.top = 50;
-sun.shadow.camera.bottom = -50;
-sun.shadow.bias = -0.001;
-scene.add(sun);
-
-const fill = new THREE.DirectionalLight(0x5577ff, 0.25);
-fill.position.set(-15, 10, -15);
-scene.add(fill);
-
-// Atmospheric point lights
-const pointLights = [];
-const lightDefs = [
-    { pos: [15, 6, 12], color: 0xff6600, intensity: 3, dist: 25 },
-    { pos: [-15, 6, -12], color: 0x0066ff, intensity: 3, dist: 25 },
-    { pos: [0, 6, -20], color: 0xffcc00, intensity: 2, dist: 20 },
-    { pos: [23, 3, 10], color: 0xff3333, intensity: 2, dist: 15 },
-];
-
-lightDefs.forEach(l => {
-    const pl = new THREE.PointLight(l.color, l.intensity, l.dist);
-    pl.position.set(...l.pos);
-    scene.add(pl);
-    pointLights.push(pl);
-    
-    const orb = new THREE.Mesh(
-        new THREE.SphereGeometry(0.15, 8, 8),
-        new THREE.MeshBasicMaterial({ color: l.color })
-    );
-    orb.position.set(...l.pos);
-    scene.add(orb);
-});
-
-// Lens flares
-const lensFlare = new LensFlare(scene, camera);
-
-// Register lights with post-processing for day/night transitions
-postProcessing.registerLights(ambient, sun, fill, pointLights);
-
-// Add lens flares to atmospheric lights
-lensFlare.addFlare(new THREE.Vector3(15, 6, 12), 0xff6600, 2.5);
-lensFlare.addFlare(new THREE.Vector3(-15, 6, -12), 0x0066ff, 2.5);
-lensFlare.addFlare(new THREE.Vector3(0, 6, -20), 0xffcc00, 2);
-lensFlare.addFlare(new THREE.Vector3(23, 3, 10), 0xff3333, 1.5);
+const { ambient, sun, fill, pointLights, lensFlare } = setupLighting(scene, camera, postProcessing);
 
 // World
 const world = new World(scene);
@@ -225,13 +169,13 @@ const origin = new OriginSystem(player, characterSheet);
 player.setCharacterSheet(characterSheet);
 
 // Apply stored character creation choices
-const savedOrigin = sessionStorage.getItem('rpg_origin');
-const savedArchetype = sessionStorage.getItem('rpg_archetype');
+const savedOrigin = localStorage.getItem('rpg_origin');
+const savedArchetype = localStorage.getItem('rpg_archetype');
 if (savedOrigin) {
-    try { origin.setOrigin(savedOrigin); } catch (e) { console.warn('OriginSystem.setOrigin missing', e); }
+    try { origin.setOrigin(savedOrigin); } catch (e) { if (__DEV__) console.warn('OriginSystem.setOrigin missing', e); }
 }
 if (savedArchetype) {
-    try { archetype.setPrimary(savedArchetype); } catch (e) { console.warn('ArchetypeSystem.setPrimary missing', e); }
+    try { archetype.setPrimary(savedArchetype); } catch (e) { if (__DEV__) console.warn('ArchetypeSystem.setPrimary missing', e); }
 }
 
 // RPG Phase 2-4 systems
@@ -435,7 +379,7 @@ const passiveTree = new PassiveTree(activeArchetypeId, skillSystem);
 passiveTree._load();
 
 progression.onLevelUp = (level, points) => {
-    console.log(`Level up! Now level ${level}. Attribute points: ${points}`);
+    if (__DEV__) console.log(`Level up! Now level ${level}. Attribute points: ${points}`);
     if (passiveTree) passiveTree.addPoints(1);
 };
 
@@ -444,79 +388,22 @@ saveSystem.register('passiveTree',
     (data) => passiveTree.deserialize(data)
 );
 
-// Manual load for passiveTree since it was registered after saveSystem.load()
+// Remove the manual load hack; passiveTree is registered and will be loaded by saveSystem on next save/load cycle.
+// If load already happened, deserialize now:
 try {
     const _rawSave = localStorage.getItem(saveSystem.key);
     if (_rawSave) {
         const _saveData = JSON.parse(_rawSave);
         if (_saveData.passiveTree) passiveTree.deserialize(_saveData.passiveTree);
     }
-} catch (e) { /* ignore */ }
+} catch (e) { if (__DEV__) console.warn('PassiveTree manual load failed', e); }
 
-const pipeWrench = new PipeWrench(scene, player);
-const semiAutoPistol = new SemiAutoPistol(scene, player);
-const assaultRifle = new AssaultRifle(scene, player);
-const shotgun = new Shotgun(scene, player);
-const stickyBomb = new StickyBomb(scene, player);
-
-weaponSystem.equip(pipeWrench, WEAPON_SLOTS.MELEE);
-weaponSystem.equip(semiAutoPistol, WEAPON_SLOTS.SIDEARM);
-weaponSystem.equip(assaultRifle, WEAPON_SLOTS.PRIMARY);
-weaponSystem.equip(shotgun, WEAPON_SLOTS.HEAVY);
-weaponSystem.equip(stickyBomb, WEAPON_SLOTS.THROWABLE);
-weaponSystem.switchSlot(WEAPON_SLOTS.MELEE);
-
-// Magic weapons
-const staffOfEmbers = new StaffOfEmbers(scene, player);
-const voidWand = new VoidWand(scene, player);
-const cryoGauntlet = new CryoGauntlet(scene, player);
-weaponSystem.equip(staffOfEmbers, WEAPON_SLOTS.PRIMARY);
-weaponSystem.equip(voidWand, WEAPON_SLOTS.SIDEARM);
-weaponSystem.equip(cryoGauntlet, WEAPON_SLOTS.MELEE);
-
-// Magic system
-const magicSystem = new MagicSystem(player, resourceSystem, scene);
-player.magicSystem = magicSystem;
-
-// Accessory system
-const accessorySystem = new AccessorySystem(player, characterSheet);
-
-// Inventory system
-const inventorySystem = new InventorySystem(player, 20);
-// Starter consumables
-inventorySystem.addItem('health_potion', 3);
-inventorySystem.addItem('smoke_bomb', 2);
-
-// Additional weapons (available for loot/shop, not all equipped)
-const sniperRifle = new SniperRifle(scene, player);
-const subMachineGun = new SubMachineGun(scene, player);
-const rocketLauncher = new RocketLauncher(scene, player);
-const flamethrower = new Flamethrower(scene, player);
-const plasmaRifle = new PlasmaRifle(scene, player);
-const energySword = new EnergySword(scene, player);
-const crossbow = new Crossbow(scene, player);
-const grenadeLauncher = new GrenadeLauncher(scene, player);
-weaponSystem.equip(sniperRifle, WEAPON_SLOTS.PRIMARY); // overrides staff for default
-weaponSystem.equip(energySword, WEAPON_SLOTS.MELEE);   // overrides cryo for default
-weaponSystem.switchSlot(WEAPON_SLOTS.MELEE);
-
-// Mini-bosses
-const miniBosses = [];
-const gatekeeper = new Gatekeeper(scene, world, player, new THREE.Vector3(15, 0, 15));
-gatekeeper.start();
-miniBosses.push(gatekeeper);
-
-const riftStalker = new RiftStalker(scene, world, player, new THREE.Vector3(-15, 0, -15));
-riftStalker.start();
-miniBosses.push(riftStalker);
-
-const forgeHound = new ForgeHound(scene, world, player, new THREE.Vector3(20, 0, -10));
-forgeHound.start();
-miniBosses.push(forgeHound);
-
-const crystalGolem = new CrystalGolem(scene, world, player, new THREE.Vector3(-20, 0, 10));
-crystalGolem.start();
-miniBosses.push(crystalGolem);
+const {
+    pipeWrench, semiAutoPistol, assaultRifle, shotgun, stickyBomb,
+    staffOfEmbers, voidWand, cryoGauntlet,
+    sniperRifle, subMachineGun, rocketLauncher, flamethrower, plasmaRifle, energySword, crossbow, grenadeLauncher,
+    magicSystem, accessorySystem, inventorySystem, miniBosses
+} = setupWeaponLoadout(scene, world, player, weaponSystem, WEAPON_SLOTS, resourceSystem, characterSheet);
 
 // Stash panel button wiring
 (function wireStashPanel() {
@@ -791,34 +678,7 @@ player.onCeilingDrop = (pos, facing) => {
 };
 
 // Hint system
-const _shownHints = new Set();
-function showHint(text) {
-    if (_shownHints.has(text)) return;
-    _shownHints.add(text);
-    const el = document.getElementById('hint-toast');
-    if (!el) return;
-    el.textContent = text;
-    el.style.opacity = '1';
-    setTimeout(() => { el.style.opacity = '0'; }, 4000);
-}
-
-function showLootToast(item) {
-    const el = document.getElementById('loot-toast');
-    if (!el || !item) return;
-    const nameEl = document.getElementById('loot-toast-name');
-    const affixEl = document.getElementById('loot-toast-affix');
-    if (nameEl) {
-        nameEl.textContent = item.name || 'Unknown Item';
-        const rarityColors = { 1: '#aaa', 2: '#4488ff', 3: '#ffaa00', 4: '#ff4444', 5: '#00ff44', 6: '#ff8800', 7: '#ff00ff' };
-        nameEl.style.color = rarityColors[item.rarity] || '#fff';
-    }
-    if (affixEl) {
-        const firstAffix = item.affixes && item.affixes[0];
-        affixEl.textContent = firstAffix ? `${firstAffix.name}: ${firstAffix.stat} ${firstAffix.value}` : '';
-    }
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 4000);
-}
+const { showHint, showLootToast } = createHintSystem();
 
 // Equip starter gear based on origin (only on first play)
 if (!saveSystem.hasSave()) {
@@ -837,6 +697,11 @@ if (!saveSystem.hasSave()) {
 const tpc = new ThirdPersonCamera(camera, player);
 tpc.setPostProcessing(postProcessing);
 player.cameraController = tpc;
+
+// Attach 3D audio listener to camera
+if (audio && typeof audio.attachToCamera === 'function') {
+    audio.attachToCamera(tpc.camera || camera);
+}
 
 // Level Editor
 const levelEditor = new LevelEditor(scene, camera, renderer, world, player);
@@ -957,6 +822,80 @@ const difficultyTier = new DifficultyTierSystem(challenges);
 const apexRift = new ApexRiftSystem(scene, world, player, riftGuardian, challenges, lootSystem, difficultyTier, enemyManager);
 const nephalemGlory = new NephalemGlory(player, challenges);
 
+// Register remaining systems with SaveSystem
+if (saveSystem && typeof saveSystem.register === 'function' && skillSystem && typeof skillSystem.serialize === 'function') {
+    saveSystem.register('skillSystem', () => skillSystem.serialize(), (d) => skillSystem.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && resourceSystem && typeof resourceSystem.serialize === 'function') {
+    saveSystem.register('resourceSystem', () => resourceSystem.serialize(), (d) => resourceSystem.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && inventorySystem && typeof inventorySystem.serialize === 'function') {
+    saveSystem.register('inventorySystem', () => inventorySystem.serialize(), (d) => inventorySystem.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && factions && typeof factions.serialize === 'function') {
+    saveSystem.register('factions', () => factions.serialize(), (d) => factions.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && territory && typeof territory.serialize === 'function') {
+    saveSystem.register('territory', () => territory.serialize(), (d) => territory.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && mastery && typeof mastery.serialize === 'function') {
+    saveSystem.register('mastery', () => mastery.serialize(), (d) => mastery.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && codex && typeof codex.serialize === 'function') {
+    saveSystem.register('codex', () => codex.serialize(), (d) => codex.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && legacy && typeof legacy.serialize === 'function') {
+    saveSystem.register('legacy', () => legacy.serialize(), (d) => legacy.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && ngPlus && typeof ngPlus.serialize === 'function') {
+    saveSystem.register('ngPlus', () => ngPlus.serialize(), (d) => ngPlus.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && collapse && typeof collapse.serialize === 'function') {
+    saveSystem.register('collapse', () => collapse.serialize(), (d) => collapse.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && npcSystem && typeof npcSystem.serialize === 'function') {
+    saveSystem.register('npcSystem', () => npcSystem.serialize(), (d) => npcSystem.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && accessorySystem && typeof accessorySystem.serialize === 'function') {
+    saveSystem.register('accessorySystem', () => accessorySystem.serialize(), (d) => accessorySystem.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && nephalemGlory && typeof nephalemGlory.serialize === 'function') {
+    saveSystem.register('nephalemGlory', () => nephalemGlory.serialize(), (d) => nephalemGlory.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && apexRift && typeof apexRift.serialize === 'function') {
+    saveSystem.register('apexRift', () => apexRift.serialize(), (d) => apexRift.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && difficultyTier && typeof difficultyTier.serialize === 'function') {
+    saveSystem.register('difficultyTier', () => difficultyTier.serialize(), (d) => difficultyTier.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && bounty && typeof bounty.serialize === 'function') {
+    saveSystem.register('bounty', () => bounty.serialize(), (d) => bounty.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && debt && typeof debt.serialize === 'function') {
+    saveSystem.register('debt', () => debt.serialize(), (d) => debt.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && consequences && typeof consequences.serialize === 'function') {
+    saveSystem.register('consequences', () => consequences.serialize(), (d) => consequences.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && challenges && typeof challenges.serialize === 'function') {
+    saveSystem.register('challenges', () => challenges.serialize(), (d) => challenges.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && risingTide && typeof risingTide.serialize === 'function') {
+    saveSystem.register('risingTide', () => risingTide.serialize(), (d) => risingTide.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && ghostRacing && typeof ghostRacing.serialize === 'function') {
+    saveSystem.register('ghostRacing', () => ghostRacing.serialize(), (d) => ghostRacing.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && speedrunILs && typeof speedrunILs.serialize === 'function') {
+    saveSystem.register('speedrunILs', () => speedrunILs.serialize(), (d) => speedrunILs.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && timeTrial && typeof timeTrial.serialize === 'function') {
+    saveSystem.register('timeTrial', () => timeTrial.serialize(), (d) => timeTrial.deserialize(d));
+}
+if (saveSystem && typeof saveSystem.register === 'function' && inventoryStash && typeof inventoryStash.serialize === 'function') {
+    saveSystem.register('inventoryStash', () => inventoryStash.serialize(), (d) => inventoryStash.deserialize(d));
+}
+
 // ── Zelda-style systems ────────────────────────────────────────────────────
 // Heart containers replace the numeric health bar (3 hearts = 12 HP to start)
 const heartSystem = new HeartContainerSystem(player);
@@ -979,6 +918,7 @@ demoPuzzle.addBlockPuzzle(
     new THREE.Vector3(-5, 0, 8),
     new THREE.Vector3(-5, 0, 5),
     () => {
+        if (audio && typeof audio.playSFX === 'function') audio.playSFX('mechanical_click');
     }
 );
 
@@ -1000,6 +940,8 @@ const uiManager = new UIManager({
 });
 uiManager.createMiniBossBars(miniBosses);
 uiManager.createManaBar();
+
+const menuNavigator = new MenuNavigator();
 
 // Apply difficulty scaling to existing world drones
 if (world.drones && world.drones.drones && difficultyTier) {
@@ -1041,6 +983,13 @@ world.setPlayer(player);
 // Input
 const input = new InputManager();
 
+// Touch controls (fullscreen overlay on canvas)
+const touchControls = new TouchControls(renderer.domElement, input);
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (isTouchDevice) {
+    touchControls.setEnabled(true);
+}
+
 // UI elements
 const startScreen = document.getElementById('start-screen');
 const ui = document.getElementById('ui');
@@ -1067,6 +1016,8 @@ const bossVictory = document.getElementById('boss-victory');
 
 let gameStarted = false;
 let paused = false;
+let gameOver = false;
+window.gameOver = gameOver; // expose for PhotoMode/RunnerVision guards
 
 // Pause menu wiring
 const pauseMenu = document.getElementById('pause-menu');
@@ -1090,8 +1041,20 @@ if (btnSettings) {
 if (btnQuit) {
     btnQuit.addEventListener('click', () => {
         paused = false;
-        if (pauseMenu) pauseMenu.style.display = 'none';
+        gameOver = false;
         gameStarted = false;
+        if (bossFight && typeof bossFight.cleanup === 'function') bossFight.cleanup();
+        if (apexRift && typeof apexRift.endRun === 'function') apexRift.endRun();
+        if (player) {
+            player.isDead = false;
+            player.health = player.maxHealth || 100;
+            player.state = 'idle';
+        }
+        if (statusEffectSystem && typeof statusEffectSystem.clearAll === 'function') statusEffectSystem.clearAll();
+        // Hide any overlays
+        const overlays = ['rift-result-overlay','death-screen','boss-victory','celebration'];
+        overlays.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        if (pauseMenu) pauseMenu.style.display = 'none';
         startScreen.style.display = 'flex';
         ui.style.display = 'none';
         crosshair.style.display = 'none';
@@ -1125,13 +1088,14 @@ document.addEventListener('pointerlockchange', () => {
             if (skb) skb.style.display = 'flex';
             if (skillBarUI) skillBarUI.show();
         }
-        audio.playAmbience();
+        if (!audio._ambiencePlaying) audio.playAmbience();
     } else {
         // Do NOT conflate pointer lock loss with pause or game stop
         if (paused) {
             paused = false;
             if (pauseMenu) pauseMenu.style.display = 'none';
         }
+        audio._ambiencePlaying = false;
     }
 });
 
@@ -1149,10 +1113,18 @@ document.getElementById('boss-exit').addEventListener('click', () => {
     bossHUD.style.display = 'none';
     ui.style.display = 'block';
     document.body.requestPointerLock();
+    if (player) {
+        player.position.set(0, 2, 0); // warehouse default spawn
+        player.health = player.maxHealth || 100;
+        player.isDead = false;
+        player.state = 'idle';
+    }
+    if (statusEffectSystem && typeof statusEffectSystem.clearAll === 'function') statusEffectSystem.clearAll();
 });
 
 // Death screen respawn button
 document.getElementById('death-respawn').addEventListener('click', () => {
+    gameOver = false;
     if (player) player.respawn();
     document.getElementById('death-screen').style.display = 'none';
     document.body.requestPointerLock();
@@ -1187,201 +1159,13 @@ wireSkillCallbacks({
     postProcessing
 });
 
-// Settings panel wiring
-(function wireSettings() {
-    const SETTINGS_KEY = 'apex_settings';
+let settings = { ...DEFAULT_SETTINGS };
+window.settingsStore = settings;
 
-    function getSettingsValues() {
-        const vals = {};
-        const fovSlider = document.getElementById('set-fov');
-        if (fovSlider) vals.fov = parseFloat(fovSlider.value);
-        const effects = [
-            ['set-filmgrain', 'filmGrain'],
-            ['set-motionblur', 'motionBlur'],
-            ['set-sao', 'sao'],
-            ['set-bloom', 'bloom'],
-            ['set-chromatic', 'chromaticAberration'],
-            ['set-vignette', 'vignette']
-        ];
-        for (const [id, name] of effects) {
-            const cb = document.getElementById(id);
-            if (cb) vals[name] = cb.checked;
-        }
-        const volMaster = document.getElementById('set-vol-master');
-        if (volMaster) vals.masterVolume = parseFloat(volMaster.value);
-        const volSFX = document.getElementById('set-vol-sfx');
-        if (volSFX) vals.sfxVolume = parseFloat(volSFX.value);
-        const volMusic = document.getElementById('set-vol-music');
-        if (volMusic) vals.musicVolume = parseFloat(volMusic.value);
-        const assistJump = document.getElementById('set-assist-jump');
-        if (assistJump) vals.assistJump = assistJump.checked;
-        const assistGrapple = document.getElementById('set-assist-grapple');
-        if (assistGrapple) vals.assistGrapple = assistGrapple.checked;
-        const assistAim = document.getElementById('set-assist-aim');
-        if (assistAim) vals.assistAim = assistAim.checked;
-        return vals;
-    }
+wireSettings(settings, { postProcessing, audio, assistMode, player, touchControls, saveSystem });
+const keybindingsGamepadCheck = wireKeybindings(gamepad);
 
-    function saveSettings() {
-        try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(getSettingsValues()));
-        } catch (e) { /* ignore */ }
-    }
-
-    function applySettings(data) {
-        if (!data) return;
-        const fovSlider = document.getElementById('set-fov');
-        if (fovSlider && data.fov !== undefined) {
-            fovSlider.value = data.fov;
-            if (postProcessing) postProcessing.setFOV(data.fov);
-        }
-        const effects = [
-            ['set-filmgrain', 'filmGrain'],
-            ['set-motionblur', 'motionBlur'],
-            ['set-sao', 'sao'],
-            ['set-bloom', 'bloom'],
-            ['set-chromatic', 'chromaticAberration'],
-            ['set-vignette', 'vignette']
-        ];
-        for (const [id, name] of effects) {
-            const cb = document.getElementById(id);
-            if (cb && data[name] !== undefined) {
-                cb.checked = data[name];
-                if (postProcessing) postProcessing.setEffectEnabled(name, data[name]);
-            }
-        }
-        const volMaster = document.getElementById('set-vol-master');
-        if (volMaster && data.masterVolume !== undefined) {
-            volMaster.value = data.masterVolume;
-            if (audio) audio.setMasterVolume(data.masterVolume / 100);
-        }
-        const volSFX = document.getElementById('set-vol-sfx');
-        if (volSFX && data.sfxVolume !== undefined) {
-            volSFX.value = data.sfxVolume;
-            if (audio) audio.setSFXVolume(data.sfxVolume / 100);
-        }
-        const volMusic = document.getElementById('set-vol-music');
-        if (volMusic && data.musicVolume !== undefined) {
-            volMusic.value = data.musicVolume;
-            if (audio) audio.setMusicVolume(data.musicVolume / 100);
-        }
-        const assistJump = document.getElementById('set-assist-jump');
-        if (assistJump && data.assistJump !== undefined) {
-            assistJump.checked = data.assistJump;
-            if (assistMode) {
-                assistMode.setJumpAssist(data.assistJump);
-                if (data.assistJump) assistMode.modifyPlayer(player);
-                else assistMode.restorePlayer(player);
-            }
-        }
-        const assistGrapple = document.getElementById('set-assist-grapple');
-        if (assistGrapple && data.assistGrapple !== undefined) {
-            assistGrapple.checked = data.assistGrapple;
-            if (assistMode) {
-                assistMode.setGrappleAssist(data.assistGrapple);
-                if (data.assistGrapple) assistMode.modifyPlayer(player);
-                else assistMode.restorePlayer(player);
-            }
-        }
-        const assistAim = document.getElementById('set-assist-aim');
-        if (assistAim && data.assistAim !== undefined) {
-            assistAim.checked = data.assistAim;
-            if (assistMode) {
-                assistMode.setAimAssist(data.assistAim);
-                if (data.assistAim) assistMode.modifyPlayer(player);
-                else assistMode.restorePlayer(player);
-            }
-        }
-    }
-
-    // Load on startup
-    try {
-        const raw = localStorage.getItem(SETTINGS_KEY);
-        if (raw) applySettings(JSON.parse(raw));
-    } catch (e) { /* ignore */ }
-
-    // Wire listeners that also save
-    const fovSlider = document.getElementById('set-fov');
-    if (fovSlider && postProcessing) {
-        fovSlider.addEventListener('input', (e) => {
-            postProcessing.setFOV(parseFloat(e.target.value));
-            saveSettings();
-        });
-    }
-    const effects = [
-        ['set-filmgrain', 'filmGrain'],
-        ['set-motionblur', 'motionBlur'],
-        ['set-sao', 'sao'],
-        ['set-bloom', 'bloom'],
-        ['set-chromatic', 'chromaticAberration'],
-        ['set-vignette', 'vignette']
-    ];
-    for (const [id, name] of effects) {
-        const cb = document.getElementById(id);
-        if (cb && postProcessing) {
-            cb.addEventListener('change', (e) => {
-                postProcessing.setEffectEnabled(name, e.target.checked);
-                saveSettings();
-            });
-        }
-    }
-    const volMaster = document.getElementById('set-vol-master');
-    if (volMaster && audio) {
-        volMaster.addEventListener('input', (e) => {
-            audio.setMasterVolume(parseFloat(e.target.value) / 100);
-            saveSettings();
-        });
-    }
-    const volSFX = document.getElementById('set-vol-sfx');
-    if (volSFX && audio) {
-        volSFX.addEventListener('input', (e) => {
-            audio.setSFXVolume(parseFloat(e.target.value) / 100);
-            saveSettings();
-        });
-    }
-    const volMusic = document.getElementById('set-vol-music');
-    if (volMusic && audio) {
-        volMusic.addEventListener('input', (e) => {
-            audio.setMusicVolume(parseFloat(e.target.value) / 100);
-            saveSettings();
-        });
-    }
-    const assistJump = document.getElementById('set-assist-jump');
-    if (assistJump && assistMode) {
-        assistJump.addEventListener('change', (e) => {
-            assistMode.setJumpAssist(e.target.checked);
-            if (e.target.checked) assistMode.modifyPlayer(player);
-            else assistMode.restorePlayer(player);
-            saveSettings();
-        });
-    }
-    const assistGrapple = document.getElementById('set-assist-grapple');
-    if (assistGrapple && assistMode) {
-        assistGrapple.addEventListener('change', (e) => {
-            assistMode.setGrappleAssist(e.target.checked);
-            if (e.target.checked) assistMode.modifyPlayer(player);
-            else assistMode.restorePlayer(player);
-            saveSettings();
-        });
-    }
-    const assistAim = document.getElementById('set-assist-aim');
-    if (assistAim && assistMode) {
-        assistAim.addEventListener('change', (e) => {
-            assistMode.setAimAssist(e.target.checked);
-            if (e.target.checked) assistMode.modifyPlayer(player);
-            else assistMode.restorePlayer(player);
-            saveSettings();
-        });
-    }
-    const saveBtn = document.getElementById('btn-save-game');
-    if (saveBtn) saveBtn.addEventListener('click', () => saveSystem.save());
-    const loadBtn = document.getElementById('btn-load-game');
-    if (loadBtn) loadBtn.addEventListener('click', () => saveSystem.load());
-})();
-
-// Hide loading overlay once init completes
-const loadingOverlay = document.getElementById('loading-overlay');
-if (loadingOverlay) loadingOverlay.style.display = 'none';
+window.settingsStore = settings;
 
 // Game loop
 const clock = new THREE.Clock();
@@ -1391,18 +1175,29 @@ function animate() {
     requestAnimationFrame(animate);
     
     const rawDt = clock.getDelta();
-    const dt = Math.min(rawDt, 0.05);
+    let dt = Math.min(rawDt, 0.05);
+
     
     if (gameStarted) {
+        if (touchControls && typeof touchControls.update === 'function') touchControls.update();
+        if (gameOver) return;
+        // Check for gamepad keybinding input
+        if (keybindingsGamepadCheck) keybindingsGamepadCheck();
         // Use gamepad if connected, otherwise keyboard/mouse
         const activeInput = (gamepad.gamepad) ? gamepad : input;
-        activeInput.preUpdate();
+        activeInput.preUpdate(); // sole source of truth — Player.js must NOT call this too
         const mouseDelta = activeInput.consumeMouse();
+
+        // Menu navigation (gamepad/keyboard focus)
+        if (typeof menuNavigator !== 'undefined' && menuNavigator) {
+            menuNavigator.update(activeInput);
+        }
         
         // === PAUSE TOGGLE ===
         if (activeInput.wasPressed('Escape')) {
             paused = !paused;
             if (paused) {
+                if (uiManager && typeof uiManager.closeAllPanels === 'function') uiManager.closeAllPanels();
                 if (pauseMenu) pauseMenu.style.display = 'flex';
                 document.exitPointerLock();
             } else {
@@ -1418,7 +1213,7 @@ function animate() {
         }
         
         // === EDITOR MODE TOGGLE (F1) ===
-        if (activeInput.wasPressed('F1')) {
+        if (__DEV__ && activeInput.wasPressed('F1')) {
             levelEditor.toggle();
             if (levelEditor.isActive()) {
                 document.exitPointerLock();
@@ -1441,6 +1236,7 @@ function animate() {
                 deathScreen.style.display = 'flex';
                 if (document.pointerLockElement) document.exitPointerLock();
             }
+            gameOver = true;
         } else {
             const deathScreen = document.getElementById('death-screen');
             if (deathScreen && deathScreen.style.display === 'flex') deathScreen.style.display = 'none';
@@ -1454,22 +1250,15 @@ function animate() {
         }
 
         // === UNIFIED INPUT DISPATCHERS ===
-        function _consumeKeyPress(activeInput, code) {
-            if (activeInput === input) {
-                input.prevKeys[code] = true;
-            } else if (activeInput === gamepad) {
-                gamepad.prevKeys[code] = true;
-            }
-        }
 
         // --- Mouse1 (LMB) dispatcher ---
         if (activeInput.wasPressed('Mouse1')) {
             if (player.grapplingHook && player.grapplingHook.isAiming()) {
                 ziplineGun.fire(player.facingDirection || new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)));
-                _consumeKeyPress(activeInput, 'Mouse1');
+                activeInput.consumeKey('Mouse1');
             } else if (skillSystem && skillSystem.canUse('LMB')) {
                 skillSystem.useSkill('LMB');
-                _consumeKeyPress(activeInput, 'Mouse1');
+                activeInput.consumeKey('Mouse1');
             }
             // Else: let CombatSystem fire weapon
         }
@@ -1482,7 +1271,7 @@ function animate() {
                     const pPos = pulled.position || (pulled.mesh && pulled.mesh.position);
                     if (pPos) spawnDamageNumber(pPos.clone().add(new THREE.Vector3(0, 1, 0)), 'YANKED', false, 'kinetic');
                 }
-                _consumeKeyPress(activeInput, 'KeyQ');
+                activeInput.consumeKey('KeyQ');
             } else if (activeInput.isPressed('ShiftLeft')) {
                 if (player.comboSystem && player.comboSystem.flowMeter >= 100) {
                     player.comboSystem.flowMeter = 0;
@@ -1492,10 +1281,10 @@ function animate() {
                 } else if (overclock.tryActivate()) {
                     // Overclock triggered
                 }
-                _consumeKeyPress(activeInput, 'KeyQ');
+                activeInput.consumeKey('KeyQ');
             } else {
                 if (skillSystem) skillSystem.useSkill('Q');
-                _consumeKeyPress(activeInput, 'KeyQ');
+                activeInput.consumeKey('KeyQ');
             }
         }
 
@@ -1543,7 +1332,7 @@ function animate() {
                 const fp = document.getElementById('faction-panel');
                 if (fp) fp.style.display = (fp.style.display === 'block') ? 'none' : 'block';
             }
-            if (handled) _consumeKeyPress(activeInput, 'KeyF');
+            if (handled) activeInput.consumeKey('KeyF');
         }
         
         // === BOSS FIGHT TOGGLE (B) ===
@@ -1565,10 +1354,15 @@ function animate() {
         }
 
         if (activeInput.wasPressed('KeyM')) {
-            const tiers = ['normal', 'nightmare', 'hell', 'torment1', 'torment2', 'torment3', 'torment4', 'torment5', 'torment6'];
-            const currentIdx = tiers.indexOf(difficultyTier.currentTier);
-            const nextIdx = (currentIdx + 1) % tiers.length;
-            if (difficultyTier.setTier(tiers[nextIdx])) {
+            const tiers = ['normal','nightmare','hell','torment1','torment2','torment3','torment4','torment5','torment6'];
+            const currentId = difficultyTier.currentTierId || 'normal';
+            const currentIdx = tiers.indexOf(currentId);
+            let next = (currentIdx + 1) % tiers.length;
+            let attempts = 0;
+            while (attempts < tiers.length) {
+                if (difficultyTier.setTier(tiers[next])) break;
+                next = (next + 1) % tiers.length;
+                attempts++;
             }
         }
         
@@ -1629,7 +1423,8 @@ function animate() {
         }
         
         // Panel toggles (delegated to UIManager)
-        if (uiManager) uiManager.handleInput(activeInput);
+        const uiConsumed = uiManager.handleInput(activeInput);
+        if (uiConsumed) return;
 
         // Speedrun IL hotkeys
         if (activeInput.wasPressed('Digit1')) speedrunILs.startIL('Rooftop');
@@ -1638,12 +1433,12 @@ function animate() {
         if (activeInput.wasPressed('Digit4')) speedrunILs.startIL('HangarBay');
         
         // Day/night toggle
-        if (input.isPressed('KeyN') && !dayNightPressed) {
+        if (activeInput.isPressed('KeyN') && !dayNightPressed) {
             dayNightPressed = true;
             presetIndex = (presetIndex + 1) % presets.length;
             postProcessing.setTimeOfDay(presets[presetIndex]);
             godRays.setTimeOfDay(presets[presetIndex]);
-        } else if (!input.isPressed('KeyN')) {
+        } else if (!activeInput.isPressed('KeyN')) {
             dayNightPressed = false;
         }
         
@@ -1661,7 +1456,7 @@ function animate() {
         } else {
             // Still update trajectory and visuals during countdown
             player.trajectory.hide();
-            player.updateVisuals(dt, new THREE.Vector3(), input);
+            player.updateVisuals(dt, new THREE.Vector3(), activeInput);
         }
         
         timeTrial.update(dt, player);
@@ -1985,5 +1780,9 @@ function animate() {
         renderer.render(scene, camera);
     }
 }
+
+// Hide loading overlay once init completes
+const loadingOverlay = document.getElementById('loading-overlay');
+if (loadingOverlay) loadingOverlay.style.display = 'none';
 
 animate();

@@ -66,7 +66,7 @@ export class FamiliaritySystem {
 
   setHeirloomName(weaponId, name) {
     if (this.getKills(weaponId) < NAMING_THRESHOLD) {
-      console.warn(`FamiliaritySystem: cannot name weapon until ${NAMING_THRESHOLD} kills`);
+      window.__DEV__ && console.warn(`FamiliaritySystem: cannot name weapon until ${NAMING_THRESHOLD} kills`);
       return false;
     }
     const data = this._ensure(weaponId);
@@ -89,7 +89,7 @@ export class FamiliaritySystem {
 
   deserialize(data) {
     if (!data || typeof data !== 'object') {
-      console.warn('FamiliaritySystem: invalid deserialize data');
+      window.__DEV__ && console.warn('FamiliaritySystem: invalid deserialize data');
       return;
     }
     this.weaponData.clear();

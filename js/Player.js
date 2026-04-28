@@ -305,8 +305,7 @@ export class Player {
         // Sync max health from character sheet gear bonuses
         this._syncMaxHealth();
 
-        // Snapshot input state for edge detection (wasPressed / wasMouse2Released)
-        input.preUpdate();
+        // NOTE: preUpdate() is called once per frame in main.js — do NOT add another here
 
         this.facing = cameraYaw;
         const moveDir = this.getMoveDir(input, cameraYaw);
@@ -1850,6 +1849,9 @@ export class Player {
     }
 
     triggerParry() {
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('parry');
+        }
         if (this._parryCooldown > 0 || this.isDead) return false;
         this._parryWindow = 0.25; // 0.25s window
         this._parryCooldown = 1.0; // 1s cooldown
@@ -1880,7 +1882,8 @@ export class Player {
             }
             // I-frames for remainder of roll
             this.isInvincible = true;
-            setTimeout(() => { this.isInvincible = false; }, 300);
+            clearTimeout(this._invincibilityTimer);
+            this._invincibilityTimer = setTimeout(() => { this.isInvincible = false; }, 300);
             return 0;
         }
 
@@ -1955,6 +1958,9 @@ export class Player {
         }
 
         this.health -= amount;
+        if (window.audioManager && typeof window.audioManager.playHitSound === 'function') {
+            window.audioManager.playHitSound(type, this.position);
+        }
         if (this.health <= 0) {
             // Allow legendary powers to block fatal damage
             let blocked = false;
@@ -1980,6 +1986,10 @@ export class Player {
     }
 
     die() {
+        if (window.audioManager && typeof window.audioManager.playDeathSound === 'function') {
+            window.audioManager.playDeathSound(this.position);
+        }
+        clearTimeout(this._invincibilityTimer);
         // Adrenal Valve death rewind
         const stats = this.getRPGStats();
         const implantBonuses = stats._implantBonuses || {};
@@ -2002,7 +2012,8 @@ export class Player {
                 this.state = 'IDLE';
                 this.isDead = false;
                 this.isInvincible = true;
-                setTimeout(() => { this.isInvincible = false; }, 1000);
+                clearTimeout(this._invincibilityTimer);
+                this._invincibilityTimer = setTimeout(() => { this.isInvincible = false; }, 1000);
                 if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
                     const pos = this.position.clone(); pos.y += 1.8;
                     this.scene.userData.spawnDamageNumber(pos, 'REWIND', true, 'energy');
@@ -2017,10 +2028,14 @@ export class Player {
     }
 
     respawn() {
+        clearTimeout(this._invincibilityTimer);
         this.isDead = false;
         this.health = this.maxHealth + this._respawnHPBonus;
         this.state = 'IDLE';
         this.velocity.set(0, 0, 0);
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('respawn');
+        }
     }
 
     getHealthPercent() {

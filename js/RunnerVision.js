@@ -47,6 +47,7 @@ export class RunnerVision {
 
 		// Own key listener so we don't need InputManager changes
 		this._onKey = (e) => {
+			if (!window.gameStarted || window.paused) return;
 			if (e.code === 'KeyV') this.toggle();
 		};
 		document.addEventListener('keydown', this._onKey);
@@ -64,6 +65,14 @@ export class RunnerVision {
 
 	toggle() {
 		this.active = !this.active;
+	}
+
+	/**
+	 * InputManager routing. Call from main.js if available.
+	 * @param {InputManager} input
+	 */
+	handleInput(input) {
+		if (input.wasPressed('KeyV')) this.toggle();
 	}
 
 	/**

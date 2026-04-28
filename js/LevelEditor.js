@@ -5,15 +5,6 @@ import { MovingPlatform } from './MovingPlatform.js';
  * LevelEditor - Browser-based 3D parkour level editor using Three.js.
  *
  * Integrates into an existing parkour game with scene, camera, renderer, world, and player.
- *
- * Hotkeys (handled externally in main.js):
- *   F1           = toggle editor
- *   G            = toggle grid snap
- *   H            = toggle helpers
- *   Delete       = delete selected
- *   Ctrl+Z       = undo last placement
- *   Ctrl+S       = export level (triggers download)
- *   Ctrl+O       = import level (file input)
  */
 
 const POWERUP_TYPES = [
@@ -524,7 +515,7 @@ export default class LevelEditor {
                 root = this._createSpawnPointMesh(position);
                 break;
             default:
-                console.warn('Unknown placement type:', type);
+                if (window.__DEV__) console.warn('Unknown placement type:', type);
                 return;
         }
 
@@ -1242,12 +1233,12 @@ export default class LevelEditor {
         try {
             data = JSON.parse(jsonString);
         } catch (e) {
-            console.error('Failed to parse level JSON:', e);
+            window.__DEV__ && console.error('Failed to parse level JSON:', e);
             return false;
         }
 
         if (!data || data.version !== 1) {
-            console.warn('Unsupported level version');
+            window.__DEV__ && console.warn('Unsupported level version');
             return false;
         }
 

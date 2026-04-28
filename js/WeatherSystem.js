@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sharedAudioContext } from './AudioManager.js';
 
 /**
  * WeatherSystem – atmospheric states for the warehouse.
@@ -40,7 +41,7 @@ export class WeatherSystem {
 		this.steamParticles = [];
 		this.steamGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
 		this.steamMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.25 });
-		// Fake pipe vent locations around the warehouse
+		// Procedural pipe vent locations around the warehouse
 		this.steamVents = [
 			new THREE.Vector3(-20, 0, -20),
 			new THREE.Vector3(20, 0, 20),
@@ -227,9 +228,12 @@ export class WeatherSystem {
 
 	_startRainAudio() {
 		try {
-			const AudioContext = window.AudioContext || window.webkitAudioContext;
-			if (!this._audioCtx) this._audioCtx = new AudioContext();
-			const ctx = this._audioCtx;
+			let ctx = sharedAudioContext;
+			if (!ctx) {
+				const AudioContext = window.AudioContext || window.webkitAudioContext;
+				if (!this._audioCtx) this._audioCtx = new AudioContext();
+				ctx = this._audioCtx;
+			}
 			if (ctx.state === 'suspended') ctx.resume();
 
 			const bufferSize = Math.floor(ctx.sampleRate * 2); // 2-second loop

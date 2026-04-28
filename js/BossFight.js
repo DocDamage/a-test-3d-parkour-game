@@ -582,6 +582,19 @@ export default class BossFight {
         return hits === 0 ? 'S' : hits <= 3 ? 'A' : hits <= 6 ? 'B' : hits <= 10 ? 'C' : 'F';
     }
 
+    takeDamage(amount, type = 'kinetic', source = null) {
+        if (window.audioManager && typeof window.audioManager.playHitSound === 'function') {
+            window.audioManager.playHitSound('boss', this.bossGroup ? this.bossGroup.position : null);
+        }
+    }
+
+    die() {
+        if (window.audioManager && typeof window.audioManager.playDeathSound === 'function') {
+            window.audioManager.playDeathSound(this.bossGroup ? this.bossGroup.position : null);
+        }
+        this._startDefeatSequence();
+    }
+
     /* ---------------------------------------------------------------------- */
     /*  Damage & Cores                                                        */
     /* ---------------------------------------------------------------------- */
@@ -592,6 +605,10 @@ export default class BossFight {
         if (this.coreHealth[index] <= 0) return;
 
         this.coreHealth[index] -= amount;
+
+        if (window.audioManager && typeof window.audioManager.playHitSound === 'function') {
+            window.audioManager.playHitSound('boss', this.bossGroup ? this.bossGroup.position : null);
+        }
 
         // Flash white on hit
         const core = this.cores[index];
@@ -745,6 +762,9 @@ export default class BossFight {
     /*  Phase transitions                                                     */
     /* ---------------------------------------------------------------------- */
     _startPhaseTransition(newPhase) {
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('boss_phase', this.bossGroup ? this.bossGroup.position : null);
+        }
         this.bossState = 'phase_transition';
         this.cinematicMode = 'phase';
         this.cinematicTimer = 3;
@@ -822,6 +842,9 @@ export default class BossFight {
     /*  Defeat                                                                */
     /* ---------------------------------------------------------------------- */
     _startDefeatSequence() {
+        if (window.audioManager && typeof window.audioManager.playDeathSound === 'function') {
+            window.audioManager.playDeathSound(this.bossGroup ? this.bossGroup.position : null);
+        }
         this.bossState = 'defeated';
         this.cinematicMode = 'defeat';
         this.cinematicTimer = 5;
@@ -1308,7 +1331,7 @@ export default class BossFight {
                 if (this.player && typeof this.player.takeDamage === 'function') {
                     this.player.takeDamage(10 * dt, 'energy', this);
                 } else {
-                    console.warn('BossFight: player.takeDamage not available');
+                    if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                 }
                 this.hitsTaken++;
                 const push = new THREE.Vector3()
@@ -1337,7 +1360,7 @@ export default class BossFight {
                 if (this.player && typeof this.player.takeDamage === 'function') {
                     this.player.takeDamage(20, 'energy', this);
                 } else {
-                    console.warn('BossFight: player.takeDamage not available');
+                    if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                 }
                 this.hitsTaken++;
                 if (this.player && typeof this.player.startStumble === 'function') {
@@ -1374,7 +1397,7 @@ export default class BossFight {
                     if (this.player && typeof this.player.takeDamage === 'function') {
                         this.player.takeDamage(30, 'energy', this);
                     } else {
-                        console.warn('BossFight: player.takeDamage not available');
+                        if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                     }
                     this.hitsTaken++;
                     if (this.player && typeof this.player.startRagdoll === 'function') {
@@ -1426,7 +1449,7 @@ export default class BossFight {
                     if (this.player && typeof this.player.takeDamage === 'function') {
                         this.player.takeDamage(10, 'energy', this);
                     } else {
-                        console.warn('BossFight: player.takeDamage not available');
+                        if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                     }
                     this.hitsTaken++;
                     if (this.player && typeof this.player.startStumble === 'function') {
@@ -1448,7 +1471,7 @@ export default class BossFight {
                     if (this.player && typeof this.player.takeDamage === 'function') {
                         this.player.takeDamage(15, 'energy', this);
                     } else {
-                        console.warn('BossFight: player.takeDamage not available');
+                        if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                     }
                     this.hitsTaken++;
                 }
@@ -1522,7 +1545,7 @@ export default class BossFight {
                     if (this.player && typeof this.player.takeDamage === 'function') {
                         this.player.takeDamage(6 * dt, 'energy', this);
                     } else {
-                        console.warn('BossFight: player.takeDamage not available');
+                        if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                     }
                     this.hitsTaken++;
                 }
@@ -1546,7 +1569,7 @@ export default class BossFight {
             if (this.player && typeof this.player.takeDamage === 'function') {
                 this.player.takeDamage(25, 'energy', this);
             } else {
-                console.warn('BossFight: player.takeDamage not available');
+                if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
             }
             this.hitsTaken++;
             const knockback = new THREE.Vector3()
@@ -1566,7 +1589,7 @@ export default class BossFight {
                 if (this.player && typeof this.player.takeDamage === 'function') {
                     this.player.takeDamage(15, 'energy', this);
                 } else {
-                    console.warn('BossFight: player.takeDamage not available');
+                    if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('BossFight: player.takeDamage not available');
                 }
                 this.hitsTaken++;
                 if (this.player && typeof this.player.startRagdoll === 'function') {

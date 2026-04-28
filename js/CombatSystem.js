@@ -148,6 +148,11 @@ export class CombatSystem {
         this.stateTimer = this._getStateDuration();
         this.hitRegistered = false;
 
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            const pos = this.player ? this.player.position : null;
+            window.audioManager.playSFX(type === 'heavy' ? 'heavy_swing' : 'light_swing', pos);
+        }
+
         // Visual: brief camera nudge on attack start
         if (this.camera && type === 'heavy') {
             this._cameraNudge(0.15);
@@ -220,6 +225,10 @@ export class CombatSystem {
 
     triggerHitStop(duration = 0.06) {
         this.hitStopTimer = duration;
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            const pos = this.player ? this.player.position : null;
+            window.audioManager.playSFX('hit_stop', pos);
+        }
     }
 
     triggerCameraShake(intensity = 0.15, duration = 0.2) {

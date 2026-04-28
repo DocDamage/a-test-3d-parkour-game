@@ -38,7 +38,7 @@ export class LegacySystem {
    */
   retire(runnerName, heirloomItemId = null) {
     if (!this.canRetire()) {
-      console.warn('LegacySystem: cannot retire — level 50 required');
+      window.__DEV__ && console.warn('LegacySystem: cannot retire — level 50 required');
       return null;
     }
 

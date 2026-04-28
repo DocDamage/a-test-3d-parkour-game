@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { sharedAudioContext as importedAudioContext } from './AudioManager.js';
 
-let sharedAudioContext = null;
+let sharedAudioContext = importedAudioContext || null;
 
 function getAudioContext() {
     if (!sharedAudioContext) {

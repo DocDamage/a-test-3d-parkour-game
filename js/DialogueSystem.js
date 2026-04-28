@@ -81,15 +81,17 @@ const DIALOGUES = {
 };
 
 export class DialogueSystem {
-    constructor(player, npcSystem, bountySystem) {
+    constructor(player, npcSystem, bountySystem, world = null) {
         this._player      = player;
         this._bountySystem = bountySystem;
+        this._world       = world;
         this._open        = false;
         this._currentNpcId = null;
         this._lineIndex   = 0;
         this._nearNpcId   = null;
         this._tmp         = new THREE.Vector3();
         this._buildUI();
+        this._validateNpcPositions();
     }
 
     get isOpen() { return this._open; }
@@ -190,6 +192,7 @@ export class DialogueSystem {
         this._nameEl.textContent = NPC_NAMES[npcId] || npcId;
         this._prompt.style.display = 'none';
         this._panel.style.display  = 'block';
+        if (audioManager && typeof audioManager.playSFX === 'function') audioManager.playSFX('dialogue_advance');
         this._renderLine();
     }
 
@@ -210,6 +213,7 @@ export class DialogueSystem {
     }
 
     _advance() {
+        if (audioManager && typeof audioManager.playSFX === 'function') audioManager.playSFX('dialogue_advance');
         const data = DIALOGUES[this._currentNpcId];
         if (!data) { this.closeDialogue(); return; }
         if (this._lineIndex < data.lines.length - 1) {
@@ -227,6 +231,7 @@ export class DialogueSystem {
     }
 
     closeDialogue() {
+        if (audioManager && typeof audioManager.playSFX === 'function') audioManager.playSFX('dialogue_advance');
         this._open         = false;
         this._currentNpcId = null;
         this._panel.style.display  = 'none';
@@ -238,6 +243,16 @@ export class DialogueSystem {
     /** Register or override the world position for an NPC id. */
     registerNPCPosition(npcId, vec3) {
         NPC_POSITIONS[npcId] = vec3;
+        if (this._world && typeof this._world.getGroundHeight === 'function') {
+            vec3.y = this._world.getGroundHeight(vec3.x, vec3.z) + 1;
+        }
+    }
+
+    _validateNpcPositions() {
+        if (!this._world || typeof this._world.getGroundHeight !== 'function') return;
+        for (const pos of Object.values(NPC_POSITIONS)) {
+            pos.y = this._world.getGroundHeight(pos.x, pos.z) + 1;
+        }
     }
 
     dispose() {

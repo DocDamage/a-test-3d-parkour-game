@@ -150,6 +150,7 @@ export class BlackoutSystem {
       startedAt: this._gameTime,
       duration: dur,
     });
+    if (this._eventHistory.length > 100) this._eventHistory.shift();
 
     // Apply NPC reactions as temporary quest flags
     const reactions = NPC_REACTIONS[eventType] || [];

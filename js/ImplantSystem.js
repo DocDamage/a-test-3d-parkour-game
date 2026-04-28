@@ -125,23 +125,23 @@ export class ImplantSystem {
 
   installImplant(slot, implantId) {
     if (!VALID_SLOTS.has(slot)) {
-      console.warn(`ImplantSystem: invalid slot "${slot}"`);
+      window.__DEV__ && console.warn(`ImplantSystem: invalid slot "${slot}"`);
       return false;
     }
 
     const template = IMPLANT_MAP.get(implantId);
     if (!template) {
-      console.warn(`ImplantSystem: unknown implant "${implantId}"`);
+      window.__DEV__ && console.warn(`ImplantSystem: unknown implant "${implantId}"`);
       return false;
     }
 
     if (template.slot !== slot) {
-      console.warn(`ImplantSystem: "${implantId}" does not fit in ${slot} slot`);
+      window.__DEV__ && console.warn(`ImplantSystem: "${implantId}" does not fit in ${slot} slot`);
       return false;
     }
 
     if (this.slots[slot]) {
-      console.warn(`ImplantSystem: ${slot} already occupied`);
+      window.__DEV__ && console.warn(`ImplantSystem: ${slot} already occupied`);
       return false;
     }
 
@@ -155,13 +155,13 @@ export class ImplantSystem {
 
   removeImplant(slot) {
     if (!VALID_SLOTS.has(slot)) {
-      console.warn(`ImplantSystem: invalid slot "${slot}"`);
+      window.__DEV__ && console.warn(`ImplantSystem: invalid slot "${slot}"`);
       return null;
     }
 
     const entry = this.slots[slot];
     if (!entry) {
-      console.warn(`ImplantSystem: no implant in ${slot}`);
+      window.__DEV__ && console.warn(`ImplantSystem: no implant in ${slot}`);
       return null;
     }
 
@@ -170,7 +170,7 @@ export class ImplantSystem {
     // Deduct chips if the player exposes a currency property
     if (this.player && typeof this.player.chips === 'number') {
       if (this.player.chips < cost) {
-        console.warn(`ImplantSystem: cannot afford removal cost ${cost}`);
+        window.__DEV__ && console.warn(`ImplantSystem: cannot afford removal cost ${cost}`);
         return null;
       }
       this.player.chips -= cost;

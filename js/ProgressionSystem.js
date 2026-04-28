@@ -83,7 +83,7 @@ export class ProgressionSystem {
                 try {
                     this.onLevelUp(this._level, this.characterSheet.getAttributePoints());
                 } catch (err) {
-                    console.error('ProgressionSystem onLevelUp callback error:', err);
+                    window.__DEV__ && console.error('ProgressionSystem onLevelUp callback error:', err);
                 }
             }
         }

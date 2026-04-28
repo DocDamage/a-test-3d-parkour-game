@@ -1,3 +1,5 @@
+import { keyBindings } from './KeyBindings.js';
+
 export class InputManager {
     constructor() {
         this.keys = {};
@@ -14,11 +16,16 @@ export class InputManager {
     
     setupEvents() {
         document.addEventListener('keydown', (e) => {
-            this.keys[e.code] = true;
+            if (['Space','Tab','F1','F12','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code) || (e.ctrlKey && ['KeyS','KeyO','KeyZ'].includes(e.code))) {
+                e.preventDefault();
+            }
+            const virtual = keyBindings.getBindingForPhysicalKey(e.code);
+            this.keys[virtual || e.code] = true;
         });
         
         document.addEventListener('keyup', (e) => {
-            this.keys[e.code] = false;
+            const virtual = keyBindings.getBindingForPhysicalKey(e.code);
+            this.keys[virtual || e.code] = false;
         });
         
         document.addEventListener('mousemove', (e) => {
@@ -29,24 +36,45 @@ export class InputManager {
         });
         
         document.addEventListener('mousedown', (e) => {
+            const physical = e.button === 0 ? 'Mouse1' : (e.button === 1 ? 'Mouse3' : (e.button === 2 ? 'Mouse2' : null));
+            if (!physical) return;
+            const virtual = keyBindings.getBindingForPhysicalKey(physical);
+            const code = virtual || physical;
             if (e.button === 0) {
                 this.mouseDown = true;
-                this.keys['Mouse1'] = true;
+                this.keys[code] = true;
+            } else if (e.button === 1) {
+                this.mouse1Down = true;
+                this.keys[code] = true;
             } else if (e.button === 2) {
                 this.mouse2Down = true;
-                this.keys['Mouse2'] = true;
+                this.keys[code] = true;
             }
         });
         
         document.addEventListener('mouseup', (e) => {
+            const physical = e.button === 0 ? 'Mouse1' : (e.button === 1 ? 'Mouse3' : (e.button === 2 ? 'Mouse2' : null));
+            if (!physical) return;
+            const virtual = keyBindings.getBindingForPhysicalKey(physical);
+            const code = virtual || physical;
             if (e.button === 0) {
                 this.mouseDown = false;
-                this.keys['Mouse1'] = false;
+                this.keys[code] = false;
+            } else if (e.button === 1) {
+                this.mouse1Down = false;
+                this.keys[code] = false;
             } else if (e.button === 2) {
                 this.mouse2Down = false;
-                this.keys['Mouse2'] = false;
+                this.keys[code] = false;
             }
         });
+        
+        document.addEventListener('wheel', (e) => {
+            const upVirtual = keyBindings.getBindingForPhysicalKey('ScrollUp');
+            const downVirtual = keyBindings.getBindingForPhysicalKey('ScrollDown');
+            this.keys[upVirtual || 'ScrollUp'] = e.deltaY < 0;
+            this.keys[downVirtual || 'ScrollDown'] = e.deltaY > 0;
+        }, { passive: true });
         
         // Prevent context menu on right-click so Mouse2 can be used for gameplay
         document.addEventListener('contextmenu', (e) => {
@@ -63,6 +91,12 @@ export class InputManager {
         this.prevKeys = { ...this.keys };
         this.prevMouseDown = this.mouseDown;
         this.prevMouse2Down = this.mouse2Down;
+        const scrollUpVirtual = keyBindings.getBindingForPhysicalKey('ScrollUp') || 'ScrollUp';
+        const scrollDownVirtual = keyBindings.getBindingForPhysicalKey('ScrollDown') || 'ScrollDown';
+        this.prevKeys[scrollUpVirtual] = this.keys[scrollUpVirtual];
+        this.prevKeys[scrollDownVirtual] = this.keys[scrollDownVirtual];
+        this.keys[scrollUpVirtual] = false;
+        this.keys[scrollDownVirtual] = false;
     }
     
     isPressed(code) {
@@ -93,10 +127,29 @@ export class InputManager {
         return !this.mouse2Down && this.prevMouse2Down;
     }
     
+    consumeKey(code) {
+        const pressed = this.wasPressed(code);
+        if (pressed) this.prevKeys[code] = true;
+        return pressed;
+    }
+    
     consumeMouse() {
         const d = { x: this.mouse.dx, y: this.mouse.dy };
         this.mouse.dx = 0;
         this.mouse.dy = 0;
         return d;
+    }
+
+    /**
+     * Programmatically set a key state. Used by TouchControls to inject
+     * synthetic keyboard input without mutating internals directly.
+     */
+    setKey(code, pressed) {
+        this.keys[code] = pressed;
+    }
+    
+    dispose() {
+        // Remove all listeners if needed for long-lived SPAs
+        // Currently listeners are attached to document and leak on hot-reload
     }
 }

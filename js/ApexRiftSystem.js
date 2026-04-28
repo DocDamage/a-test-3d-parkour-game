@@ -106,7 +106,13 @@ export class ApexRiftSystem {
       if (timeEl) timeEl.textContent = `Time: ${Math.floor(timeUsed / 60)}:${String(Math.floor(timeUsed % 60)).padStart(2, '0')}`;
       const lvlEl = document.getElementById('rift-result-levels');
       if (lvlEl) lvlEl.textContent = `Levels Gained: ${upgrades}`;
-      setTimeout(() => { if (result) result.style.display = 'none'; }, 3000);
+      const closeBtn = document.getElementById('rift-result-close');
+      if (closeBtn) {
+        closeBtn.onclick = () => {
+          result.style.display = 'none';
+          document.body.requestPointerLock();
+        };
+      }
     }
 
     this._cleanupArena();

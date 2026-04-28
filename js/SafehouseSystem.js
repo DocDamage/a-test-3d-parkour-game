@@ -108,7 +108,7 @@ export class SafehouseSystem {
      */
     addCurrency(type, amount) {
         if (!CURRENCY_TYPES.includes(type)) {
-            console.warn(`SafehouseSystem: unknown currency type "${type}"`);
+            window.__DEV__ && console.warn(`SafehouseSystem: unknown currency type "${type}"`);
             return;
         }
         if (amount <= 0) return;
@@ -200,15 +200,15 @@ export class SafehouseSystem {
     purchaseUpgrade(id, opts = {}) {
         const up = this._upgrades.get(id);
         if (!up) {
-            console.warn(`SafehouseSystem: unknown upgrade "${id}"`);
+            window.__DEV__ && console.warn(`SafehouseSystem: unknown upgrade "${id}"`);
             return false;
         }
         if (up.currentLevel >= up.maxLevel) {
-            console.warn(`SafehouseSystem: upgrade "${id}" is already max level.`);
+            window.__DEV__ && console.warn(`SafehouseSystem: upgrade "${id}" is already max level.`);
             return false;
         }
         if (!this.canAffordUpgrade(id)) {
-            console.warn(`SafehouseSystem: cannot afford upgrade "${id}".`);
+            window.__DEV__ && console.warn(`SafehouseSystem: cannot afford upgrade "${id}".`);
             return false;
         }
 
@@ -297,11 +297,11 @@ export class SafehouseSystem {
     dismantleCommonToRare(commonItems) {
         const forge = this._upgrades.get('scrap_forge');
         if (!forge || forge.currentLevel <= 0) {
-            console.warn('SafehouseSystem: Scrap Forge not unlocked.');
+            window.__DEV__ && console.warn('SafehouseSystem: Scrap Forge not unlocked.');
             return null;
         }
         if (!Array.isArray(commonItems) || commonItems.length < 3) {
-            console.warn('SafehouseSystem: need 3 common items.');
+            window.__DEV__ && console.warn('SafehouseSystem: need 3 common items.');
             return null;
         }
         // Return a deterministic "success" flag and consume the items.
@@ -384,7 +384,7 @@ export class SafehouseSystem {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.serialize()));
         } catch (e) {
-            console.warn('SafehouseSystem: save failed', e);
+            window.__DEV__ && console.warn('SafehouseSystem: save failed', e);
         }
     }
 
@@ -395,7 +395,7 @@ export class SafehouseSystem {
                 this.deserialize(JSON.parse(raw));
             }
         } catch (e) {
-            console.warn('SafehouseSystem: load failed', e);
+            window.__DEV__ && console.warn('SafehouseSystem: load failed', e);
         }
     }
 }

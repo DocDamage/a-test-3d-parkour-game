@@ -85,7 +85,7 @@ export class GhostRacing {
         try {
             localStorage.setItem(key, JSON.stringify(payload));
         } catch (e) {
-            console.warn('GhostRacing: localStorage save failed', e);
+            window.__DEV__ && console.warn('GhostRacing: localStorage save failed', e);
         }
     }
 
@@ -98,13 +98,7 @@ export class GhostRacing {
         // Clear existing ghosts
         this.clearGhosts();
 
-        const keys = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith('ghostRun_')) {
-                keys.push(k);
-            }
-        }
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('ghostRun_'));
 
         if (keys.length === 0) return 0;
 
@@ -126,7 +120,7 @@ export class GhostRacing {
                 this._spawnGhost(data, this.ghostColors[i % this.ghostColors.length]);
                 loaded++;
             } catch (e) {
-                console.warn('GhostRacing: failed to load ghost', keys[i], e);
+                window.__DEV__ && console.warn('GhostRacing: failed to load ghost', keys[i], e);
             }
         }
 

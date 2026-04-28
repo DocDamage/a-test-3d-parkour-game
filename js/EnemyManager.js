@@ -532,7 +532,7 @@ export class EnemyManager {
     spawnEnemy(type, config = {}) {
         const def = ENEMY_TYPES[type];
         if (!def) {
-            console.warn(`[EnemyManager] Unknown enemy type: ${type}`);
+            window.__DEV__ && console.warn(`[EnemyManager] Unknown enemy type: ${type}`);
             return null;
         }
 

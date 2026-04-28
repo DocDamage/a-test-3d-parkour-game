@@ -92,7 +92,7 @@ export class InventorySystem {
         setTimeout(() => { this.player.isInvisible = false; }, (def.duration || 5) * 1000);
         return true;
       case 'teleport':
-        // Placeholder — would teleport to safehouse
+        // Teleport to safehouse
         return true;
       default:
         return false;

@@ -35,11 +35,12 @@ export const AMMO_TYPES = {
 };
 
 export class WeaponSystem {
-    constructor(player, scene, hitboxSystem, projectileManager) {
+    constructor(player, scene, hitboxSystem, projectileManager, audioManager = null) {
         this.player = player;
         this.scene = scene;
         this.hitboxSystem = hitboxSystem;
         this.projectileManager = projectileManager;
+        this.audioManager = audioManager;
 
         this.slots = new Map();
         this.currentSlot = WEAPON_SLOTS.MELEE;
@@ -129,6 +130,9 @@ export class WeaponSystem {
         if (this.slots.has(slot)) {
             this.currentSlot = slot;
             this._updateUI();
+            if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+                window.audioManager.playSFX('weapon_switch');
+            }
             return true;
         }
         return false;
@@ -143,6 +147,9 @@ export class WeaponSystem {
         if (next >= keys.length) next = 0;
         this.currentSlot = keys[next];
         this._updateUI();
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('weapon_switch');
+        }
         return true;
     }
 
@@ -215,6 +222,11 @@ export class WeaponSystem {
         const fireRate = eff ? eff.fireRate : (w.fireRate || w.attackSpeed || 5);
         this.fireCooldown = 1 / fireRate;
         this._updateUI();
+
+        if (window.audioManager && typeof window.audioManager.playWeaponFire === 'function') {
+            window.audioManager.playWeaponFire(w ? (w.name || 'default') : 'default', origin);
+        }
+
         return true;
     }
 
@@ -226,7 +238,13 @@ export class WeaponSystem {
         const clipSize = eff ? Math.round(eff.clipSize) : (w.clipSize || 10);
         if (w.reload && typeof w.reload === 'function') {
             const did = w.reload();
-            if (did) { this.isReloading = true; this.reloadTimer = reloadTime; }
+            if (did) { 
+                this.isReloading = true; 
+                this.reloadTimer = reloadTime;
+                if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+                    window.audioManager.playSFX('reload');
+                }
+            }
             return did;
         }
         const ammo = this.ammo[w.ammoType];
@@ -234,6 +252,9 @@ export class WeaponSystem {
 
         this.isReloading = true;
         this.reloadTimer = reloadTime;
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('reload');
+        }
         return true;
     }
 
@@ -258,8 +279,8 @@ export class WeaponSystem {
         if (input && input.wasPressed && input.wasPressed('ScrollUp')) this.cycleSlot(-1);
         if (input && input.wasPressed && input.wasPressed('ScrollDown')) this.cycleSlot(1);
 
-        // Input: number keys switch slots (skip if speedrun IL digits are in use)
-        if (input && input.wasPressed && !document.getElementById('speedrun-panel')) {
+        // Input: number keys switch slots
+        if (input && input.wasPressed) {
             if (input.wasPressed('Digit1')) this.switchSlot(WEAPON_SLOTS.MELEE);
             if (input.wasPressed('Digit2')) this.switchSlot(WEAPON_SLOTS.SIDEARM);
             if (input.wasPressed('Digit3')) this.switchSlot(WEAPON_SLOTS.PRIMARY);

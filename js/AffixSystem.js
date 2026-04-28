@@ -239,17 +239,17 @@ export class AffixSystem {
 
   rerollAffix(item, affixIndex) {
     if (!item || !Array.isArray(item.affixes)) {
-      console.warn('AffixSystem: invalid item for reroll');
+      window.__DEV__ && console.warn('AffixSystem: invalid item for reroll');
       return null;
     }
     if (affixIndex < 0 || affixIndex >= item.affixes.length) {
-      console.warn('AffixSystem: affixIndex out of bounds');
+      window.__DEV__ && console.warn('AffixSystem: affixIndex out of bounds');
       return null;
     }
 
     const newAffixes = this.rollAffixes(item.rarity, item.slot);
     if (newAffixes.length === 0) {
-      console.warn('AffixSystem: no affix pool for rarity', item.rarity);
+      window.__DEV__ && console.warn('AffixSystem: no affix pool for rarity', item.rarity);
       return null;
     }
 

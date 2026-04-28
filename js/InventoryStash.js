@@ -11,7 +11,7 @@ export class InventoryStash {
   acquireItem(item) {
     if (!item) return false;
     if (this.stash.length >= this.maxSize) {
-      console.warn('[Stash] Full — cannot acquire', item.name || 'item');
+      window.__DEV__ && console.warn('[Stash] Full — cannot acquire', item.name || 'item');
       return false;
     }
     this.stash.push(item);

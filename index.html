@@ -22,6 +22,7 @@
             z-index: 10;
             max-width: 300px;
         }
+        #weapon-bar { pointer-events: auto; }
         
         #ui h1 {
             font-size: 18px;
@@ -71,9 +72,13 @@
             cursor: pointer;
             pointer-events: auto;
             line-height: 1;
-            padding: 2px 6px;
+            padding: 4px 12px;
+            min-width: 44px;
+            min-height: 44px;
         }
         .panel-close:hover { color: #fff; }
+
+        .empty-state { color: #888; font-style: italic; padding: 10px; text-align: center; }
 
         /* Loading Overlay */
         #loading-overlay {
@@ -693,13 +698,7 @@
             background: linear-gradient(90deg, #ff0000, #ff6600);
             transition: width 0.3s;
         }
-        /* Player Health Bar — legacy, hidden in favour of heart containers */
-        #player-health-bar {
-            display: none !important;
-        }
-        #player-health-text {
-            display: none !important;
-        }
+
 
         /* ─── Zelda Heart Containers ─────────────────────── */
         #heart-container-row {
@@ -1416,6 +1415,26 @@
         .settings-row input[type="range"] { width: 140px; }
         .settings-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
+        /* === Keybindings Panel === */
+        #keybindings-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 480px; max-height: 80vh; overflow-y: auto;
+            background: rgba(0,0,0,0.92); border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px; padding: 24px; color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 20; display: none;
+        }
+        #keybindings-panel h2 { font-size: 18px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; text-align: center; }
+        .kb-header { display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; color: #888; padding: 0 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .kb-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+        .kb-row:hover { background: rgba(255,255,255,0.03); }
+        .kb-row.listening { background: rgba(79,195,247,0.15); }
+        .kb-action { flex: 1; }
+        .kb-key { min-width: 80px; text-align: center; padding: 4px 8px; background: rgba(255,255,255,0.08); border-radius: 4px; cursor: pointer; margin: 0 4px; }
+        .kb-key:hover { background: rgba(255,255,255,0.15); }
+        #keybindings-reset, #keybindings-close { margin-top: 12px; padding: 8px 16px; background: #2a2a35; border: 1px solid #444; border-radius: 4px; color: #ccc; font-size: 13px; cursor: pointer; }
+        #keybindings-reset { margin-right: 8px; }
+
         /* === Passive Tree Panel === */
         #passive-tree {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -1479,6 +1498,130 @@
             background: #ffaa00;
             color: #111;
         }
+
+        /* === Touch Controls Overlay === */
+        .touch-controls {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 50;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        .touch-controls .tc-joystick-base {
+            position: absolute;
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            pointer-events: none;
+            display: none;
+        }
+        .touch-controls .tc-joystick-stick {
+            position: absolute;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 170, 0, 0.45);
+            border: 2px solid rgba(255, 170, 0, 0.7);
+            pointer-events: none;
+            display: none;
+        }
+        .touch-controls .tc-btn {
+            position: absolute;
+            width: 72px; height: 72px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 22px;
+            font-weight: bold;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            pointer-events: auto;
+            touch-action: manipulation;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s, transform 0.05s;
+            padding: 0;
+        }
+        .touch-controls .tc-btn.pressed {
+            background: rgba(255, 170, 0, 0.5);
+            border-color: rgba(255, 170, 0, 0.9);
+            transform: scale(0.92);
+        }
+        /* Button positions — right side */
+        .tc-pos-jump     { bottom: 220px; right: 24px; }
+        .tc-pos-interact { bottom: 310px; right: 24px; }
+        .tc-pos-fire     { bottom: 120px; right: 24px; }
+        .tc-pos-crouch   { bottom: 20px;  right: 24px; }
+        .tc-pos-dash     { bottom: 120px; right: 108px; }
+        /* Responsive scaling on small screens */
+        @media (max-width: 480px) {
+            .touch-controls .tc-btn {
+                width: 64px; height: 64px;
+                font-size: 20px;
+            }
+            .tc-pos-dash { right: 96px; }
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            /* Larger touch targets for all panel buttons */
+            #pause-menu button,
+            #settings-panel button,
+            #keybindings-panel button,
+            #inventory-panel button,
+            #stash-panel button,
+            #character-panel button,
+            #gear-panel button,
+            #safehouse-panel button,
+            #bounty-panel button,
+            #codex-panel button,
+            #mastery-panel button,
+            #implants-panel button,
+            #rift-result-overlay button,
+            .panel-close {
+                min-height: 48px;
+                min-width: 48px;
+                font-size: 18px;
+                padding: 12px 20px;
+            }
+            
+            /* Make panels scrollable with momentum scrolling */
+            #settings-panel,
+            #inventory-panel,
+            #stash-panel,
+            #character-panel,
+            #codex-panel,
+            #mastery-panel,
+            #implants-panel,
+            #keybindings-panel,
+            #rift-result-overlay,
+            #credits-overlay {
+                -webkit-overflow-scrolling: touch;
+                overflow-y: auto;
+                max-height: 85vh;
+            }
+            
+            /* Slightly larger text in panels for readability */
+            #settings-panel,
+            #inventory-panel,
+            #stash-panel {
+                font-size: 16px;
+            }
+            
+            /* Ensure touch controls don't block panel buttons */
+            .touch-controls {
+                z-index: 40; /* panels are z-index 100+ */
+            }
+        }
+
+        .menu-focus {
+            outline: 2px solid #ffaa00 !important;
+            outline-offset: 3px !important;
+            box-shadow: 0 0 8px rgba(255, 170, 0, 0.6);
+        }
     </style>
     <script type="importmap">
     {
@@ -1487,6 +1630,14 @@
             "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
     }
+    </script>
+    <script>
+        try {
+            const c = document.createElement('canvas');
+            if (!c.getContext('webgl2')) {
+                document.body.innerHTML = '<h1>WebGL 2 Required</h1><p>This game requires a modern browser with WebGL 2 support.</p>';
+            }
+        } catch (e) {}
     </script>
 </head>
 <body>
@@ -1509,6 +1660,7 @@
             <div class="cc-options" id="archetype-options"></div>
             <p class="cc-desc" id="archetype-desc">Select an archetype.</p>
         </div>
+        <button id="btn-char-back" style="margin-top:10px;">Back</button>
         <button id="cc-confirm" disabled>Confirm & Start</button>
     </div>
 
@@ -1516,6 +1668,7 @@
         <h1>Warehouse Parkour</h1>
         <p>Click anywhere to start</p>
         <div class="click-hint">Mouse to look • WASD to move • Space to jump/climb</div>
+        <button id="btn-start-settings" style="margin-top:10px;">Settings</button>
     </div>
     
     <div id="character-panel">
@@ -1615,7 +1768,7 @@
     <div id="celebration" style="display:none;">New Best Time!</div>
 
     <!-- Level Editor UI -->
-    <div id="editor-ui">
+    <div id="editor-ui" style="display:none">
         <div id="editor-palette">
             <h3>Objects</h3>
             <div class="cat-label">Geometry</div>
@@ -1871,6 +2024,13 @@
         <div id="stash-list"></div>
     </div>
 
+    <!-- Inventory Panel -->
+    <div id="inventory-panel" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);padding:20px;z-index:100;color:#fff;max-width:400px;">
+        <h3>Inventory</h3>
+        <div id="inventory-list"></div>
+        <button id="inventory-close">Close</button>
+    </div>
+
     <!-- RPG Safehouse Panel -->
     <div id="safehouse-panel">
         <h2 style="position:relative;">Safehouse <span class="panel-close" onclick="document.getElementById('safehouse-panel').style.display='none'">×</span></h2>
@@ -1932,6 +2092,7 @@
         <h2 id="rift-result-title">CLEARED</h2>
         <div class="rift-result-stat" id="rift-result-time">Time: 00:00</div>
         <div class="rift-result-stat" id="rift-result-levels">Levels Gained: 0</div>
+        <button id="rift-result-close" style="margin-top:20px;padding:10px 20px;font-size:16px;">Continue</button>
     </div>
 
     <!-- Difficulty Badge -->
@@ -1965,6 +2126,7 @@
     <!-- Settings Panel -->
     <div id="settings-panel">
         <h2 style="position:relative;">Settings <span class="panel-close" onclick="document.getElementById('settings-panel').style.display='none'">×</span></h2>
+        <button id="settings-close-btn" style="margin-top:20px;width:100%;padding:8px;">Close Settings</button>
         <div class="settings-section">
             <h3>Graphics</h3>
             <div class="settings-row">
@@ -2000,12 +2162,36 @@
             <div class="settings-row"><label><input type="checkbox" id="set-assist-aim"> Assist Aim</label></div>
         </div>
         <div class="settings-section">
+            <h3>Input</h3>
+            <div class="settings-row">
+                <span>Camera Sensitivity</span>
+                <input type="range" id="set-sensitivity" min="0.5" max="5" step="0.1" value="2.5">
+            </div>
+            <div class="settings-row"><label><input type="checkbox" id="set-haptics"> Controller Vibration</label></div>
+            <div class="settings-row"><label><input type="checkbox" id="set-touch"> Touch Controls</label></div>
+        </div>
+        <div class="settings-section">
             <h3>Game</h3>
             <div class="settings-row">
                 <button id="btn-save-game" style="padding:6px 14px;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:13px;cursor:pointer;">Save Game</button>
                 <button id="btn-load-game" style="padding:6px 14px;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:13px;cursor:pointer;">Load Game</button>
             </div>
         </div>
+        <div class="settings-section">
+            <h3>Controls</h3>
+            <div class="settings-row">
+                <button id="btn-keybindings" style="padding:6px 14px;background:#2a2a35;border:1px solid #444;border-radius:4px;color:#ccc;font-size:13px;cursor:pointer;">Key Bindings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keybindings Panel -->
+    <div id="keybindings-panel">
+        <h2 style="position:relative;">Key Bindings <span class="panel-close" onclick="document.getElementById('keybindings-panel').style.display='none'">×</span></h2>
+        <div class="kb-header"><span>Action</span><span>Keyboard</span><span>Gamepad</span></div>
+        <div id="keybindings-list"></div>
+        <button id="keybindings-reset">Reset to Defaults</button>
+        <button id="keybindings-close">Close</button>
     </div>
 
     <!-- Passive Tree Panel -->
@@ -2020,9 +2206,18 @@
         <h1>Paused</h1>
         <button id="pause-resume">Resume</button>
         <button id="pause-settings">Settings</button>
+        <button id="pause-keybindings">Key Bindings</button>
         <button id="pause-quit">Quit to Main Menu</button>
     </div>
 
     <script type="module" src="js/main.js"></script>
+    <div id="credits-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);color:#fff;z-index:9999;padding:40px;overflow-y:auto;">
+        <h2>Credits</h2>
+        <p>Built with <a href="https://threejs.org" target="_blank" style="color:#4fc3f7">Three.js</a> (MIT License)</p>
+        <p>© 2026 Apex Rift Team</p>
+        <button id="credits-close" style="margin-top:20px;padding:10px 20px;">Close</button>
+    </div>
+
+    <span id="game-version" style="position:fixed;bottom:8px;right:8px;color:rgba(255,255,255,0.4);font-size:12px;z-index:10;">v1.0.0</span>
 </body>
 </html>

@@ -48,7 +48,13 @@ export class ChallengeSystem {
             destroyer: false,       // collapse 5 structural objects
             photographer: false,    // take a photo
         };
-        return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+        if (!saved) return { ...defaults };
+        try {
+            return { ...defaults, ...JSON.parse(saved) };
+        } catch (e) {
+            if (window.__DEV__) console.warn('ChallengeSystem: failed to parse achievements', e);
+            return { ...defaults };
+        }
     }
 
     _saveAchievements() {
@@ -194,7 +200,13 @@ export class ChallengeSystem {
 
     _loadDiscoveredTricks() {
         const saved = localStorage.getItem("parkour_trick_dictionary");
-        return saved ? JSON.parse(saved) : {};
+        if (!saved) return {};
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            if (window.__DEV__) console.warn('ChallengeSystem: failed to parse discovered tricks', e);
+            return {};
+        }
     }
 
     _saveDiscoveredTricks() {
@@ -311,13 +323,21 @@ export class ChallengeSystem {
 
     _loadDailyScores() {
         const saved = localStorage.getItem("parkour_daily_scores");
-        const all = saved ? JSON.parse(saved) : [];
+        let all = [];
+        if (saved) {
+            try { all = JSON.parse(saved); } catch (e) { all = []; }
+        }
+        if (!Array.isArray(all)) all = [];
         return all.filter(s => s.seed === this.dailySeed);
     }
 
     _saveDailyScore(score) {
         const saved = localStorage.getItem("parkour_daily_scores");
-        const all = saved ? JSON.parse(saved) : [];
+        let all = [];
+        if (saved) {
+            try { all = JSON.parse(saved); } catch (e) { all = []; }
+        }
+        if (!Array.isArray(all)) all = [];
         all.push({
             seed: this.dailySeed,
             score: score,
@@ -508,6 +528,8 @@ export class ChallengeSystem {
     hideGradeScreen() {
         if (this.gradeScreen && this.gradeScreen.style.display === "flex") {
             this.gradeScreen.style.display = "none";
+            document.removeEventListener("keydown", this._gradeKeyHandler);
+            this.gradeScreen.removeEventListener("click", this._gradeKeyHandler);
             this.resetRunStats();
         }
     }

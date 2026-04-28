@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+const _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
+export { _sharedCtx as sharedAudioContext };
+
 export class AudioManager {
     constructor(scene, world) {
         this.scene = scene;
@@ -12,13 +15,14 @@ export class AudioManager {
         this.slideNode = null;
         this.ambienceNodes = [];
         this._clangTimeout = null;
+        this._ambiencePlaying = false;
         this.initialized = false;
+        this.listener = null;
     }
 
     init() {
         if (this.initialized) return;
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        this.ctx = new AudioContext();
+        this.ctx = _sharedCtx;
 
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.8;
@@ -35,6 +39,13 @@ export class AudioManager {
         this.reverbNode.connect(this.reverbGain);
         this.reverbGain.connect(this.masterGain);
         this.dryGain.connect(this.masterGain);
+
+        this.musicGain = this.ctx.createGain();
+        this.voiceGain = this.ctx.createGain();
+        this.uiGain = this.ctx.createGain();
+        this.musicGain.connect(this.masterGain);
+        this.voiceGain.connect(this.masterGain);
+        this.uiGain.connect(this.masterGain);
 
         this.initialized = true;
     }
@@ -75,13 +86,76 @@ export class AudioManager {
 
     setMusicVolume(vol) {
         this.ensureInit();
-        // Music is part of ambience; scale ambience nodes
-        const target = Math.max(0, vol);
-        for (const node of this.ambienceNodes) {
-            if (node.gain) {
-                try { node.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05); } catch (e) {}
+        if (this.musicGain) {
+            this.musicGain.gain.setTargetAtTime(Math.max(0, vol), this.ctx.currentTime, 0.05);
+        }
+    }
+
+    setVoiceVolume(vol) {
+        this.ensureInit();
+        if (this.voiceGain) {
+            this.voiceGain.gain.setTargetAtTime(Math.max(0, vol), this.ctx.currentTime, 0.05);
+        }
+    }
+
+    setUIVolume(vol) {
+        this.ensureInit();
+        if (this.uiGain) {
+            this.uiGain.gain.setTargetAtTime(Math.max(0, vol), this.ctx.currentTime, 0.05);
+        }
+    }
+
+    attachToCamera(camera) {
+        if (!this.listener) {
+            this.listener = new THREE.AudioListener();
+            camera.add(this.listener);
+            if (this.listener.context.state === 'suspended') {
+                this.listener.context.resume();
             }
         }
+    }
+
+    _createToneBuffer(freq, duration, type = 'sine') {
+        if (!this.listener) return null;
+        const ctx = this.listener.context;
+        const sampleRate = ctx.sampleRate;
+        const length = Math.floor(sampleRate * duration);
+        const buffer = ctx.createBuffer(1, length, sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i++) {
+            const t = i / sampleRate;
+            let sample = 0;
+            if (type === 'sine') sample = Math.sin(2 * Math.PI * freq * t);
+            else if (type === 'square') sample = Math.sin(2 * Math.PI * freq * t) > 0 ? 1 : -1;
+            else if (type === 'sawtooth') sample = 2 * (t * freq - Math.floor(t * freq + 0.5));
+            else if (type === 'noise') sample = Math.random() * 2 - 1;
+            const env = Math.min(1, (length - i) / (length * 0.1));
+            data[i] = sample * env * 0.5;
+        }
+        return buffer;
+    }
+
+    playPositionalSound(position, options = {}) {
+        if (!this.listener) return;
+        const buffer = this._createToneBuffer(
+            options.freq || 440,
+            options.duration || 0.5,
+            options.type || 'sine'
+        );
+        if (!buffer) return;
+        const sound = new THREE.PositionalAudio(this.listener);
+        sound.setBuffer(buffer);
+        sound.setRefDistance(options.refDistance || 10);
+        sound.setMaxDistance(options.maxDistance || 100);
+        sound.setRolloffFactor(options.rolloff || 1);
+        sound.position.copy(position);
+        this.scene.add(sound);
+        sound.play();
+        const duration = options.duration || 0.5;
+        setTimeout(() => {
+            this.scene.remove(sound);
+            if (sound.source) sound.source.stop();
+        }, duration * 1000 + 100);
     }
 
     // ------------------------------------------------------------
@@ -316,7 +390,7 @@ export class AudioManager {
             this.slideNode.gain.gain.setTargetAtTime(0, t, 0.04);
             setTimeout(() => {
                 if (this.slideNode) {
-                    try { this.slideNode.noise.stop(); } catch (e) {}
+                    try { this.slideNode.noise.stop(); } catch(e) { if (window.__DEV__) console.warn(e); }
                     this.slideNode = null;
                 }
             }, 150);
@@ -420,8 +494,10 @@ export class AudioManager {
     // ------------------------------------------------------------
     playAmbience() {
         this.ensureInit();
+        if (this._ambiencePlaying) return;
+        this._ambiencePlaying = true;
         const t = this.ctx.currentTime;
-        const dest = this._makeDestination();
+        const dest = this.musicGain;
 
         // Low drone
         const droneOsc = this.ctx.createOscillator();
@@ -476,17 +552,29 @@ export class AudioManager {
         osc.start(t);
         osc.stop(t + 2.5);
 
+        const duration = 2.5;
+        setTimeout(() => {
+            try { osc.stop(); } catch(e) { if (window.__DEV__) console.warn(e); }
+            try { osc.disconnect(); } catch(e) { if (window.__DEV__) console.warn(e); }
+            try { filter.disconnect(); } catch(e) { if (window.__DEV__) console.warn(e); }
+            try { gain.disconnect(); } catch(e) { if (window.__DEV__) console.warn(e); }
+        }, duration * 1000 + 50);
+
         this._clangTimeout = setTimeout(() => this._scheduleClang(), 4000 + Math.random() * 8000);
     }
 
     stopAmbience() {
         if (!this.initialized) return;
+        this._ambiencePlaying = false;
         const t = this.ctx.currentTime;
+        if (this.ambienceNodes) {
+            this.ambienceNodes.forEach(n => { try { n.disconnect(); } catch(e) { if (window.__DEV__) console.warn(e); } });
+        }
         this.ambienceNodes.forEach(node => {
             if (node.gain) {
-                try { node.gain.setTargetAtTime(0, t, 0.5); } catch (e) {}
+                try { node.gain.setTargetAtTime(0, t, 0.5); } catch(e) { if (window.__DEV__) console.warn(e); }
             } else if (node.stop) {
-                try { node.stop(t + 0.6); } catch (e) {}
+                try { node.stop(t + 0.6); } catch(e) { if (window.__DEV__) console.warn(e); }
             }
         });
         this.ambienceNodes = [];
@@ -502,7 +590,6 @@ export class AudioManager {
     playUIClick() {
         this.ensureInit();
         const t = this.ctx.currentTime;
-        const dest = this._makeDestination();
         const osc = this.ctx.createOscillator();
         osc.type = 'sine';
         osc.frequency.value = 1000;
@@ -510,9 +597,114 @@ export class AudioManager {
         gain.gain.setValueAtTime(0.18, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
         osc.connect(gain);
-        gain.connect(dest);
+        gain.connect(this.uiGain);
         osc.start(t);
         osc.stop(t + 0.08);
+    }
+
+    playHitSound(type = 'generic', position = null) {
+        this.ensureInit();
+        if (position && this.listener) {
+            const freq = type === 'explosion' ? 80 : 150;
+            this.playPositionalSound(position, {
+                freq,
+                duration: 0.35,
+                type: 'sawtooth',
+                refDistance: 8,
+                rolloff: 1.5
+            });
+            return;
+        }
+        const ctx = this.ctx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(type === 'explosion' ? 80 : 150, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.connect(gain).connect(this.dryGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+    }
+
+    playDeathSound(position = null) {
+        this.ensureInit();
+        if (position && this.listener) {
+            this.playPositionalSound(position, {
+                freq: 200,
+                duration: 1.5,
+                type: 'sine',
+                refDistance: 12,
+                rolloff: 1.2
+            });
+            return;
+        }
+        const ctx = this.ctx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.5);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+        osc.connect(gain).connect(this.dryGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 1.6);
+    }
+
+    playWeaponFire(weaponName = 'default', position = null) {
+        this.ensureInit();
+        if (position && this.listener) {
+            const baseFreq = weaponName.includes('pistol') ? 600 : weaponName.includes('rifle') ? 400 : 200;
+            this.playPositionalSound(position, {
+                freq: baseFreq,
+                duration: 0.2,
+                type: weaponName.includes('melee') ? 'square' : 'sawtooth',
+                refDistance: 10,
+                rolloff: 1.0
+            });
+            return;
+        }
+        const ctx = this.ctx;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = weaponName.includes('melee') ? 'square' : 'sawtooth';
+        const baseFreq = weaponName.includes('pistol') ? 600 : weaponName.includes('rifle') ? 400 : 200;
+        osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.connect(gain).connect(this.dryGain);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+    }
+
+    playSFX(id, position = null) {
+        switch(id) {
+            case 'mechanical_click': this.playUIClick(); break;
+            case 'boss_phase':
+                if (position && this.listener) {
+                    this.playPositionalSound(position, { freq: 300, duration: 1.2, type: 'sawtooth', refDistance: 15, rolloff: 1.0 });
+                }
+                break;
+            case 'enemy_death':
+                if (position && this.listener) {
+                    this.playPositionalSound(position, { freq: 120, duration: 0.6, type: 'sawtooth', refDistance: 10, rolloff: 1.2 });
+                }
+                break;
+            case 'drone_explosion':
+                if (position && this.listener) {
+                    this.playPositionalSound(position, { freq: 200, duration: 0.5, type: 'noise', refDistance: 12, rolloff: 1.5 });
+                }
+                break;
+            case 'miniboss_death':
+                if (position && this.listener) {
+                    this.playPositionalSound(position, { freq: 100, duration: 1.0, type: 'sawtooth', refDistance: 15, rolloff: 1.2 });
+                }
+                break;
+            default: break;
+        }
     }
 
     playTone(freq, duration, type = 'sine') {

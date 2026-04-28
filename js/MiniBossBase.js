@@ -145,6 +145,9 @@ export class MiniBossBase {
     die(source) {
         this.isDead = true;
         this._respawnTimer = 60;
+        if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
+            window.audioManager.playSFX('miniboss_death', this.position);
+        }
         if (this.onDeath) this.onDeath(this, source);
         // Hide after brief delay
         setTimeout(() => { if (this.isDead) this.group.visible = false; }, 2000);

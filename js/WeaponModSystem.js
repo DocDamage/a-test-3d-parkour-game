@@ -211,7 +211,8 @@ export class WeaponModSystem {
                 for (const [modSlot, mod] of Object.entries(slotData)) {
                     slotMap.set(modSlot, mod);
                 }
-                this.equipped.set(Number(weaponSlot) || weaponSlot, slotMap);
+                const key = String(weaponSlot);
+                this.equipped.set(key, slotMap);
             }
         } catch (e) { /* ignore */ }
     }

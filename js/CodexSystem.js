@@ -135,7 +135,7 @@ export class CodexSystem {
   unlockEntry(entryId, source) {
     const def = CODEX_ENTRIES[entryId];
     if (!def) {
-      console.warn(`CodexSystem: unknown entry "${entryId}"`);
+      window.__DEV__ && console.warn(`CodexSystem: unknown entry "${entryId}"`);
       return false;
     }
 

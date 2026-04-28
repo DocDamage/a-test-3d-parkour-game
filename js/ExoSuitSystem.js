@@ -138,7 +138,7 @@ export class ExoSuitSystem {
 
   equip(item) {
     if (!item || !VALID_SLOTS.has(item.slot)) {
-      console.warn('ExoSuitSystem: invalid item or slot', item);
+      window.__DEV__ && console.warn('ExoSuitSystem: invalid item or slot', item);
       return false;
     }
     const prev = this.equipped[item.slot];

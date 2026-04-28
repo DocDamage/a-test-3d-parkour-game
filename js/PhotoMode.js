@@ -196,6 +196,7 @@ export class PhotoMode {
 	 * ============================================================ */
 
 	_onKeyDown(e) {
+		if (!window.gameStarted || window.paused) return;
 		this._keys[e.code] = true;
 
 		if (e.code === 'F12') {
@@ -234,6 +235,8 @@ export class PhotoMode {
 	_takeScreenshot() {
 		// Render one clean frame first
 		this.postProcessing.render(0.016);
+
+		if (audioManager && typeof audioManager.playSFX === 'function') audioManager.playSFX('camera_shutter');
 
 		this.renderer.domElement.toBlob((blob) => {
 			if (!blob) return;

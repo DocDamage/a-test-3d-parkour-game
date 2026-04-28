@@ -71,7 +71,7 @@ export class MasterySystem {
     if (amount <= 0) return;
     const data = this._moves.get(moveId);
     if (!data) {
-      console.warn(`MasterySystem: unknown move "${moveId}"`);
+      window.__DEV__ && console.warn(`MasterySystem: unknown move "${moveId}"`);
       return;
     }
 

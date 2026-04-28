@@ -39,11 +39,11 @@ export class DifficultyTierSystem {
 
   setTier(tierId) {
     if (!TIERS[tierId]) {
-      console.warn('DifficultyTierSystem: unknown tier', tierId);
+      window.__DEV__ && console.warn('DifficultyTierSystem: unknown tier', tierId);
       return false;
     }
     if (!this.unlockedTiers.has(tierId)) {
-      console.warn('DifficultyTierSystem: tier locked', tierId);
+      window.__DEV__ && console.warn('DifficultyTierSystem: tier locked', tierId);
       return false;
     }
     this.currentTier = tierId;
@@ -143,13 +143,35 @@ export class DifficultyTierSystem {
         div.onclick = () => {
           if (this.setTier(id)) {
             popup.style.display = 'none';
+            this._removeOutsideClickListener();
           }
         };
         popup.appendChild(div);
       }
     }
     badge.onclick = () => {
-      if (popup) popup.style.display = popup.style.display === 'block' ? 'none' : 'block';
+      if (popup) {
+        const showing = popup.style.display === 'block';
+        popup.style.display = showing ? 'none' : 'block';
+        if (!showing) {
+          this._outsideClickHandler = (e) => {
+            if (!popup.contains(e.target) && e.target !== badge) {
+              popup.style.display = 'none';
+              document.removeEventListener('mousedown', this._outsideClickHandler);
+            }
+          };
+          document.addEventListener('mousedown', this._outsideClickHandler);
+        } else {
+          this._removeOutsideClickListener();
+        }
+      }
     };
+  }
+
+  _removeOutsideClickListener() {
+    if (this._outsideClickHandler) {
+      document.removeEventListener('mousedown', this._outsideClickHandler);
+      this._outsideClickHandler = null;
+    }
   }
 }

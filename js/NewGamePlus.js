@@ -91,7 +91,7 @@ export class NewGamePlus {
    */
   startNewCycle(heirloomItemId = null) {
     if (!this._unlocked) {
-      console.warn('NewGamePlus: not unlocked');
+      window.__DEV__ && console.warn('NewGamePlus: not unlocked');
       return false;
     }
 
