@@ -472,15 +472,7 @@ saveSystem.register('passiveTree',
     (data) => passiveTree.deserialize(data)
 );
 
-// Remove the manual load hack; passiveTree is registered and will be loaded by saveSystem on next save/load cycle.
-// If load already happened, deserialize now:
-try {
-    const _rawSave = localStorage.getItem(saveSystem.key);
-    if (_rawSave) {
-        const _saveData = JSON.parse(_rawSave);
-        if (_saveData.passiveTree) passiveTree.deserialize(_saveData.passiveTree);
-    }
-} catch (e) { if (__DEV__) console.warn('PassiveTree manual load failed', e); }
+// Deferred-load is now handled by SaveSystem.register() itself — no manual hack needed.
 
 const {
     pipeWrench, semiAutoPistol, assaultRifle, shotgun, stickyBomb,
@@ -926,79 +918,50 @@ const difficultyTier = new DifficultyTierSystem(challenges);
 const apexRift = new ApexRiftSystem(scene, world, player, riftGuardian, challenges, lootSystem, difficultyTier, enemyManager);
 const nephalemGlory = new NephalemGlory(player, challenges);
 
-// Register remaining systems with SaveSystem
-if (saveSystem && typeof saveSystem.register === 'function' && skillSystem && typeof skillSystem.serialize === 'function') {
-    saveSystem.register('skillSystem', () => skillSystem.serialize(), (d) => skillSystem.deserialize(d));
+// Register remaining systems with SaveSystem.
+// autoRegister skips null systems and those without serialize/deserialize.
+function autoRegister(key, system) {
+    if (system && typeof system.serialize === 'function' && typeof system.deserialize === 'function') {
+        saveSystem.register(key, () => system.serialize(), (d) => system.deserialize(d));
+    }
 }
-if (saveSystem && typeof saveSystem.register === 'function' && resourceSystem && typeof resourceSystem.serialize === 'function') {
-    saveSystem.register('resourceSystem', () => resourceSystem.serialize(), (d) => resourceSystem.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && inventorySystem && typeof inventorySystem.serialize === 'function') {
-    saveSystem.register('inventorySystem', () => inventorySystem.serialize(), (d) => inventorySystem.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && factions && typeof factions.serialize === 'function') {
-    saveSystem.register('factions', () => factions.serialize(), (d) => factions.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && territory && typeof territory.serialize === 'function') {
-    saveSystem.register('territory', () => territory.serialize(), (d) => territory.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && mastery && typeof mastery.serialize === 'function') {
-    saveSystem.register('mastery', () => mastery.serialize(), (d) => mastery.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && codex && typeof codex.serialize === 'function') {
-    saveSystem.register('codex', () => codex.serialize(), (d) => codex.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && legacy && typeof legacy.serialize === 'function') {
-    saveSystem.register('legacy', () => legacy.serialize(), (d) => legacy.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && ngPlus && typeof ngPlus.serialize === 'function') {
-    saveSystem.register('ngPlus', () => ngPlus.serialize(), (d) => ngPlus.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && collapse && typeof collapse.serialize === 'function') {
-    saveSystem.register('collapse', () => collapse.serialize(), (d) => collapse.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && npcSystem && typeof npcSystem.serialize === 'function') {
-    saveSystem.register('npcSystem', () => npcSystem.serialize(), (d) => npcSystem.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && accessorySystem && typeof accessorySystem.serialize === 'function') {
-    saveSystem.register('accessorySystem', () => accessorySystem.serialize(), (d) => accessorySystem.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && nephalemGlory && typeof nephalemGlory.serialize === 'function') {
-    saveSystem.register('nephalemGlory', () => nephalemGlory.serialize(), (d) => nephalemGlory.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && apexRift && typeof apexRift.serialize === 'function') {
-    saveSystem.register('apexRift', () => apexRift.serialize(), (d) => apexRift.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && difficultyTier && typeof difficultyTier.serialize === 'function') {
-    saveSystem.register('difficultyTier', () => difficultyTier.serialize(), (d) => difficultyTier.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && bounty && typeof bounty.serialize === 'function') {
-    saveSystem.register('bounty', () => bounty.serialize(), (d) => bounty.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && debt && typeof debt.serialize === 'function') {
-    saveSystem.register('debt', () => debt.serialize(), (d) => debt.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && consequences && typeof consequences.serialize === 'function') {
-    saveSystem.register('consequences', () => consequences.serialize(), (d) => consequences.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && challenges && typeof challenges.serialize === 'function') {
-    saveSystem.register('challenges', () => challenges.serialize(), (d) => challenges.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && risingTide && typeof risingTide.serialize === 'function') {
-    saveSystem.register('risingTide', () => risingTide.serialize(), (d) => risingTide.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && ghostRacing && typeof ghostRacing.serialize === 'function') {
-    saveSystem.register('ghostRacing', () => ghostRacing.serialize(), (d) => ghostRacing.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && speedrunILs && typeof speedrunILs.serialize === 'function') {
-    saveSystem.register('speedrunILs', () => speedrunILs.serialize(), (d) => speedrunILs.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && timeTrial && typeof timeTrial.serialize === 'function') {
-    saveSystem.register('timeTrial', () => timeTrial.serialize(), (d) => timeTrial.deserialize(d));
-}
-if (saveSystem && typeof saveSystem.register === 'function' && inventoryStash && typeof inventoryStash.serialize === 'function') {
-    saveSystem.register('inventoryStash', () => inventoryStash.serialize(), (d) => inventoryStash.deserialize(d));
-}
+
+autoRegister('skillSystem',    skillSystem);
+autoRegister('resourceSystem', resourceSystem);
+autoRegister('inventorySystem',inventorySystem);
+autoRegister('factions',       factions);
+autoRegister('territory',      territory);
+autoRegister('mastery',        mastery);
+autoRegister('codex',          codex);
+autoRegister('legacy',         legacy);
+autoRegister('ngPlus',         ngPlus);
+autoRegister('collapse',       collapse);
+autoRegister('npcSystem',      npcSystem);
+autoRegister('accessorySystem',accessorySystem);
+autoRegister('nephalemGlory',  nephalemGlory);
+autoRegister('apexRift',       apexRift);
+autoRegister('difficultyTier', difficultyTier);
+autoRegister('bounty',         bounty);
+autoRegister('debt',           debt);
+autoRegister('consequences',   consequences);
+autoRegister('challenges',     challenges);
+autoRegister('risingTide',     risingTide);
+autoRegister('ghostRacing',    ghostRacing);
+autoRegister('speedrunILs',    speedrunILs);
+autoRegister('timeTrial',      timeTrial);
+autoRegister('inventoryStash', inventoryStash);
+
+// Show a brief HUD indicator after every save (auto-save and manual).
+saveSystem.onSave = (meta) => {
+    const el = document.getElementById('save-toast');
+    if (!el) return;
+    const timeStr = new Date(meta.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msgEl = el.querySelector('#save-toast-msg');
+    if (msgEl) msgEl.textContent = `Saved ${timeStr}`;
+    el.style.display = 'block';
+    clearTimeout(saveSystem._toastTimer);
+    saveSystem._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2500);
+};
 
 // ── Zelda-style systems ────────────────────────────────────────────────────
 // Heart containers replace the numeric health bar (3 hearts = 12 HP to start)
@@ -1516,7 +1479,8 @@ function animate() {
         
         tpc.update(dt, mouseDelta, world);
         
-        // Auto-save every 30 seconds
+        // Track playtime and auto-save every 30 seconds
+        saveSystem.tickPlaytime(dt);
         autoSaveTimer += dt;
         if (autoSaveTimer >= 30) {
             saveSystem.save();
