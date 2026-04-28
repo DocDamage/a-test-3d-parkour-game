@@ -1,508 +1,325 @@
 # Vertical Parkour ARPG
 
-A browser-based **Vertical Parkour ARPG** built with **Three.js r160** (ES modules). No build step — serve the files and play. Installable as a PWA.
+A browser-native Three.js action RPG where movement is the combat system. Wall-runs, slides, grapples, air dashes, weapons, skills, loot, and endgame rifts all run in one static ES module app with no build step.
 
-> **Core Identity:** Movement is combat. Parkour, melee, guns, magic/powers, and exo-suit abilities chain together through vertical combat arenas.
+The current game is a large prototype/completion branch rather than a tiny demo: it has character creation, archetypes, skills, weapons, gear, stash, gems, legendary powers, bosses, rifts, safehouse systems, accessibility settings, controller support, PWA files, and automated validation.
 
-> **Play now:** `python -m http.server 8080` → `http://localhost:8080`
-> **Dev mode:** append `#dev` to the URL for verbose console logging.
-> **Install:** Add to home screen via your browser's PWA install prompt.
+## Quick Start
 
----
+Requirements:
 
-## What's New
+- A modern browser with WebGL 2
+- Node 22+ for validation scripts
+- Chrome or Edge for the headless browser smoke test
+- Any static file server for playing locally
 
-- **Full Modern Controller Support** — gyro aiming, per-device deadzone & trigger thresholds, hot-swap, adaptive trigger API stub, auto-detected button prompts (Xbox / PlayStation / Switch).
-- **Accessibility Suite** — 4 colorblind modes, UI scaling, high contrast, reduced motion, subtitle system, screen reader support, toggle sprint, sticky targeting, pause-on-damage, sound visualization, photosensitive mode, dyslexia-friendly font.
-- **Internationalization** — i18n framework with `en.json` catalog; `Intl` date/number formatting; ready for additional locales.
-- **Build Codes** — export/import full character builds as shareable short strings.
-- **Seasonal Events** — 7 rotating weekly global modifiers based on real-world date.
-- **PWA** — offline-capable via service worker; fullscreen display; installable on desktop and mobile.
-- **Combat Polish** — aim assist with distance falloff, directional damage indicators, sound visualization arcs.
+Run locally:
 
----
-
-## Core Loop
-
-```
-Start → Parkour/Combat → Kill Enemies → Loot/XP → Upgrade Build → Save → Harder Encounters
+```powershell
+cd c:\Users\dferr\dev\TEST
+python -m http.server 8080
 ```
 
-**Pillars:**
-- **Parkour is Combat** — wallruns, dives, slides, and aerials are attacks
-- **Skill Bar Drives Combat** — 5 active slots with resource/cooldown gameplay
-- **Exo-Suit is Always On** — baseline identity, not an accessory
-- **Magic/Powers are Combat Kit** — integrated into the skill bar, not bolted on
-- **Loot Supports Builds** — gear with affixes and legendary powers
-- **RPG Stats Support Movement/Combat/Survival** — 6 attributes with clear combat consequences
-- **Enemies, Bosses, Arena, Rift** — content exists to test the loop
+Open:
 
-### 1. Character Creation
-On first launch you choose an **Origin** (background story that grants passive stat bonuses) and a **Primary Archetype** (Traceur, Operative, Saboteur, Specimen, Netrunner, Mage — each with a unique skill tree). Choices persist in `localStorage` and carry through New Game+.
+```text
+http://localhost:8080
+```
 
-### 2. Explore the Warehouse
-The core 80×80m warehouse is your playground — climb walls, vault obstacles, wall-run, and grapple through 7 themed zones (Rooftop, Underground Tunnel, Vertical Shaft, Water Treatment, Freezer Section, Server Room, Hangar Bay). Collect **Data Chips** (scrap currency) and **Heart Piece** collectibles. Interact with **NPCs** for dialogue, bounties, and shop access.
+Developer mode:
 
-### 3. Fight Drones & Earn XP
-Enemy drones patrol every zone. Take them down by wall-running into them, using weapons, or chaining skills. Each kill awards XP, loot drops, and combo flow. Complete **Bounty Contracts** for bonus rewards. Defeating enemies fills your **Nephalem Glory** meter for damage/speed multipliers.
+```text
+http://localhost:8080/#dev
+```
 
-### 4. Progress Your Runner
-- **Level up** via ProgressionSystem → earn Attribute Points for CharacterSheet stats (MOB, REF, SYN, FOR, TEC, GUT).
-- Spend points on the **Passive Tree** for passive upgrades.
-- Equip **Exo-Suit gear** with random affixes and Legendary Powers.
-- Install **Implants** for permanent stat boosts.
-- Unlock **Masteries** and **Codex entries** by performing techniques.
-- Manage **Stamina** — sprint and skill use are gated by a stamina bar.
+`#dev` enables development-only logging and tools such as the level editor.
 
-### 5. Challenge Modes
-- **Time Trial** (`T`) — race 10 checkpoints, beat your ghost.
-- **Speedrun ILs** (`1-4`) — per-zone leaderboard runs with S–F grading.
-- **Rising Tide** (`Shift+O`) — survive endless toxic sludge rising from below.
-- **Arena Mode** (`Shift+T`) — wave-based combat selector.
-- **Boss Fight** (`B`) — 3-phase battle against The Overseer.
+## What This Is
 
-### 6. Endgame Loop
-Defeating the Boss unlocks:
-- **New Game+** — replay with corruption modifiers (elite drones, EMP bursts, gravity shifts, rapid respawn).
-- **Collapse Mode** (`Y`) — 10-floor roguelike survival with scaling enemies.
-- **Apex Rift** (`T`) — portal to a separate endgame dimension.
+Vertical Parkour ARPG is built around one core rule:
 
-The **Legacy System** carries heirloom stats and dynasty bonuses from retired runners across NG+ cycles.
+**Parkour is combat.**
 
----
+Movement states are not just traversal animations. They are combat verbs, combo windows, skill triggers, defensive choices, and build expression.
 
-## Features
+Examples:
 
-### Core Parkour — 16 Movement States
+- Wall-run into drone takedowns.
+- Slide into crowd control.
+- Dive kick from height for burst damage.
+- Grapple through vertical arenas to reposition.
+- Use skill resources generated by motion, damage, stealth, gadgets, or hacks.
+- Chase gear, gems, affixes, and legendary powers that change how the parkour-combat loop feels.
 
-| State | How to Enter |
-|-------|-------------|
-| Idle / Walk / Sprint | `WASD` + `Shift` |
-| Crouch | `C` while grounded |
-| Jump | `Space` |
-| Fall | Step off edge |
-| Climb | `Space` into climbable wall |
-| Slide | `C` while sprinting |
-| Vault | `Space` into low obstacle |
-| Wall-run | Sprint parallel to wall while airborne |
-| Hang (ledge) | Fall near ledge edge |
-| Roll | `C` while landing from height |
-| Stumble | Hard landing without roll |
-| Ragdoll | Severe sudden velocity loss |
-| Grapple Aim / Swing / Retract | `Mouse2` |
-| Ceiling Run | `Ctrl` near ceiling (Magnet Boots) |
-| Platform Grab | Hold `E` at platform edge |
+## Current Feature Set
 
-**Advanced tech:** crouch-jump, edge boost, climb-cancel kick, chain vaulting, bunny-hop chaining, strafe jumps, tic-tac, dive kick, ground pound, wall-kick stun, ledge takedown, ceiling drop assassination, backflip kick, vault strike, slide tackle, rolling thunder (invincible roll tackle).
+### Movement
 
-### RPG Systems
-
-#### Character Building
-- **CharacterSheet** — 6 core stats: MOB (mobility), REF (reflexes / parry window), SYN (synergy / tech), FOR (fortitude / HP), TEC (tech / weapons), GUT (resilience). Stats derive crit chance, crit damage, parry window, stamina, and more.
-- **ArchetypeSystem** — 6 archetypes (Traceur, Operative, Saboteur, Specimen, Netrunner, Mage) each with unique passive bonuses, resource type, and skill tree paths.
-- **OriginSystem** — 4 origins granting flat stat bonuses and world-interaction modifiers.
-- **ProgressionSystem** — XP → level-up → attribute points. Level-up toast shown in HUD.
-- **PassiveTree** — spendable point tree keyed to archetype (`P`).
-- **ImplantSystem** — slot-based permanent stat augmentations (`M`).
-- **MasterySystem** — technique-based milestones (e.g. "land 50 vaults") (`L`).
-- **CodexSystem** — lore entries unlocked by exploration and kills (`K`).
-- **LegacySystem** — cross-NG+ heirloom stats and dynasty bonus applied to all CharacterSheet stat lookups.
-
-#### Gear & Inventory
-- **ExoSuitSystem** — helmet, chest, gloves, boots, optics, shoulders, greaves; each item has base stats + up to 4 random affixes (from AffixSystem) (`G`).
-- **InventoryStash** — persistent off-character gear storage (`I`).
-- **LegendaryPowerSystem** — unique effects: Aegis Field (parry-granted damage shield), Loot Beacon (auto-pickup radius), and more.
-- **WeaponSystem** — 5 weapon slots (Melee, Sidearm, Primary, Heavy, Throwable); starter: energy sword + SMG.
-- **WeaponLoadoutUI** — `[` panel to swap slots from the unlocked weapon pool.
-- **WeaponModSystem** — attach mods to weapons for stat bonuses.
-- **InventorySystem** — consumable bag: health potions, mana potions, smoke bombs, stamina vials (`]` to view, `6-9` quick-use).
-- **BottleSystem** — Zelda-style 4-bottle slots (`6-9`), fillable at shops.
-- **ResourceSystem** — tracks scrap, mana, energy, and crafting materials.
-
-#### Economy
-- **ShopSystem** — NPC vendor; shows debt indicator and 10% discount when `shop_bonus_chips` flag is active via ConsequenceSystem.
-- **DebtSystem** — borrow chips when broke; accrues daily interest.
-- **BountySystem** — accept kill contracts per zone; rank improves contract quality (`J`).
-- **LootSystem** — enemies drop gear, consumables, scrap on death; consumables automatically routed to InventorySystem.
-
-#### Social / World
-- **FactionSystem** — runner factions with standing; affects prices and ally behavior.
-- **TerritorySystem** — zone ownership shifts based on kills and events.
-- **NPCSystem** — schedule-driven NPCs with time-of-day routing; sector position map for all world areas.
-- **DialogueSystem** — branching choice dialogue with consequence recording.
-- **ConsequenceSystem** — world-flag system; flags like `shop_bonus_chips` and `trophy_buff_active` alter gameplay globally.
-- **RivalSystem** — up to 3 rival runners who compete, taunt, and fight.
-- **FamiliaritySystem** — weapon use history boosts damage with oft-used weapons.
-- **LoyaltySystem** — companion drone loyalty grows with use; unlocks advanced behaviors.
+- Third-person parkour controller with sprint, crouch, jump, fall, climb, slide, vault, wall-run, ledge hang, roll, stumble, ragdoll, grapple swing, grapple retract, ceiling run, and platform grab states.
+- Advanced movement tech including wall kick, slide jump, mantle, slope grind, air dodge, tic-tac, dive roll, chain grapple relays, magnet boots, runner vision, overclock, and bullet-time events.
+- Moving platforms, hazards, weather effects, hologram platforms, structural collapse, ziplines, power-ups, and interactive environment objects.
 
 ### Combat
 
-#### Weapons (10+ Types)
-Energy Sword, SMG, Rocket Launcher, Flamethrower, Plasma Rifle, Crossbow, Grenade Launcher, Sniper Rifle. All support hitbox-based melee, hitscan ranged, and projectile variants via ProjectileManager.
+- Shared combat pipeline using `CombatSystem`, `DamageSystem`, `HitboxSystem`, `StatusEffectSystem`, `WeaponSystem`, `ProjectileManager`, and `EnemyManager`.
+- Transient combat hitboxes with team filtering and spatial hashing when many hitboxes are active.
+- Melee, projectile, beam, explosive, and skill-driven attacks.
+- Status effects, crits, dodge, block mitigation, parry hooks, stamina gates, damage numbers, directional damage indicators, and controller aim assist.
+- Enemy drones, advanced enemy variants, mini-bosses, five expansion bosses, the original boss fight, and the unique Rift Guardian.
 
-#### Drone Enemies
+### RPG Buildcraft
 
-| Type | Behavior |
-|------|---------|
-| **Base Drone** | Patrol → detect → chase → melee + ranged shots (4–8m) |
-| **Sniper Drone** | Ground-tracking laser, stun projectile |
-| **Swarm Drone** | 3-drone triangle, simultaneous detection lock |
-| **Hunter Drone** | Platform-destroying pursuit (Rising Tide) |
+- Character creation with origin and archetype selection.
+- Archetype resources and active skills for Traceur, Operative, Saboteur, Specimen, and Netrunner.
+- Progression, attributes, passive tree, skill bar, implants, mastery, codex, familiarity, companion, faction, territory, rivalry, and legacy systems.
+- Exo-suit gear with rarity tiers, base stats, affixes, set bonuses, legendary powers, and persistent equipment.
+- Persistent stash with identify, equip-swap, scrap, gem-specific socketing, unsocketing, and stat comparison against equipped gear.
+- Stackable gems with stat bonuses through equipped gear.
+- Safehouse Identifier Bench for identifying all stashed gear for chips.
 
-All drones: vision cones with LOS, stealth break on `player.isInvisible`, EMP-disable via NG+ `static_field`, separate ranged cooldown, Firewall interception (reflects shots back).
+### Loot And Endgame
 
-#### Combat Mechanics
-- **ComboSystem** — 4-tier flow multiplier (1.0–1.30×) boosts speed and damage.
-- **DamageSystem** — types: kinetic, energy, explosive, psychic. Applies CharacterSheet resistances, crit rolls, status effects.
-- **HitboxSystem** — transient AABB hitboxes for melee, vault strikes, ground pound, rolling thunder.
-- **StatusEffectSystem** — burn, stun, freeze, slow, root.
-- **Parry** (`Shift+F`) — 0.25s + REF-stat bonus window. Aegis Field grants a damage-absorbing shield on perfect parry.
-- **Perfect Dodge** — dodge during i-frame window → 2× counter for 2s.
-- **DroneTakedown** (`F` while wall-running) — slow-mo execution.
-- **NephalemGlory** — kill-streak tier power: T1 (+25% dmg / +10% spd), T2 (+60% / +25%), T3 (+100% / +50%) with particle trail.
-- **DamageNumbers** — floating color-coded damage labels.
-- **Stamina** (`StaminaSystem`) — sprint and skills consume stamina; `canSprint()` gates sprint entry.
-- **AimAssist** — controller magnetism toward nearest enemy within configurable cone; strength scales inversely with distance.
-- **DirectionalDamageIndicator** — red chevrons at screen edge pointing to off-screen attackers.
+- Loot tiers from Common through Primal.
+- Smart drops, unidentified legendary-plus gear, stash routing, gem drops, scrap, chips, consumables, and loot vacuum support.
+- Rarity and rift tuning live in `js/BalanceModel.js`.
+- Deterministic balance simulation lives in `scripts/balance-sim.mjs`.
+- Apex Rift loop with waves, progress, Rift Guardian spawn, time limit, clear/fail overlay, and rift-level scaling.
+- Rift 100 Guardian tuning currently simulates to roughly 62k HP with rift-aware damage scaling and capped Ancient/Primal odds.
 
-#### Boss Fight: The Overseer
-Circular arena, 3 phases:
-- **Phase 1** — Sweep beam, shockwave slam, drone spawns.
-- **Phase 2** — Dive bombs, missile barrage, platform purge, perimeter lasers.
-- **Phase 3** — Time distortion, healing drones, arena collapse.
+### Challenge And World Systems
 
-Destroy all 3 weak-point cores to win. S–F grade based on damage taken. Victory triggers `onVictory` callback → unlocks NG+ and CollapseMode.
+- Time Trial, Speedrun ILs, Rising Tide, Arena Mode, Collapse Mode, Apex Rift, New Game+, Legacy, Difficulty Tiers, Nephalem Glory, bounty systems, photo bounties, escort events, rhythm parkour, trap crafting, and predator drone encounters.
+- Dungeon, puzzle room, key item, safehouse, shop, debt, dialogue, NPC schedule, light/dark world, and overworld map systems.
+- Level editor in dev mode for placing/exporting/importing scene objects.
 
-### Skills
-SkillSystem: 4 active slots mapped to `RMB`, `E`, `R`, `Q`. ~40 skills per archetype (mobility, combat, stealth, utility). SkillBarUI renders cooldown pip HUD.
+### Accessibility And Platform
 
-### Endgame Systems
-
-| System | Unlock | Key |
-|--------|--------|-----|
-| New Game+ | Beat the Boss | Auto |
-| Collapse Mode | Beat the Boss or clear all dungeons | `Y` |
-| Apex Rift | Post-boss | `T` |
-| Legacy System | NG+ cycles | Auto |
-| DifficultyTierSystem | Always | `Shift+T` selector |
-
-**New Game+ corruption modifiers:** static_field (EMP bursts), rapid_respawn (30s drone revival), director_watches (all drones elite), gravity_shifts (periodic upward impulse), and more stacking per NG+ tier.
-
-### Seasonal Events
-Real-world weekly rotation (7 modifiers):
-- **Low Gravity** — 1.5× jump height, reduced fall damage.
-- **Electric Storm** — bonus lightning damage, drones attack 30% faster.
-- **Dense Air** — 20% slower movement, doubled wall-run duration.
-- **Golden Age** — doubled shard drops, 25% shop discount.
-- **Hazard Pay** — doubled environmental damage, increased loot quality.
-- **Ghost Protocol** — halved drone detection, doubled melee damage.
-- **Overdrive** — halved overclock cooldown, doubled energy drain.
-
-### Build Codes
-Export your full character build (archetype, origin, stats, passives, skills, gear, implants, weapons) as a short shareable code. Paste a code in Settings → Build Code to import another player's build.
-
-### Dungeons & Puzzles
-- **DungeonSystem** — multi-room dungeons with locked doors, mini-bosses, and boss rooms.
-- **PuzzleRoom** — block-push, pressure-plate, sequence puzzles; `onSolve` grants heart piece.
-- **KeyItemSystem** — dungeon keys and plot items tracked separately (`Shift+I`).
-
-### World & Environment
-
-**8 Interactive Areas:** Moving platform gauntlet, laser corridor, glass bridge, wrecking ball room, fan shaft, spinner alley, conveyor run, mirror room.
-
-**7 Themed Zones:** Rooftop, Underground Tunnel, Vertical Shaft, Water Treatment, Freezer Section (icy physics), Server Room, Hangar Bay.
-
-**Dynamic Weather:** Rain (slippery), steam (obscures drones), power outage (lasers off + strobes). Affects friction, drone detection range, and laser states.
-
-**Collectibles:**
-- 15 Data Chips (scrap)
-- 8 Heart Pieces in hard-to-reach spots — 4 pieces = +1 max HP heart container
-- 10 Power-Up orb types: Speed, Ghost, Double Jump, Gravity, Magnet, Time Freeze, Super Jump, Invincible, Bounce, Teleport
-
-**Structural collapse** — fracture physics on marked walls.
-
-### Traversal Gadgets
-- **GrapplingHook** — RMB aim, pendulum swing, retract. Trajectory preview line.
-- **Zipline Network** — grab and slide.
-- **Chain Grapple Relays** — cyan rings reset grapple cooldown.
-- **Magnet Boots** — ceiling run with `Ctrl`.
-- **OverclockSystem** (`Shift+Q`) — heat-based slow-mo with 2 air dashes.
-- **RunnerVision** (`V`) — emissive highlight: climbables (red), vaultables (orange), grapple anchors (cyan), checkpoints (green). Routed through InputManager; no raw listener bypass.
-
-### Visual Effects
-- **Post-processing chain** — SAO → Bloom → Motion Blur → Film Grain → Chromatic Aberration → Vignette → Output.
-- **Day/Night/Neon** preset cycle (`N`).
-- **God Rays** — 4 volumetric shafts with dust motes.
-- **Lens Flares** — on atmospheric point lights.
-- **Particle Effects** — speed lines, sparks, dust, explosions, wall-run decals.
-- **Procedural Animation** — head tracking, breathing, lean on movement transitions.
-- **Foot IK** — slope adaptation, wall bracing.
-- **Nephalem Glory trail** — cyan particle trail during kill-streak tiers.
-
-### Audio
-All audio procedurally synthesised via **Web Audio API** — no external files.
-- Singleton `AudioContext` shared across all systems (no duplicate contexts).
-- 3D positional audio via `THREE.AudioListener` attached to the camera.
-- Dynamic ambience, surface-aware footsteps, jump, land, climb, slide, vault, grapple, UI SFX.
-- Subtitle system with speaker names and priority queue for all audio events.
-
-### Photo & Cinematic
-- **Photo Mode** (`F12`) — free-orbit camera, depth-of-field, 5 filter presets. Pauses game.
-- **Director Mode** — AI camera predicts highlight moments and records a 30s rolling buffer.
-
-### Level Editor (`F1` — Dev Only)
-Full in-browser 3D editor. 14 object types, live properties panel, undo, export/import JSON. Gated behind `#dev` URL hash in release builds.
-
-### Accessibility
-- **Assist Mode** (`Shift+P`) — extended coyote time, auto-vault, halved knockback, slower drones and Rising Tide.
-- **Colorblind Modes** — Deuteranopia, Protanopia, Tritanopia, Achromatopsia via SVG `<feColorMatrix>` filters on the canvas.
-- **UI Scale** — 75%–150% via CSS custom property.
-- **High Contrast** — white borders, opaque backgrounds on all panels.
-- **Reduced Motion** — disables animations and transitions.
-- **Subtitle System** — speaker names, 3 sizes, optional background, `aria-live` region.
-- **Screen Reader Support** — toggles `aria-live` on level-up, save, and death toasts.
-- **Motor Accessibility** — toggle sprint, sticky targeting, pause-on-damage (0.5s freeze), sound visualization (directional arcs), dyslexia-friendly font.
-- **Photosensitive Mode** — auto-disables bloom, film grain, and chromatic aberration.
-
-### Controller Support
-- **Full modern gamepad** — Xbox, PlayStation (DualSense/DualShock), Switch Pro.
-- **Gyro Aiming** — reads `Gamepad.pose.orientation` when enabled; configurable sensitivity.
-- **Per-device Deadzone** — left/right stick deadzone stored per `gamepad.id`.
-- **Trigger Thresholds** — analog trigger activation point configurable 0.0–1.0.
-- **Hot-swap** — unplug one controller, plug in another mid-session without restart.
-- **Adaptive Triggers** — API stub for PS5 DualSense resistance via WebHID (future-ready).
-- **Button Prompts** — auto-detects controller type; shows Xbox/PlayStation/Switch glyphs in UI.
-- **Haptics** — rumble on hard landings, hits, and shoulder bashes; toggle in settings.
-- **Touch controls** — left-side joystick (movement), right-side swipe (camera look).
-
-### Infrastructure
-- **GameContext** (`js/GameContext.js`) — DI container with topological sort, circular dependency detection, event bus, and per-system `.update()` dispatch. Enables clean NG+ re-initialization.
-- **SaveSystem** — serialize/deserialize all subsystems to `localStorage`.
-- **InputManager** — edge detection (`wasPressed`), key consumption (`consumeKey`), synthetic mouse delta injection (`addMouseDelta`), scroll wheel weapon switching.
-- **KeyBindings / KeybindingsUI** — runtime-remappable key bindings with settings panel.
-- **Loading progress text** — `#loading-progress` sub-element updates: "Initializing renderer..." → "Building world..." → "Creating player..." → "Ready!".
-- **WebGL 2 guard** — shows a clear error message before Three.js fails if WebGL 2 is absent.
-- **Dev mode** (`#dev`) — enables `__DEV__` console warnings in all error catch blocks.
-- **PWA** — `manifest.json` + `sw.js` for offline cache and installability.
-
----
+- PWA manifest and service worker.
+- Keyboard/mouse, controller, touch controls, remappable key bindings, controller prompts, rumble, trigger thresholds, and hot-swap support.
+- Accessibility manager with colorblind filters, UI scale, high contrast, reduced motion, subtitle support, screen reader toggles, motor assists, photosensitive mode, and dyslexia-friendly font option.
+- Procedural Web Audio synthesis with no external audio files.
 
 ## Controls
 
-### Keyboard & Mouse
+The game has many systems, but the core loop starts with these.
 
-| Key | Action |
-|-----|--------|
+### Movement And Combat
+
+| Input | Action |
+| --- | --- |
 | `W A S D` | Move |
 | `Shift` | Sprint |
-| `Space` | Jump / Grab / Hang |
-| `C` | Slide / Crouch / Roll |
-| `Q` | Air Dash |
-| `Shift+Q` | Overclock |
-| `Ctrl` | Magnet Boots |
-| `Mouse2` | Grapple Aim |
-| `F` | Context (Talk / Shop / Takedown) |
+| `Space` | Jump / climb / grab |
+| `C` | Crouch / slide / roll |
+| `Mouse2` | Grapple aim / grapple swing |
+| `Q` | Air dash / archetype utility |
+| `E` | Interact / archetype defensive skill |
+| `R` | Archetype ultimate |
+| `F` | Context action / takedown |
 | `Shift+F` | Parry |
-| `E` | Drop / Interact / Mirror |
-| `T` | Time Trial |
-| `Shift+T` | Arena Mode Selector |
-| `O` | Settings |
-| `Shift+O` | Rising Tide |
-| `P` | Passive Tree |
-| `Shift+P` | Assist Mode |
-| `G` | Gear Panel |
-| `U` | Companion |
+| `V` | Runner Vision |
+| `Shift+Q` | Overclock |
+
+### Panels And Modes
+
+| Input | Panel / Mode |
+| --- | --- |
+| `I` | Stash |
+| `]` | Inventory |
+| `[` | Weapon loadout |
+| `G` | Gear |
+| `P` | Passive tree |
 | `H` | Safehouse |
 | `J` | Bounty |
 | `K` | Codex |
 | `L` | Mastery |
-| `I` | Stash |
-| `Shift+I` | Key Items |
 | `M` | Implants |
-| `N` | Day / Night / Neon |
-| `[` | Weapon Loadout |
-| `]` | Inventory |
+| `O` | Settings |
+| `T` | Time Trial / Apex Rift context |
+| `Shift+T` | Arena / difficulty selector context |
 | `Y` | Collapse Mode |
-| `B` | Boss Fight |
-| `V` | Runner Vision |
-| `Z` | Phase Mirror |
-| `` ` `` | Overworld Map |
+| `B` | Boss fight |
+| `Shift+B` | Spawn expansion boss |
 | `F12` | Photo Mode |
-| `1-4` | Speedrun ILs |
-| `6-9` | Quick-use consumables |
+| `F1` | Level editor, dev mode only |
 
-### Controller (Xbox / PlayStation / Switch Pro)
+Some keys are context-sensitive because the project has several overlapping prototype systems. See `index.html` and `js/UIManager.js` for the source of truth on panel wiring.
 
-| Input | Action |
-|-------|--------|
-| Left Stick | Move |
-| Right Stick | Look |
-| A / Cross / B (Switch) | Jump / Grab |
-| B / Circle / A (Switch) | Slide / Crouch |
-| X / Square / Y (Switch) | Air Dash |
-| Y / Triangle / X (Switch) | Drop |
-| LB / L1 / L | Sprint |
-| RB / R1 / R | Takedown |
-| LT / L2 / ZL | Grapple Aim |
-| RT / R2 / ZR | Overclock |
-| L3 / L Stick | Magnet Boots |
-| R3 / R Stick | Day / Night |
+## Project Structure
 
-### Level Editor
+```text
+index.html
+  UI panels, canvas, import map, styles, PWA entry points
 
-| Input | Action |
-|-------|--------|
-| `Click` | Place / Select |
-| `Right-Click` | Delete |
-| `Drag` | Move |
-| `Shift+Drag` | Move on Y axis |
-| `Scroll` | Rotate Y |
-| `Shift+Scroll` | Scale |
-| `Middle-Mouse` | Orbit camera |
-| `W A S D / Q E` | Fly camera |
-| `Space` | Fast fly speed |
-| `G` | Grid snap |
-| `H` | Toggle helpers |
-| `Delete` | Delete selected |
-| `Ctrl+Z` | Undo |
-| `Ctrl+S` | Export JSON |
-| `Ctrl+O` | Import JSON |
+js/main.js
+  Composition root: creates the scene, systems, wiring, and game loop
 
----
+js/Player.js
+  Player state machine and movement/health source of truth
 
-## Architecture
+js/World.js
+  Geometry, zones, platforms, climbables, hazards, drones, collectibles
 
-```
-index.html              — UI panels, canvas, importmap, CSS, PWA manifest link
-js/main.js              — Renderer/scene setup, system creation, loop startup
-js/GameDirector.js      — Gameplay orchestration: start, pause, death, save, release gating
-js/GameContext.js       — DI container: register, topological sort, event bus
-js/Player.js            — 16-state parkour controller (~1700 lines)
-js/World.js             — Warehouse geometry, zones, collectibles, hazards
-js/ThirdPersonCamera.js — Orbit + collision-avoiding follow camera
-js/InputManager.js      — Keyboard/mouse, edge detection, key consumption
-js/GamepadController.js — Gamepad API: gyro, dead zones, hot-swap, trigger thresholds, rumble
-js/PostProcessing.js    — EffectComposer chain + day/night transitions
-js/AudioManager.js      — Procedural Web Audio synthesis, shared AudioContext
-js/SubtitleSystem.js    — Closed captions for all audio events
-js/AccessibilityManager.js — Colorblind, UI scale, high contrast, reduced motion, motor aids
-js/AimAssist.js         — Controller magnetism toward nearest enemy
-js/DirectionalDamageIndicator.js — Screen-edge damage direction chevrons
-js/I18n.js              — i18n with interpolation, pluralization, Intl formatting
-js/BuildCodeSystem.js   — Encode/decode full character builds to shareable strings
-js/SeasonSystem.js      — Real-world weekly rotation of global gameplay modifiers
-js/ControllerPrompts.js — Auto-detect controller type for button glyphs
+js/GameContext.js
+  Lightweight dependency container, event bus, lifecycle helpers
+
+js/GameDirector.js
+  Game start, pause, death, save, enemy kill, loot, and release-safe orchestration
+
+js/BalanceModel.js
+  Shared rift scaling and Ancient/Primal rarity tuning
+
+js/Lifecycle.js
+  Adapter for mixed legacy subsystem update signatures
+
+docs/
+  Architecture, design notes, quality scorecard, and execution plans
+
+scripts/
+  Validation, browser smoke, unit tests, and balance simulation
 ```
 
-### Module Map
+One subsystem generally lives in one `js/*.js` file. New gameplay modules should not be folded into `Player.js` or `World.js`.
+
+## Architecture Notes
+
+The game is pure browser JavaScript:
+
+- Renderer: Three.js r160 via CDN import map
+- Post-processing: EffectComposer chain
+- Audio: Web Audio API procedural synthesis
+- Persistence: `localStorage`
+- Build system: none
+- Platform: browser only
+
+Important contracts:
+
+- Gameplay systems should receive `finalDt`, not raw `dt`, so overclock and slow-motion affect simulation consistently.
+- Visual effects can use raw `dt`.
+- `Player.js` owns player position, velocity, state, health, death, invincibility, RPG stats, radius, and current height.
+- Gameplay modules should not mutate `world.collidables`, `world.climbables`, `world.platforms`, or `world.drones.drones` directly.
+- Constructor signatures vary across older modules; verify signatures before new wiring.
+
+Read more:
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Design](docs/DESIGN.md)
+- [Quality Scorecard](docs/QUALITY.md)
+- [Roadmap to 100%](docs/plans/ROADMAP_TO_100_PERCENT.md)
+
+## Validation
+
+Run the full local check before committing:
+
+```powershell
+scripts/check.ps1
 ```
-Traversal:    GrapplingHook, ZiplineNetwork, ChainGrappleRelays, MagnetBoots
-              OverclockSystem, BulletTime, AdvancedMovement, RunnerVision
-Combat:       CombatSystem, DamageSystem, HitboxSystem, StatusEffectSystem
-              WeaponSystem, WeaponLoadout, WeaponLoadoutUI, WeaponModSystem
-              DroneTakedown, ComboSystem, NephalemGlory, AimAssist
-              DirectionalDamageIndicator
-Enemies:      DroneAI, AdvancedDrones, EnemyManager, EnemyBase, EnemyHealthBar
-              BossFight, RiftGuardian, MiniBossBase
-RPG:          CharacterSheet, ProgressionSystem, ArchetypeSystem, OriginSystem
-              PassiveTree, SkillSystem, SkillData, SkillCallbacks, SkillBarUI
-              ExoSuitSystem, AffixSystem, ImplantSystem, LegendaryPowerSystem
-              MasterySystem, CodexSystem, FamiliaritySystem
-              BuildCodeSystem, SeasonSystem
-Inventory:    InventorySystem, InventoryStash, LootSystem, ResourceSystem
-              BottleSystem, WeaponModSystem, KeyItemSystem
-Economy:      ShopSystem, DebtSystem, BountySystem
-Social:       NPCSystem, DialogueSystem, FactionSystem, TerritorySystem
-              RivalSystem, LoyaltySystem, CompanionDrone
-World:        MovingPlatform, HologramPlatforms, Hazards, WeatherSystem
-              WeatherGameplay, PowerUpSystem, Collectibles, DecalSystem
-              InteractiveEnvironment, StructuralCollapse, LightDarkWorldSystem
-Challenge:    TimeTrial, SpeedrunILs, ChallengeSystem, GhostRacing
-              RisingTide, ArenaMode, CollapseMode, ApexRiftSystem
-              DifficultyTierSystem, NewGamePlus, LegacySystem
-Content:      DungeonSystem, PuzzleRoom, SafehouseSystem, OverworldMap
-              BlackoutSystem, SubLevelSystem
-Visual:       ParticleEffects, GodRays, LensFlare, FootIK, ProceduralAnimation
-              DamageNumbers, PhotoMode, DirectorMode
-UI:           UIManager, MenuNavigator, HintSystem, SettingsUI, KeybindingsUI
-              EditorUI, LevelEditor, I18n, SubtitleSystem, AccessibilityManager
-              ControllerPrompts
-Platform:     manifest.json, sw.js
-```
 
----
-
-## Development Setup
-
-No build tooling required.
+Unix:
 
 ```bash
-git clone https://github.com/DocDamage/a-test-3d-parkour-game.git
-cd a-test-3d-parkour-game
-python -m http.server 8080
-# open http://localhost:8080
+scripts/check.sh
 ```
 
-**Requirements:** WebGL 2 (Chrome 80+, Firefox 71+, Edge 80+).
+The check scripts run:
 
-**CDN deps (importmap in `index.html`):**
-- `three` @ 0.160.0 via unpkg
+- `node -c` syntax checks for all `js/*.js`
+- file size warnings
+- module count report
+- focused unit tests in `scripts/unit-tests.mjs`
+- deterministic balance simulation in `scripts/balance-sim.mjs`
+- docs freshness checks
+- headless browser smoke in `scripts/browser-smoke.mjs`
 
-### Validation
+The browser smoke boots the app in Chrome/Edge, starts gameplay, seeds stash/gem data, and asserts that stash comparison, socket/unsocket controls, and safehouse identify UI render.
+
+Latest known good output:
+
+```text
+Unit tests passed.
+Balance simulation passed.
+Browser smoke passed.
+All checks passed.
+```
+
+## Balance Simulation
+
+Run only the tuning simulation:
+
 ```powershell
-scripts/check.ps1   # Windows — syntax-checks all js/*.js, enforces size limits, checks docs
-scripts/check.sh    # Unix
+node scripts/balance-sim.mjs
 ```
 
-### Adding a New Module
-1. Create `js/MyModule.js` with a named export class.
-2. Import in `js/main.js` after its dependencies.
-3. Register: `ctx.register('myModule', ['dep1'], () => instance)`.
-4. Call `.update(finalDt, ...)` in the `animate()` loop.
-5. Add controls to `index.html` `#ui` panel if player-facing.
-6. Run `scripts/check.ps1` before committing.
+It prints rift scaling and simulated Guardian gear drops across Rift 1, 25, 50, 75, and 100.
 
----
+Current Rift 100 highlights:
 
-## Level Format
-
-```json
-{
-  "version": 1,
-  "metadata": { "name": "My Level", "author": "Player", "created": "2026-04-28" },
-  "spawnPoint": { "x": 0, "y": 2, "z": 0 },
-  "objects": [
-    {
-      "type": "platform",
-      "position": { "x": 5, "y": 1, "z": 0 },
-      "rotation": { "x": 0, "y": 0, "z": 0 },
-      "scale":    { "x": 1, "y": 1, "z": 1 },
-      "color": 8899994,
-      "props": { "width": 4, "height": 0.4, "depth": 4 }
-    }
-  ]
-}
+```text
+enemy HP x200.44
+guardian HP 62460
+guardian dmg x5.85
+guardian gear drops: ancient ~0.65%, primal ~0.29%
+roll-table cap: Ancient 1.00%, Primal 0.44%
 ```
 
-Import via Level Editor (`Ctrl+O`) or `levelEditor.importLevel(jsonString)`.
+## CI
 
----
+GitHub Actions runs `.github/workflows/check.yml` on push and pull request.
 
-## Localization
+The workflow:
 
-The game ships with an `en.json` catalog. To add a new locale:
+- checks out the repo
+- installs Node 22
+- installs Chrome
+- runs `scripts/check.sh`
 
-1. Copy `locales/en.json` to `locales/<lang>.json`.
-2. Translate all values.
-3. Add the language code to the `<select id="set-language">` dropdown in `index.html`.
-4. The I18n module will auto-detect the user's browser language on first boot.
+Browser smoke is required in CI.
 
----
+## Development Workflow
+
+1. Read `AGENTS.md` before changing gameplay systems.
+2. Inspect existing module patterns before adding a new system.
+3. Keep gameplay modules small and separate.
+4. Use `finalDt` for gameplay updates.
+5. Add UI controls to `index.html` and route panel behavior through `UIManager` when player-facing.
+6. Add tests or browser-smoke assertions for user-facing systems.
+7. Run `scripts/check.ps1`.
+8. Commit with a descriptive message.
+
+## Adding A Gameplay Module
+
+1. Create `js/MyModule.js` and export a class.
+2. Import it in `js/main.js`.
+3. Instantiate it after the dependencies it needs already exist.
+4. Register it with `GameContext` if it participates in save, events, or shared lookup.
+5. Call `.update(finalDt, ...)` from the loop or through a lifecycle adapter.
+6. Implement `.dispose()` or `.cleanup()` if it creates Three.js objects.
+7. Add controls and docs if the player can interact with it.
+8. Run validation.
+
+## Save Data
+
+Most progression and settings are stored in `localStorage`, including character creation, gear, stash, gems, difficulty, rift level, passive tree, and settings. When testing fresh-player flows, clear site data or use a fresh browser profile.
+
+## Browser Support
+
+Recommended:
+
+- Chrome / Chromium
+- Microsoft Edge
+- Firefox with WebGL 2 support
+
+The game requires WebGL 2. If WebGL 2 is unavailable, the app displays a clear unsupported-browser message before Three.js fails.
+
+## Known Gaps
+
+This is a large browser prototype, not a production-shipped game. Current useful follow-ups are tracked in [docs/QUALITY.md](docs/QUALITY.md), especially:
+
+- deeper scenario automation for rift entry and combat interactions
+- live economy telemetry export for long sessions
+- dense-combat profiling with the HitboxSystem spatial hash enabled
+- continued migration of legacy subsystem signatures toward `update(dt, context)`
 
 ## License
 
-MIT — fork, modify, and build on top freely.
-
----
-
-Built with love and way too many `requestAnimationFrame` callbacks.
+MIT. Fork it, mod it, and make it weirder.
