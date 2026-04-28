@@ -518,12 +518,16 @@ export class UIManager {
         }
         const archEl = document.getElementById('char-archetype');
         const origEl = document.getElementById('char-origin');
+        const nameEl = document.getElementById('char-runner-name');
+        const resLblEl = document.getElementById('char-resource-label');
+        if (nameEl) nameEl.textContent = localStorage.getItem('runner_name') || '—';
         if (archEl && d.archetype) {
             const primaryKey = d.archetype.getPrimaryArchetype ? d.archetype.getPrimaryArchetype() : null;
             const primaryData = primaryKey && d.archetype.getArchetypeData ? d.archetype.getArchetypeData(primaryKey) : null;
             archEl.textContent = primaryData ? primaryData.name : '-';
+            if (resLblEl && primaryData) resLblEl.textContent = (primaryData.resource || 'Resource') + ':';
         }
-        if (origEl && d.origin) origEl.textContent = d.origin.currentOrigin ?? d.origin.name ?? '-';
+        if (origEl && d.origin) origEl.textContent = (d.origin.getName ? d.origin.getName() : null) ?? d.origin.currentOrigin ?? '-';
         const resFill = document.getElementById('char-resource-fill');
         if (resFill && d.characterSheet) {
             const res = d.archetype ? d.archetype.getResourceValue() : 0;

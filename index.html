@@ -588,83 +588,164 @@
         #char-create {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(5, 5, 15, 0.97);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+            overflow-y: auto;
             z-index: 200;
             color: white;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px 16px 48px;
+            box-sizing: border-box;
         }
-        #char-create h2 {
-            font-size: 36px;
+        /* Step progress indicator */
+        .cc-progress {
+            display: flex;
+            align-items: center;
+            margin: 10px 0 28px;
+            flex-shrink: 0;
+        }
+        .cc-step-dot {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: #181820;
+            border: 2px solid #444;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: bold; color: #555;
+            transition: all 0.25s;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .cc-step-dot.active { border-color: #ffaa00; color: #ffaa00; box-shadow: 0 0 8px rgba(255,170,0,0.4); }
+        .cc-step-dot.done   { background: #ffaa00; border-color: #ffaa00; color: #111; }
+        .cc-step-line {
+            width: 48px; height: 2px;
+            background: #333;
+            flex-shrink: 0;
+        }
+        /* Per-step container */
+        .cc-step {
+            width: 100%; max-width: 740px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+        .cc-step.active { display: flex; }
+        .cc-step h2 {
+            font-size: 26px;
             color: #ffaa00;
-            margin-bottom: 24px;
+            margin: 0 0 6px;
             text-transform: uppercase;
             letter-spacing: 3px;
+            text-align: center;
         }
-        #char-create .cc-section {
-            margin-bottom: 20px;
-            width: 90%;
-            max-width: 600px;
+        .cc-subtitle {
+            color: #777; font-size: 13px;
+            margin: 0 0 18px; text-align: center;
         }
-        #char-create .cc-section h3 {
-            font-size: 20px;
-            color: #ffaa00;
-            margin-bottom: 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            padding-bottom: 6px;
+        /* Name input */
+        #cc-name-input {
+            background: #111;
+            border: 2px solid #444;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 22px;
+            padding: 12px 20px;
+            width: 100%; max-width: 380px;
+            text-align: center;
+            outline: none;
+            letter-spacing: 2px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
         }
-        #char-create .cc-options {
-            display: flex;
-            flex-wrap: wrap;
+        #cc-name-input:focus { border-color: #ffaa00; }
+        #cc-name-input.invalid { border-color: #ff4444; }
+        .cc-error { color: #ff5555; font-size: 13px; min-height: 20px; margin: 6px 0 0; }
+        /* Cards grid */
+        .cc-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
             gap: 10px;
-            justify-content: center;
+            width: 100%;
+            margin-bottom: 10px;
         }
-        #char-create .cc-option {
-            background: #1a1a22;
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 12px 16px;
+        .cc-card {
+            background: #0c0c18;
+            border: 2px solid #2a2a3a;
+            border-radius: 10px;
+            padding: 14px 10px 12px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.18s;
             text-align: center;
-            min-width: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
         }
-        #char-create .cc-option:hover {
-            background: #2a2a35;
-            border-color: #ffaa00;
-        }
-        #char-create .cc-option.selected {
-            background: #ffaa00;
-            color: #111;
-            border-color: #ffaa00;
-            font-weight: bold;
-        }
-        #char-create .cc-desc {
+        .cc-card:hover  { background: #161624; border-color: #ffaa00; transform: translateY(-2px); }
+        .cc-card.selected { background: #18140a; border-color: #ffaa00; box-shadow: 0 0 14px rgba(255,170,0,0.25); }
+        .cc-card-icon { font-size: 34px; line-height: 1; margin-bottom: 2px; }
+        .cc-card-name { font-size: 14px; font-weight: bold; color: #fff; }
+        .cc-card-tag  { font-size: 11px; color: #ffaa00; text-transform: uppercase; letter-spacing: 1px; }
+        .cc-card-bonus {
+            font-size: 11px; color: #aaa;
+            background: rgba(255,170,0,0.07);
+            border: 1px solid rgba(255,170,0,0.18);
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin-top: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            line-height: 1.45;
             text-align: center;
-            color: #aaa;
-            font-size: 14px;
-            margin-top: 8px;
-            min-height: 20px;
         }
-        #char-create button {
-            padding: 12px 32px;
-            font-size: 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            background: #ffaa00;
-            color: #111;
-            font-weight: bold;
-            margin-top: 10px;
+        .cc-card.selected .cc-card-bonus { background: rgba(255,170,0,0.13); border-color: rgba(255,170,0,0.4); }
+        .cc-lore {
+            text-align: center; color: #777;
+            font-size: 13px; font-style: italic;
+            min-height: 38px; margin: 4px 0 10px;
+            max-width: 520px; line-height: 1.5;
         }
-        #char-create button:disabled {
-            background: #555;
-            color: #888;
-            cursor: not-allowed;
+        /* Navigation */
+        .cc-nav {
+            display: flex; gap: 12px; margin-top: 14px; align-items: center;
         }
+        .cc-nav button {
+            padding: 10px 26px; font-size: 15px;
+            border: none; border-radius: 8px;
+            cursor: pointer; font-weight: bold; transition: all 0.15s;
+        }
+        .cc-nav button.primary { background: #ffaa00; color: #111; }
+        .cc-nav button.primary:hover { background: #ffc233; }
+        .cc-nav button.primary:disabled { background: #444; color: #777; cursor: not-allowed; }
+        .cc-nav button.secondary { background: #1c1c28; color: #888; border: 1px solid #333; }
+        .cc-nav button.secondary:hover { background: #252535; color: #ccc; }
+        /* Summary step */
+        .cc-summary { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+        .cc-summary-name { font-size: 30px; font-weight: bold; color: #ffaa00; letter-spacing: 4px; text-transform: uppercase; }
+        .cc-summary-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; width: 100%; }
+        .cc-summary-card {
+            background: #0c0c18; border: 2px solid #ffaa00; border-radius: 10px;
+            padding: 14px 22px; min-width: 150px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+        }
+        /* Stat preview table */
+        .cc-stat-table { border-collapse: collapse; font-size: 13px; min-width: 340px; }
+        .cc-stat-table th { color: #555; font-weight: normal; padding: 3px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .cc-stat-table td { padding: 4px 10px; text-align: center; }
+        .cc-stat-table .stat-name { text-align: left; color: #bbb; font-size: 13px; }
+        .cc-stat-table .stat-base { color: #555; }
+        .cc-stat-table .stat-final { color: #fff; font-weight: bold; font-size: 16px; }
+        .cc-stat-table .delta-pos  { color: #44dd66; font-size: 12px; }
+        .cc-stat-table .delta-neg  { color: #ff6644; font-size: 12px; }
+        .cc-stat-table .delta-zero { color: #444;    font-size: 12px; }
+        .cc-new-runner-link {
+            font-size: 12px; color: #444; cursor: pointer; margin-top: 12px;
+            text-decoration: underline; text-underline-offset: 2px;
+        }
+        .cc-new-runner-link:hover { color: #888; }
 
         /* Boss Fight UI */
         #boss-hud {
@@ -1650,30 +1731,82 @@
 
     <!-- Character Creation Overlay -->
     <div id="char-create">
-        <h2>Create Your Runner</h2>
-        <div class="cc-section">
-            <h3>Origin</h3>
-            <div class="cc-options" id="origin-options"></div>
-            <p class="cc-desc" id="origin-desc">Select an origin.</p>
+        <!-- Progress indicator -->
+        <div class="cc-progress">
+            <div class="cc-step-dot" id="cc-dot-1">1</div>
+            <div class="cc-step-line"></div>
+            <div class="cc-step-dot" id="cc-dot-2">2</div>
+            <div class="cc-step-line"></div>
+            <div class="cc-step-dot" id="cc-dot-3">3</div>
+            <div class="cc-step-line"></div>
+            <div class="cc-step-dot" id="cc-dot-4">4</div>
         </div>
-        <div class="cc-section">
-            <h3>Primary Archetype</h3>
-            <div class="cc-options" id="archetype-options"></div>
-            <p class="cc-desc" id="archetype-desc">Select an archetype.</p>
+
+        <!-- Step 1: Name -->
+        <div class="cc-step" id="cc-step-1">
+            <h2>Name Your Runner</h2>
+            <p class="cc-subtitle">3–20 characters · Letters, numbers, spaces, hyphens</p>
+            <input type="text" id="cc-name-input" maxlength="20" placeholder="Enter runner name…" autocomplete="off" spellcheck="false">
+            <p class="cc-error" id="cc-name-error"></p>
+            <div class="cc-nav">
+                <button class="secondary" id="btn-char-back">← Back</button>
+                <button class="primary" id="cc-next-1" disabled>Next →</button>
+            </div>
         </div>
-        <button id="btn-char-back" style="margin-top:10px;">Back</button>
-        <button id="cc-confirm" disabled>Confirm & Start</button>
+
+        <!-- Step 2: Origin -->
+        <div class="cc-step" id="cc-step-2">
+            <h2>Choose Your Origin</h2>
+            <p class="cc-subtitle">Your background defines your passive bonuses and starting equipment.</p>
+            <div class="cc-cards" id="origin-cards"></div>
+            <p class="cc-lore" id="origin-lore">Select an origin to see its story.</p>
+            <div class="cc-nav">
+                <button class="secondary" id="cc-back-2">← Back</button>
+                <button class="primary" id="cc-next-2" disabled>Next →</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Archetype -->
+        <div class="cc-step" id="cc-step-3">
+            <h2>Choose Your Archetype</h2>
+            <p class="cc-subtitle">Your playstyle determines your unique resource and skill tree access.</p>
+            <div class="cc-cards" id="archetype-cards"></div>
+            <p class="cc-lore" id="archetype-lore">Select an archetype to see its description.</p>
+            <div class="cc-nav">
+                <button class="secondary" id="cc-back-3">← Back</button>
+                <button class="primary" id="cc-next-3" disabled>Next →</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Summary & Confirm -->
+        <div class="cc-step" id="cc-step-4">
+            <h2>Your Runner</h2>
+            <div class="cc-summary">
+                <div class="cc-summary-name" id="sum-name"></div>
+                <div class="cc-summary-row">
+                    <div class="cc-summary-card" id="sum-origin"></div>
+                    <div class="cc-summary-card" id="sum-archetype"></div>
+                </div>
+                <table class="cc-stat-table" id="sum-stats"></table>
+            </div>
+            <div class="cc-nav">
+                <button class="secondary" id="cc-back-4">← Back</button>
+                <button class="primary" id="cc-confirm">Begin →</button>
+            </div>
+        </div>
     </div>
 
     <div id="start-screen">
-        <h1>Warehouse Parkour</h1>
-        <p>Click anywhere to start</p>
+        <h1 id="start-title">Warehouse Parkour</h1>
+        <p id="start-welcome">Click anywhere to start</p>
         <div class="click-hint">Mouse to look • WASD to move • Space to jump/climb</div>
         <button id="btn-start-settings" style="margin-top:10px;">Settings</button>
+        <div class="cc-new-runner-link" id="btn-new-runner">New Runner</div>
     </div>
     
     <div id="character-panel">
         <h2 style="position:relative;">Character <span class="panel-close" onclick="document.getElementById('character-panel').style.display='none'">×</span></h2>
+        <div class="info-row" style="color:#ffaa00;font-size:15px;font-weight:bold;margin-bottom:4px;">Runner: <strong id="char-runner-name">—</strong></div>
         <div>Level <span id="char-level">1</span></div>
         <div class="xp-bar-wrap"><div class="xp-bar-fill" id="char-xp-fill"></div></div>
         <div class="stat-row">MOB <span id="char-mob">10</span></div>
@@ -1684,7 +1817,7 @@
         <div class="stat-row">GUT <span id="char-gut">10</span></div>
         <div class="info-row">Archetype: <strong id="char-archetype">-</strong></div>
         <div class="info-row">Origin: <strong id="char-origin">-</strong></div>
-        <div class="info-row">Momentum</div>
+        <div class="info-row" id="char-resource-label">Resource</div>
         <div class="resource-bar-wrap"><div class="resource-bar-fill" id="char-resource-fill"></div></div>
     </div>
 
@@ -1885,72 +2018,349 @@
 
     <script>
     (function() {
-        const origins = [
-            { id: 'street_kid', name: 'Street Kid', desc: 'Grew up in the sprawl. Bonus to MOB and GUT.' },
-            { id: 'corp_exile', name: 'Corp Exile', desc: 'Former corporate security. Bonus to TEC and REF.' },
-            { id: 'nomad', name: 'Nomad', desc: 'Traveled the wastes. Bonus to FOR and MOB.' },
-            { id: 'netrunner', name: 'Netrunner', desc: 'Digital ghost. Bonus to SYN and TEC.' }
+        'use strict';
+
+        // ── Data (IDs match OriginSystem.js / ArchetypeSystem.js) ──────────────
+
+        var ORIGINS = [
+            {
+                id: 'corporate_defector',
+                name: 'Corporate Defector', icon: '🏢', tag: 'Tech Insider',
+                lore: 'You left the boardroom for the rooftops, taking trade secrets with you. Insider knowledge still opens doors — and drops jaws.',
+                bonusText: '+25% chip drops\nShop 10% discount',
+                statDeltas: { syn: 3, tec: 2, mob: -1 }
+            },
+            {
+                id: 'street_traceur',
+                name: 'Street Traceur', icon: '🏃', tag: 'Urban Survivor',
+                lore: 'No academy taught you to move. You learned vaults escaping rent-a-cops. The street gave you calluses, instincts, and a network of informants.',
+                bonusText: '+5 stamina on vaults',
+                statDeltas: { mob: 3, gut: 2, for: -1 }
+            },
+            {
+                id: 'military_washout',
+                name: 'Military Washout', icon: '⚔️', tag: 'Combat Veteran',
+                lore: 'Discharged but not disarmed. Discipline is your weapon. Your tactical mindset turns every alley into a killzone — or an escape route.',
+                bonusText: '+30% reload speed\nDrones hesitate on sight',
+                statDeltas: { tec: 3, ref: 2, syn: -1 }
+            },
+            {
+                id: 'salvage_rat',
+                name: 'Salvage Rat', icon: '🔧', tag: 'Scrap Artist',
+                lore: "One person's scrap is your payday. You grew up in the Rust Quarter pulling fusion cells from dead mechs — you strip a drone to parts in thirty seconds.",
+                bonusText: '+50% scrap drops',
+                statDeltas: { for: 2, gut: 3, ref: -1 }
+            }
         ];
-        const archetypes = [
-            { id: 'traceur', name: 'Traceur', desc: 'Master of movement. Bonus to MOB and REF.' },
-            { id: 'brawler', name: 'Brawler', desc: 'Heavy hitter. Bonus to FOR and GUT.' },
-            { id: 'ghost', name: 'Ghost', desc: 'Unseen operative. Bonus to REF and SYN.' },
-            { id: 'engineer', name: 'Engineer', desc: 'Tech specialist. Bonus to TEC and SYN.' },
-            { id: 'saboteur', name: 'Saboteur', desc: 'Chaos agent. Bonus to TEC and GUT.' }
+
+        var ARCHETYPES = [
+            {
+                id: 'traceur',
+                name: 'Traceur', icon: '💨', tag: 'Mobility', resource: 'Momentum',
+                lore: 'Master of fluid movement and kinetic chains. Momentum powers impossible acrobatics — never stop moving.',
+                bonusText: 'Resource: Momentum\nCapstone: Infinite Wall-Run',
+                statDeltas: { mob: 3, ref: 2, tec: -1 }
+            },
+            {
+                id: 'operative',
+                name: 'Operative', icon: '🎯', tag: 'Precision', resource: 'Focus',
+                lore: 'Silent, precise, always three moves ahead. Focus builds in stillness and powers the perfect shot.',
+                bonusText: 'Resource: Focus\nCapstone: Ghost Bullet',
+                statDeltas: { ref: 3, syn: 2, for: -1 }
+            },
+            {
+                id: 'saboteur',
+                name: 'Saboteur', icon: '💥', tag: 'Chaos', resource: 'Chaos',
+                lore: 'Chaos is a tool. Destruction feeds ingenuity. Break everything and harvest power from the rubble.',
+                bonusText: 'Resource: Chaos\nCapstone: Gadget Overload',
+                statDeltas: { tec: 2, gut: 2, mob: -1 }
+            },
+            {
+                id: 'specimen',
+                name: 'Specimen', icon: '💪', tag: 'Endurance', resource: 'Adrenaline',
+                lore: 'Pushing biological limits through pain. Low health unlocks raw adrenaline — the closer to death, the stronger the surge.',
+                bonusText: 'Resource: Adrenaline\nCapstone: Berserk Mode',
+                statDeltas: { for: 3, gut: 2, syn: -1 }
+            },
+            {
+                id: 'netrunner',
+                name: 'Netrunner', icon: '💻', tag: 'Tech Control', resource: 'Bandwidth',
+                lore: 'The digital world bends to your will. Bandwidth controls the machine — hack, puppet drones, and rewrite reality.',
+                bonusText: 'Resource: Bandwidth\nCapstone: Swarm Override',
+                statDeltas: { syn: 3, tec: 2, gut: -1 }
+            },
+            {
+                id: 'mage',
+                name: 'Mage', icon: '✨', tag: 'Arcane', resource: 'Mana',
+                lore: 'Reality is merely a suggestion. Bend the elements to your will, warp space, and reshape the world from within.',
+                bonusText: 'Resource: Mana\nCapstone: Mana Surge',
+                statDeltas: { syn: 3, ref: 2, for: -1 }
+            }
         ];
 
-        const charCreate = document.getElementById('char-create');
-        const startScreen = document.getElementById('start-screen');
-        const originOptions = document.getElementById('origin-options');
-        const archetypeOptions = document.getElementById('archetype-options');
-        const originDesc = document.getElementById('origin-desc');
-        const archetypeDesc = document.getElementById('archetype-desc');
-        const confirmBtn = document.getElementById('cc-confirm');
+        var STAT_LABELS = {
+            mob: { full: 'Mobility',  icon: '🏃' },
+            ref: { full: 'Reflexes',  icon: '⚡' },
+            syn: { full: 'Synergy',   icon: '🔗' },
+            for: { full: 'Fortitude', icon: '🛡️' },
+            tec: { full: 'Technique', icon: '🔧' },
+            gut: { full: 'Guts',      icon: '💢' }
+        };
+        var STAT_KEYS = ['mob', 'ref', 'syn', 'for', 'tec', 'gut'];
+        var BASE_STAT = 10;
 
-        let selectedOrigin = null;
-        let selectedArchetype = null;
+        // ── State ──────────────────────────────────────────────────────────────
 
-        function renderOptions(container, items, type) {
-            container.innerHTML = '';
-            items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'cc-option';
-                div.textContent = item.name;
-                div.dataset.id = item.id;
-                div.addEventListener('click', () => {
-                    container.querySelectorAll('.cc-option').forEach(o => o.classList.remove('selected'));
-                    div.classList.add('selected');
-                    if (type === 'origin') {
-                        selectedOrigin = item.id;
-                        originDesc.textContent = item.desc;
-                    } else {
-                        selectedArchetype = item.id;
-                        archetypeDesc.textContent = item.desc;
-                    }
-                    confirmBtn.disabled = !(selectedOrigin && selectedArchetype);
-                });
-                container.appendChild(div);
-            });
+        var currentStep = 0;
+        var selectedOrigin = null;
+        var selectedArchetype = null;
+        var runnerName = '';
+
+        var charCreate  = document.getElementById('char-create');
+        var startScreen = document.getElementById('start-screen');
+
+        // ── Step navigation ────────────────────────────────────────────────────
+
+        function goStep(n) {
+            for (var i = 1; i <= 4; i++) {
+                var s = document.getElementById('cc-step-' + i);
+                if (s) {
+                    s.classList.toggle('active', i === n);
+                }
+                var dot = document.getElementById('cc-dot-' + i);
+                if (dot) {
+                    dot.classList.remove('active', 'done');
+                    if (i < n)      dot.classList.add('done');
+                    else if (i === n) dot.classList.add('active');
+                }
+            }
+            currentStep = n;
+            charCreate.scrollTop = 0;
         }
 
-        renderOptions(originOptions, origins, 'origin');
-        renderOptions(archetypeOptions, archetypes, 'archetype');
+        // ── Step 1: Name ───────────────────────────────────────────────────────
 
-        confirmBtn.addEventListener('click', () => {
-            if (!selectedOrigin || !selectedArchetype) return;
-            // M8: use localStorage so character persists across sessions (not just this tab)
-            localStorage.setItem('rpg_origin', selectedOrigin);
-            localStorage.setItem('rpg_archetype', selectedArchetype);
+        var nameInput = document.getElementById('cc-name-input');
+        var nameError = document.getElementById('cc-name-error');
+        var next1     = document.getElementById('cc-next-1');
+
+        function validateName(v) {
+            v = v.trim();
+            if (v.length < 3) return 'At least 3 characters required.';
+            if (!/^[A-Za-z0-9 \-_]+$/.test(v)) return 'Only letters, numbers, spaces, hyphens, underscores.';
+            return null;
+        }
+
+        nameInput.addEventListener('input', function() {
+            var err = validateName(nameInput.value);
+            nameError.textContent = err || '';
+            nameInput.classList.toggle('invalid', !!err);
+            next1.disabled = !!err;
+        });
+
+        nameInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !next1.disabled) advanceFrom1();
+        });
+
+        next1.addEventListener('click', advanceFrom1);
+
+        function advanceFrom1() {
+            if (validateName(nameInput.value)) return;
+            runnerName = nameInput.value.trim();
+            goStep(2);
+        }
+
+        document.getElementById('btn-char-back').addEventListener('click', function() {
             charCreate.style.display = 'none';
             startScreen.style.display = 'flex';
         });
 
-        if (localStorage.getItem('rpg_origin') && localStorage.getItem('rpg_archetype')) {
-            charCreate.style.display = 'none';
-            startScreen.style.display = 'flex';
-        } else {
-            startScreen.style.display = 'none';
+        // ── Step 2: Origin ─────────────────────────────────────────────────────
+
+        var originCards = document.getElementById('origin-cards');
+        var originLore  = document.getElementById('origin-lore');
+        var next2       = document.getElementById('cc-next-2');
+
+        ORIGINS.forEach(function(o) {
+            var card = document.createElement('div');
+            card.className = 'cc-card';
+            card.innerHTML =
+                '<div class="cc-card-icon">' + o.icon + '</div>' +
+                '<div class="cc-card-name">' + o.name + '</div>' +
+                '<div class="cc-card-tag">'  + o.tag  + '</div>' +
+                '<div class="cc-card-bonus">' + o.bonusText.replace(/\n/g, '<br>') + '</div>';
+            card.addEventListener('click', function() {
+                originCards.querySelectorAll('.cc-card').forEach(function(c) { c.classList.remove('selected'); });
+                card.classList.add('selected');
+                selectedOrigin = o;
+                originLore.textContent = o.lore;
+                next2.disabled = false;
+            });
+            originCards.appendChild(card);
+        });
+
+        document.getElementById('cc-back-2').addEventListener('click', function() { goStep(1); });
+        next2.addEventListener('click', function() { goStep(3); });
+
+        // ── Step 3: Archetype ──────────────────────────────────────────────────
+
+        var archetypeCards = document.getElementById('archetype-cards');
+        var archetypeLore  = document.getElementById('archetype-lore');
+        var next3          = document.getElementById('cc-next-3');
+
+        ARCHETYPES.forEach(function(a) {
+            var card = document.createElement('div');
+            card.className = 'cc-card';
+            card.innerHTML =
+                '<div class="cc-card-icon">' + a.icon + '</div>' +
+                '<div class="cc-card-name">' + a.name + '</div>' +
+                '<div class="cc-card-tag">'  + a.tag  + '</div>' +
+                '<div class="cc-card-bonus">' + a.bonusText.replace(/\n/g, '<br>') + '</div>';
+            card.addEventListener('click', function() {
+                archetypeCards.querySelectorAll('.cc-card').forEach(function(c) { c.classList.remove('selected'); });
+                card.classList.add('selected');
+                selectedArchetype = a;
+                archetypeLore.textContent = a.lore;
+                next3.disabled = false;
+            });
+            archetypeCards.appendChild(card);
+        });
+
+        document.getElementById('cc-back-3').addEventListener('click', function() { goStep(2); });
+        next3.addEventListener('click', function() { buildSummary(); goStep(4); });
+
+        // ── Step 4: Summary ────────────────────────────────────────────────────
+
+        function buildSummary() {
+            document.getElementById('sum-name').textContent = runnerName;
+
+            document.getElementById('sum-origin').innerHTML =
+                '<div class="cc-card-icon">' + selectedOrigin.icon    + '</div>' +
+                '<div class="cc-card-name">' + selectedOrigin.name    + '</div>' +
+                '<div class="cc-card-tag">'  + selectedOrigin.tag     + '</div>' +
+                '<div class="cc-card-bonus" style="margin-top:6px;">' + selectedOrigin.bonusText.replace(/\n/g,'<br>') + '</div>';
+
+            document.getElementById('sum-archetype').innerHTML =
+                '<div class="cc-card-icon">' + selectedArchetype.icon     + '</div>' +
+                '<div class="cc-card-name">' + selectedArchetype.name     + '</div>' +
+                '<div class="cc-card-tag">'  + selectedArchetype.tag      + '</div>' +
+                '<div class="cc-card-bonus" style="margin-top:6px;">' + selectedArchetype.bonusText.replace(/\n/g,'<br>') + '</div>';
+
+            // Build stat preview
+            var combined = {};
+            STAT_KEYS.forEach(function(k) { combined[k] = 0; });
+            Object.keys(selectedOrigin.statDeltas).forEach(function(k)    { combined[k] = (combined[k]||0) + selectedOrigin.statDeltas[k]; });
+            Object.keys(selectedArchetype.statDeltas).forEach(function(k) { combined[k] = (combined[k]||0) + selectedArchetype.statDeltas[k]; });
+
+            var html = '<thead><tr>' +
+                '<th style="text-align:left">Stat</th>' +
+                '<th>Base</th><th>Origin</th><th>Archetype</th><th>Total</th>' +
+                '</tr></thead><tbody>';
+
+            STAT_KEYS.forEach(function(k) {
+                var od = selectedOrigin.statDeltas[k]    || 0;
+                var ad = selectedArchetype.statDeltas[k] || 0;
+                var total = BASE_STAT + od + ad;
+                var odCls = od > 0 ? 'delta-pos' : od < 0 ? 'delta-neg' : 'delta-zero';
+                var adCls = ad > 0 ? 'delta-pos' : ad < 0 ? 'delta-neg' : 'delta-zero';
+                var odStr = od > 0 ? '+' + od : od === 0 ? '—' : '' + od;
+                var adStr = ad > 0 ? '+' + ad : ad === 0 ? '—' : '' + ad;
+                var lbl = STAT_LABELS[k];
+                html += '<tr>' +
+                    '<td class="stat-name">' + lbl.icon + ' ' + lbl.full + '</td>' +
+                    '<td class="stat-base">' + BASE_STAT + '</td>' +
+                    '<td class="' + odCls + '">' + odStr + '</td>' +
+                    '<td class="' + adCls + '">' + adStr + '</td>' +
+                    '<td class="stat-final">' + total + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody>';
+            document.getElementById('sum-stats').innerHTML = html;
         }
+
+        document.getElementById('cc-back-4').addEventListener('click', function() { goStep(3); });
+
+        document.getElementById('cc-confirm').addEventListener('click', function() {
+            if (!selectedOrigin || !selectedArchetype || !runnerName) return;
+
+            // Compute starting stats from base + origin + archetype deltas
+            var startStats = {};
+            STAT_KEYS.forEach(function(k) {
+                var od = selectedOrigin.statDeltas[k]    || 0;
+                var ad = selectedArchetype.statDeltas[k] || 0;
+                startStats[k] = BASE_STAT + od + ad;
+            });
+
+            localStorage.setItem('runner_name',    runnerName);
+            localStorage.setItem('rpg_origin',     selectedOrigin.id);
+            localStorage.setItem('rpg_archetype',  selectedArchetype.id);
+
+            // Only write starting stats if no existing character save (preserves NG+ progress)
+            if (!localStorage.getItem('apex_character')) {
+                localStorage.setItem('apex_character', JSON.stringify({
+                    stats: startStats, attributePoints: 0, tempBonuses: []
+                }));
+            }
+
+            // Update start screen greeting
+            var titleEl   = document.getElementById('start-title');
+            var welcomeEl = document.getElementById('start-welcome');
+            if (titleEl)   titleEl.textContent   = runnerName;
+            if (welcomeEl) welcomeEl.textContent  = 'Ready to run. Click anywhere to start.';
+
+            charCreate.style.display  = 'none';
+            startScreen.style.display = 'flex';
+        });
+
+        // ── New Runner reset ───────────────────────────────────────────────────
+
+        function startNewRunner() {
+            if (!confirm('Start a new runner? This will reset your character choices (not your save progress).')) return;
+            localStorage.removeItem('rpg_origin');
+            localStorage.removeItem('rpg_archetype');
+            localStorage.removeItem('runner_name');
+            localStorage.removeItem('apex_character');
+            selectedOrigin    = null;
+            selectedArchetype = null;
+            runnerName        = '';
+            nameInput.value   = '';
+            next1.disabled    = true;
+            nameError.textContent = '';
+            // Deselect all cards
+            document.querySelectorAll('.cc-card').forEach(function(c) { c.classList.remove('selected'); });
+            next2.disabled = true;
+            next3.disabled = true;
+            originLore.textContent    = 'Select an origin to see its story.';
+            archetypeLore.textContent = 'Select an archetype to see its description.';
+            startScreen.style.display = 'none';
+            charCreate.style.display  = 'flex';
+            goStep(1);
+        }
+
+        var newRunnerBtn = document.getElementById('btn-new-runner');
+        if (newRunnerBtn) newRunnerBtn.addEventListener('click', startNewRunner);
+
+        // ── Auto-skip if already created; otherwise start at step 1 ───────────
+
+        var existingOrigin    = localStorage.getItem('rpg_origin');
+        var existingArchetype = localStorage.getItem('rpg_archetype');
+        var existingName      = localStorage.getItem('runner_name');
+
+        if (existingOrigin && existingArchetype) {
+            // Returning runner — skip straight to start screen
+            charCreate.style.display  = 'none';
+            startScreen.style.display = 'flex';
+            // Update greeting
+            var titleEl2   = document.getElementById('start-title');
+            var welcomeEl2 = document.getElementById('start-welcome');
+            if (existingName && titleEl2)   titleEl2.textContent   = existingName;
+            if (existingName && welcomeEl2) welcomeEl2.textContent = 'Welcome back, runner. Click to continue.';
+        } else {
+            // New runner — show character creator
+            startScreen.style.display = 'none';
+            goStep(1);
+        }
+
     })();
     </script>
     <!-- RPG Gear Panel -->
