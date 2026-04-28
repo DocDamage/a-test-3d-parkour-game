@@ -12,6 +12,7 @@ Known source notes:
 - `assets/models/enemies/megakit_*.glb` and `assets/models/environment/megakit_*.glb` are from Quaternius Modular SciFi MegaKit, CC0 1.0.
 - `assets/models/environment/industrial_*.glb` are from Industrial Cyberpunk 3D Tilepack by Slippers, CC0 1.0.
 - `assets/models/environment/corridor_kitjam_2021_08.glb` is from the local "corridor level kit - dueddel" source folder. No obvious license file was present in the added folder; keep this as a candidate asset until license/source notes are confirmed.
+- `assets/animations/player/*.glb` are curated exports from the local `my game assets/animations` animation library. Keep the raw FBX pack outside the runtime tree and confirm final distribution/license notes before wider release.
 - `assets/audio/**` attribution is tracked in `assets/audio/ATTRIBUTION.md`.
 
 Keep source packs out of this runtime tree. Commit only curated, browser-ready GLB, texture, and OGG assets.

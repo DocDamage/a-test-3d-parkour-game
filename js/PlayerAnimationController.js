@@ -19,23 +19,31 @@ const BONE_NAMES = Object.freeze({
 });
 
 export class PlayerAnimationController {
-    constructor(root, player) {
+    constructor(root, player, animationLibrary = null) {
         this.root = root;
         this.player = player;
+        this.animationLibrary = animationLibrary;
         this.time = 0;
         this.bones = {};
         this.bind = new Map();
         this.available = false;
+        this.mixer = null;
+        this.actions = new Map();
+        this.activeAction = null;
+        this.activeClipId = null;
         this._scanBones();
     }
 
     update(dt, moveAmount = 0) {
         if (!this.available) return;
         this.time += dt;
+
+        const speed = this.player.velocity ? Math.hypot(this.player.velocity.x, this.player.velocity.z) : 0;
+        if (this._updateAuthored(dt, moveAmount, speed)) return;
+
         this._resetPose(dt);
 
         const state = this.player.state;
-        const speed = this.player.velocity ? Math.hypot(this.player.velocity.x, this.player.velocity.z) : 0;
         if (state === 'CLIMB' || state === 'HANG') {
             this._poseClimb();
         } else if (state === 'SLIDE' || state === 'ROLL' || state === 'SLIDE_JUMP' || state === 'GRIND') {
@@ -49,6 +57,14 @@ export class PlayerAnimationController {
         } else {
             this._poseIdle();
         }
+    }
+
+    setAnimationLibrary(animationLibrary) {
+        this.animationLibrary = animationLibrary;
+        this.actions.clear();
+        this.activeAction = null;
+        this.activeClipId = null;
+        this.mixer = null;
     }
 
     _scanBones() {
@@ -75,6 +91,51 @@ export class PlayerAnimationController {
             this.bones.leftUpperLeg &&
             this.bones.rightUpperLeg
         );
+    }
+
+    _updateAuthored(dt, moveAmount, speed) {
+        if (!this.animationLibrary) return false;
+        const state = this.player.state;
+        if (state === 'CLIMB' || state === 'HANG' || state === 'SLIDE' || state === 'ROLL' || state === 'SLIDE_JUMP' || state === 'GRIND' || state === 'GRAPPLE_AIM' || state === 'GRAPPLE_SWING' || state === 'GRAPPLE_RETRACT') {
+            this._stopAuthored();
+            return false;
+        }
+
+        const clipId = this.animationLibrary.getClipIdForPlayer(this.player, moveAmount, speed);
+        const clip = this.animationLibrary.getClip(clipId);
+        if (!clip) {
+            this._stopAuthored();
+            return false;
+        }
+
+        if (!this.mixer) this.mixer = new THREE.AnimationMixer(this.root);
+        let action = this.actions.get(clipId);
+        if (!action) {
+            action = this.mixer.clipAction(clip);
+            action.enabled = true;
+            action.clampWhenFinished = this.animationLibrary.getLoopMode(clipId) === THREE.LoopOnce;
+            const loopMode = this.animationLibrary.getLoopMode(clipId);
+            action.setLoop(loopMode, loopMode === THREE.LoopOnce ? 1 : Infinity);
+            this.actions.set(clipId, action);
+        }
+
+        if (this.activeAction !== action) {
+            action.reset().fadeIn(0.12).play();
+            if (this.activeAction) this.activeAction.fadeOut(0.12);
+            this.activeAction = action;
+            this.activeClipId = clipId;
+        }
+
+        action.timeScale = clipId === 'sprint' ? 1.18 : clipId === 'walk' ? 0.95 : 1;
+        this.mixer.update(dt);
+        return true;
+    }
+
+    _stopAuthored() {
+        if (!this.activeAction) return;
+        this.activeAction.fadeOut(0.1);
+        this.activeAction = null;
+        this.activeClipId = null;
     }
 
     _resetPose(dt) {
@@ -160,4 +221,3 @@ function rotate(bone, x = 0, y = 0, z = 0) {
     bone.rotation.y += y;
     bone.rotation.z += z;
 }
-

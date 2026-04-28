@@ -176,10 +176,24 @@ The character creator also exposes the split body-part and limb exports generate
 
 The converted bases use `mixamorig:*` bones and are driven in-game by `js/PlayerAnimationController.js`, which procedurally poses run, sprint, air, slide, climb, and grapple states from `Player.state`. The Universal Animation Library was inspected and uses a different `root/pelvis/...` skeleton, so its clips are not directly bound to these bases yet. Use Blender retargeting if authored clip playback is needed later.
 
+Current authored animation pass:
+
+| Runtime Pattern | Source | Runtime Use |
+| --- | --- | --- |
+| `assets/animations/player/*.glb` | `my game assets/animations/Animations/Male/...` exported by `scripts/export-player-animation-library.py` | Curated idle, walk, run, sprint, jump, fall, turn, and hand-pose clips. |
+
+These animation clips use `B-*` source bones. `js/PlayerAnimationLibrary.js` retargets rotation tracks to the current `mixamorig:*` runtime bones and `js/PlayerAnimationController.js` blends them into the player visual for normal locomotion. Slide, climb, grapple, wall-run-adjacent, and other custom parkour poses still use the procedural controller until dedicated authored parkour clips are available.
+
 To reconvert those six bases after source edits:
 
 ```powershell
 blender --background --python scripts/convert-character-bases.py -- --source-root "my game assets" --output-root "assets/models/player"
+```
+
+To reconvert the curated player animation GLBs:
+
+```powershell
+blender --background --python scripts/export-player-animation-library.py -- --source-root "my game assets/animations" --output-root "assets/animations/player"
 ```
 
 Current industrial/environment additions:

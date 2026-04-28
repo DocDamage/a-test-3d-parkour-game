@@ -77,7 +77,8 @@
 | Post-Processing | B | Full chain + `setEffectEnabled(name, bool)` + `setFOV(degrees)`. Settings panel wired. |
 | Audio | B | Procedural synthesis plus curated authored OGG cues. Added `setSFXVolume()` and `setMusicVolume()`. Settings panel wired. |
 | Asset Pipeline | B | `AssetManager`, `VisualAssetRegistry`, loot visuals, character creator visuals, editor asset props, industrial kit props, and conversion scripts are in place. Needs final art direction pass and license cleanup on candidate packs. |
-| Character Creator | B | Asset-backed body bases, modular part/limb slots, gear/weapon previews, colors, save/load, randomize, and seam armor. Needs authored animation retargeting for the imported character bodies. |
+| Character Creator | B | Asset-backed body bases, modular part/limb slots, gear/weapon previews, colors, save/load, randomize, and seam armor. Authored locomotion clips now retarget onto the Mixamo-style bodies; custom parkour states still need dedicated authored clips. |
+| Player Animation | B | Curated animation-library FBXs are exported to GLB, preloaded, retargeted from `B-*` bones to `mixamorig:*`, and blended for idle/walk/run/sprint/jump/fall. Needs visual tuning per body and authored slide/climb/grapple clips. |
 | Level Editor | B | Dev-mode primitive and asset prop placement, local save/load, import/export, and curated sci-fi/industrial palettes. Needs transform gizmos and collision authoring UI. |
 | Particles | B | ParticleEffects module. Could use more hit/death FX. Grenade and EMP now use particle explosions. |
 
@@ -95,7 +96,7 @@
 1. **Economy telemetry** — Ancient/Primal odds are simulated and capped, but real run data should still be collected over longer sessions.
 2. **Scenario depth** — Browser smoke now covers boot, stash comparison, gem buttons, and safehouse identify UI; rift entry and combat scenarios can still go deeper.
 3. **Asset licensing** — Industrial Cyberpunk assets are CC0; the corridor kit and several candidate enemy/prop packs still need final license confirmation before becoming core shipped content.
-4. **Animation retargeting** — Imported player bases share useful skeleton structure, but authored external animation clips still need a proper Blender retarget/export pass.
+4. **Animation coverage** — Imported player bases now have authored basic locomotion retargeting, but slide, climb, grapple, wall-run, takedown, and combat clips still need authored coverage.
 5. **Lifecycle migration** — `Lifecycle.js` centralizes mixed update signatures; individual subsystems can now migrate toward `update(dt, context)` over time.
 6. **Combat performance profiling** — `HitboxSystem` now has spatial hashing, but heavy combat scenes should still be profiled with real enemy density.
 
@@ -133,3 +134,4 @@
 - Added a robust character creator UI with body bases, body parts, limb slots, gear silhouettes, weapon preview, colors, randomization, save/load, and runtime seam armor to smooth modular joins.
 - Expanded the dev level editor with asset prop placement, curated palette buttons, local save/load, import/export, and industrial/corridor kit candidates.
 - Added `ApexRunLoopDirector` to make the first playable session read as orient -> scavenge -> hunt -> gear up -> Apex Rift.
+- Added a curated player animation library export pass and runtime retarget bridge for idle, walk, run, sprint, jump, fall, turns, and hand poses from the newly added animation pack.

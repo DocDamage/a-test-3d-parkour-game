@@ -70,6 +70,7 @@ index.html (UI shell, canvas, CSS)
         │   ├── CharacterCustomizationSystem
         │   ├── CharacterCreatorUI
         │   ├── CharacterBaseVisuals
+        │   ├── PlayerAnimationLibrary
         │   ├── PlayerAnimationController
         │   ├── EditorAssetPalette
         │   ├── EnvironmentDressing
@@ -112,6 +113,7 @@ index.html (UI shell, canvas, CSS)
 5. **Data-first RPG modules.** The 24 RPG modules are data-only shells with UI panels. Combat integration happens gradually (Phase 1-3).
 6. **Asset IDs over raw paths.** Runtime systems should ask `VisualAssetRegistry` for stable IDs and let `AssetManager` own loading/caching.
 7. **Guidance without ownership theft.** `ApexRunLoopDirector` may spawn drops through `LootSystem` and scene-only dressing through `AssetManager`, but it must not mutate `World` arrays directly.
+8. **Authored animation is additive.** Imported locomotion clips can drive normal movement, but parkour-only states should keep procedural fallbacks until matching authored clips exist.
 
 ## Critical Integration Points
 

@@ -189,6 +189,7 @@ export class Player {
         this._baseMesh = this.mesh;
         this._customVisual = null;
         this._customAnimation = null;
+        this._animationLibrary = null;
         this._customVisualScale = 1;
         this.shadow = this.createShadow();
         this.trajectory = new Trajectory(scene);
@@ -275,9 +276,14 @@ export class Player {
         });
         this._baseMesh.add(model);
         this._customVisual = model;
-        this._customAnimation = new PlayerAnimationController(model, this);
+        this._customAnimation = new PlayerAnimationController(model, this, this._animationLibrary);
         this._customVisualScale = scale;
         return true;
+    }
+
+    setAnimationLibrary(animationLibrary) {
+        this._animationLibrary = animationLibrary;
+        if (this._customAnimation) this._customAnimation.setAnimationLibrary(animationLibrary);
     }
 
     clearVisualModel() {

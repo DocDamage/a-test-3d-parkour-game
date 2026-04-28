@@ -49,6 +49,7 @@ import { ASSET_TAGS } from './VisualAssetRegistry.js';
 import { getCharacterBase } from './CharacterBaseVisuals.js';
 import { CharacterCustomizationSystem } from './CharacterCustomizationSystem.js';
 import { CharacterCreatorUI } from './CharacterCreatorUI.js';
+import { PlayerAnimationLibrary } from './PlayerAnimationLibrary.js';
 import { ApexRunLoopDirector } from './ApexRunLoopDirector.js';
 import { EnvironmentDressing } from './EnvironmentDressing.js';
 import { SpriteSheetEffects } from './SpriteSheetEffects.js';
@@ -268,20 +269,18 @@ if (__DEV__) window.assetManager = assetManager;
 if (__DEV__) window.assetStatus = () => assetManager.getStatus();
 if (__DEV__) window.audioStatus = () => audio.getAudioStatus();
 world.drones?.setAssetManager?.(assetManager);
-assetManager.preloadTagged(ASSET_TAGS.BOOT).catch(err => {
-    if (__DEV__) console.warn('AssetManager boot preload failed', err);
-});
+assetManager.preloadTagged(ASSET_TAGS.BOOT).catch(err => __DEV__ && console.warn('AssetManager boot preload failed', err));
 const environmentDressing = new EnvironmentDressing(scene, assetManager);
 ctx.register('environmentDressing', ['scene', 'assetManager'], () => environmentDressing);
-environmentDressing.init().catch(err => {
-    if (__DEV__) console.warn('Environment dressing failed', err);
-});
+environmentDressing.init().catch(err => __DEV__ && console.warn('Environment dressing failed', err));
+const playerAnimationLibrary = new PlayerAnimationLibrary(assetManager);
+ctx.register('playerAnimationLibrary', ['assetManager'], () => playerAnimationLibrary);
+player.setAnimationLibrary(playerAnimationLibrary);
+playerAnimationLibrary.preloadCore().catch(err => __DEV__ && console.warn('Player animation preload failed', err));
 const spriteSheetEffects = new SpriteSheetEffects(scene, camera, assetManager);
 ctx.register('spriteSheetEffects', ['scene', 'camera', 'assetManager'], () => spriteSheetEffects);
 projectileManager.setSpriteEffects(spriteSheetEffects);
-spriteSheetEffects.preload().catch(err => {
-    if (__DEV__) console.warn('Sprite sheet VFX preload failed', err);
-});
+spriteSheetEffects.preload().catch(err => __DEV__ && console.warn('Sprite sheet VFX preload failed', err));
 const characterCustomization = new CharacterCustomizationSystem(assetManager, player);
 ctx.register('characterCustomization', ['assetManager', 'player'], () => characterCustomization);
 const characterCreatorUI = new CharacterCreatorUI(characterCustomization);

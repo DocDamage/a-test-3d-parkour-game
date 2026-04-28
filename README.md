@@ -83,6 +83,7 @@ The director spawns starter loot through the existing `LootSystem`, adds small a
 ### RPG Buildcraft
 
 - Character creation with origin, archetype, modular body bases, body-part slots, gear silhouettes, weapon preview, colors, randomize, save, and runtime seam armor.
+- Authored player locomotion clips imported from the new animation library for idle, walk, run, sprint, jump, and fall, with procedural fallback poses for slide, climb, grapple, and advanced parkour states.
 - Archetype resources and active skills for Traceur, Operative, Saboteur, Specimen, and Netrunner.
 - Progression, attributes, passive tree, skill bar, implants, mastery, codex, familiarity, companion, faction, territory, rivalry, and legacy systems.
 - Exo-suit gear with rarity tiers, base stats, affixes, set bonuses, legendary powers, and persistent equipment.
@@ -199,6 +200,9 @@ js/AssetManager.js / js/VisualAssetRegistry.js
 js/CharacterCustomizationSystem.js / js/CharacterCreatorUI.js
   Asset-backed create-a-character flow with body bases, modular parts, gear previews, colors, save/load, and randomization
 
+js/PlayerAnimationLibrary.js / js/PlayerAnimationController.js
+  Converted GLB animation clip registry, B-skeleton to Mixamo-name retarget bridge, and procedural fallbacks for parkour states
+
 js/EditorAssetPalette.js / js/LevelEditor.js / js/EditorUI.js
   Dev level editor with primitive placement, asset prop placement, import/export, local save/load, and curated palette entries
 
@@ -221,7 +225,7 @@ docs/
   Architecture, design notes, quality scorecard, and execution plans
 
 scripts/
-  Validation, browser smoke, unit tests, balance simulation, asset conversion, and asset validation
+  Validation, browser smoke, unit tests, balance simulation, animation export, asset conversion, and asset validation
 ```
 
 One subsystem generally lives in one `js/*.js` file. New gameplay modules should not be folded into `Player.js` or `World.js`.
