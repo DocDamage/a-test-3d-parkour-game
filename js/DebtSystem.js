@@ -166,7 +166,7 @@ export class DebtSystem {
                 maxLoan: this.maxLoan,
                 day: this.day
             }));
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('DebtSystem: storage error', e); }
     }
 
     _load() {
@@ -179,6 +179,6 @@ export class DebtSystem {
             if (data.totalDebt !== undefined) this.totalDebt = data.totalDebt;
             if (data.maxLoan !== undefined) this.maxLoan = data.maxLoan;
             if (data.day !== undefined) this.day = data.day;
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('DebtSystem: storage error', e); }
     }
 }

@@ -15,7 +15,7 @@ export class TouchControls {
         this.input = inputManager;
         this.enabled = false;
 
-        // Joystick state
+        // Joystick state (left side — movement)
         this.joystick = {
             active: false,
             touchId: null,
@@ -25,6 +25,15 @@ export class TouchControls {
             stickY: 0,
             maxRadius: 50, // px the stick can travel from centre
             vector: { x: 0, y: 0 }, // normalized -1..1
+        };
+
+        // Look state (right side — camera)
+        this.look = {
+            active: false,
+            touchId: null,
+            lastX: 0,
+            lastY: 0,
+            sensitivity: 0.4, // px → degrees-equivalent sensitivity
         };
 
         // Button definitions: id → { code, label, position class }
@@ -169,6 +178,10 @@ export class TouchControls {
         this.joystickBase.style.display = 'none';
         this.joystickStick.style.display = 'none';
 
+        // Release look
+        this.look.active = false;
+        this.look.touchId = null;
+
         // Release all buttons
         for (const [code, pressed] of this.buttonPressed) {
             if (pressed) this._setButton(code, false);
@@ -226,6 +239,14 @@ export class TouchControls {
                     this.joystickBase.style.display = 'block';
                     this.joystickStick.style.display = 'block';
                 }
+            } else if (t.clientX > window.innerWidth * 0.5) {
+                // Right 50% of screen = look/camera zone
+                if (!this.look.active) {
+                    this.look.active = true;
+                    this.look.touchId = t.identifier;
+                    this.look.lastX = t.clientX;
+                    this.look.lastY = t.clientY;
+                }
             }
         }
     }
@@ -249,6 +270,16 @@ export class TouchControls {
                 this._updateJoystickVisuals();
                 this._setJoystickKeys(this.joystick.vector.x, this.joystick.vector.y);
             }
+            // Camera look — inject delta into InputManager's mouse accumulator
+            if (this.look.active && t.identifier === this.look.touchId) {
+                const dx = (t.clientX - this.look.lastX) * this.look.sensitivity;
+                const dy = (t.clientY - this.look.lastY) * this.look.sensitivity;
+                this.look.lastX = t.clientX;
+                this.look.lastY = t.clientY;
+                if (this.input && typeof this.input.addMouseDelta === 'function') {
+                    this.input.addMouseDelta(dx, dy);
+                }
+            }
         }
     }
 
@@ -265,6 +296,10 @@ export class TouchControls {
                 this._setJoystickKeys(0, 0);
                 this.joystickBase.style.display = 'none';
                 this.joystickStick.style.display = 'none';
+            }
+            if (this.look.active && t.identifier === this.look.touchId) {
+                this.look.active = false;
+                this.look.touchId = null;
             }
         }
     }

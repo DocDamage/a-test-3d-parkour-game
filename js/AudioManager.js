@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 
-const _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
-export { _sharedCtx as sharedAudioContext };
+let _sharedCtx = null;
+export function getSharedAudioContext() {
+    if (!_sharedCtx) {
+        _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return _sharedCtx;
+}
 
 export class AudioManager {
     constructor(scene, world) {
@@ -22,7 +27,7 @@ export class AudioManager {
 
     init() {
         if (this.initialized) return;
-        this.ctx = _sharedCtx;
+        this.ctx = getSharedAudioContext();
 
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.8;

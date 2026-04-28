@@ -112,7 +112,7 @@ export class ConsequenceSystem {
                 karma: { ...this.karma },
                 worldFlags: Array.from(this.worldFlags.entries())
             }));
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('ConsequenceSystem: storage error', e); }
     }
 
     _load() {
@@ -123,6 +123,56 @@ export class ConsequenceSystem {
             if (data.choices) this.choices = new Map(data.choices);
             if (data.karma) this.karma = data.karma;
             if (data.worldFlags) this.worldFlags = new Map(data.worldFlags);
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('ConsequenceSystem: storage error', e); }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  SaveSystem integration                                            */
+    /* ------------------------------------------------------------------ */
+
+    serialize() {
+        return {
+            choices: Array.from(this.choices.entries()),
+            karma: { ...this.karma },
+            worldFlags: Array.from(this.worldFlags.entries())
+        };
+    }
+
+    deserialize(data) {
+        if (!data) return;
+        if (data.choices) this.choices = new Map(data.choices);
+        if (data.karma) this.karma = { ...this.karma, ...data.karma };
+        if (data.worldFlags) this.worldFlags = new Map(data.worldFlags);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Per-frame update — apply active worldFlags effects               */
+    /* ------------------------------------------------------------------ */
+
+    update(dt) {
+        // trophy_buff_active: +20% damage via a temp bonus on the character sheet
+        if (this.worldFlags.get('trophy_buff_active') && this._characterSheet && !this._trophyBuffApplied) {
+            this._characterSheet.addTempBonus('consequence_trophy', 'damageMultiplier', 0.20, Infinity);
+            this._trophyBuffApplied = true;
+        }
+        if (!this.worldFlags.get('trophy_buff_active') && this._trophyBuffApplied) {
+            this._characterSheet && this._characterSheet.removeTempBonus && this._characterSheet.removeTempBonus('consequence_trophy');
+            this._trophyBuffApplied = false;
+        }
+
+        // shop_bonus_chips: handled passively — ShopSystem reads this flag via getWorldFlag()
+        // sapper_npc_active: NPCSystem reads this flag
+        // prisoner_runners_active: NPCSystem reads this flag
+    }
+
+    /** Wire in the character sheet after construction for trophy buff. */
+    setCharacterSheet(cs) {
+        this._characterSheet = cs;
+        this._trophyBuffApplied = false;
+    }
+
+    /** Read a world flag by key. Used by external systems (ShopSystem, NPCSystem). */
+    getWorldFlag(key) {
+        return this.worldFlags.get(key) || false;
     }
 }

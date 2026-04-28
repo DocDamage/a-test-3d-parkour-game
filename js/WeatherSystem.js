@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { sharedAudioContext } from './AudioManager.js';
+import { sharedAudioContext, getSharedAudioContext } from './AudioManager.js';
 
 /**
  * WeatherSystem – atmospheric states for the warehouse.
@@ -228,12 +228,9 @@ export class WeatherSystem {
 
 	_startRainAudio() {
 		try {
-			let ctx = sharedAudioContext;
-			if (!ctx) {
-				const AudioContext = window.AudioContext || window.webkitAudioContext;
-				if (!this._audioCtx) this._audioCtx = new AudioContext();
-				ctx = this._audioCtx;
-			}
+			// M2: use shared AudioContext instead of creating a separate instance
+			const ctx = sharedAudioContext || getSharedAudioContext();
+			if (!ctx) return;
 			if (ctx.state === 'suspended') ctx.resume();
 
 			const bufferSize = Math.floor(ctx.sampleRate * 2); // 2-second loop
@@ -273,12 +270,12 @@ export class WeatherSystem {
 		if (this.rainAudioGain && this._audioCtx) {
 			try {
 				this.rainAudioGain.gain.linearRampToValueAtTime(0, this._audioCtx.currentTime + 0.5);
-			} catch (e) {}
+			} catch (e) { if (window.__DEV__) console.warn('WeatherSystem: audio error', e); }
 		}
 		if (this.rainAudioNode) {
 			try {
 				this.rainAudioNode.stop(this._audioCtx.currentTime + 0.6);
-			} catch (e) {}
+			} catch (e) { if (window.__DEV__) console.warn('WeatherSystem: audio error', e); }
 			this.rainAudioNode = null;
 		}
 		this.rainAudioGain = null;

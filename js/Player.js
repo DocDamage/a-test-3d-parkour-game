@@ -133,6 +133,8 @@ export class Player {
         this._parryWindow = 0;
         this._parryCooldown = 0;
         this.onPerfectParry = null;
+        this._shield = 0;          // Aegis Field absorb pool (set by onPerfectParry)
+        this._shieldTimer = 0;     // Duration remaining for the shield
 
         // Defensive mechanics
         this._dodgeWindow = 0;      // perfect dodge i-frame window
@@ -338,6 +340,10 @@ export class Player {
         // Parry timers
         if (this._parryWindow > 0) this._parryWindow = Math.max(0, this._parryWindow - dt);
         if (this._parryCooldown > 0) this._parryCooldown = Math.max(0, this._parryCooldown - dt);
+        if (this._shieldTimer > 0) {
+            this._shieldTimer = Math.max(0, this._shieldTimer - dt);
+            if (this._shieldTimer <= 0) this._shield = 0;
+        }
 
         // Dodge / defensive timers
         if (this._dodgeWindow > 0) this._dodgeWindow = Math.max(0, this._dodgeWindow - dt);
@@ -538,7 +544,7 @@ export class Player {
         let speed = this.SPEED_WALK;
         let nextState = moveDir.length() > 0.1 ? 'WALK' : 'IDLE';
 
-        if (input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND) {
+        if (input.isPressed('ShiftLeft') && moveDir.length() > 0.5 && targetHeight === this.HEIGHT_STAND && (!this.staminaSystem || this.staminaSystem.canSprint())) {
             speed = this.SPEED_SPRINT;
             nextState = 'SPRINT';
         } else if (targetHeight === this.HEIGHT_CROUCH) {
@@ -1853,7 +1859,8 @@ export class Player {
             window.audioManager.playSFX('parry');
         }
         if (this._parryCooldown > 0 || this.isDead) return false;
-        this._parryWindow = 0.25; // 0.25s window
+        const parryBonus = (this.characterSheet && this.characterSheet.getParryWindowBonus) ? this.characterSheet.getParryWindowBonus() : 0;
+        this._parryWindow = 0.25 + parryBonus; // 0.25s base + REF stat bonus
         this._parryCooldown = 1.0; // 1s cooldown
         return true;
     }
@@ -1924,6 +1931,18 @@ export class Player {
         if (this._meatShield > 0 && amount > 0) {
             const absorb = Math.min(this._meatShield, amount);
             this._meatShield -= absorb;
+            amount -= absorb;
+            if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
+                const pos = this.position.clone(); pos.y += 1.5;
+                this.scene.userData.spawnDamageNumber(pos, `SHIELD -${Math.round(absorb)}`, false, 'energy');
+            }
+            if (amount <= 0) return 0;
+        }
+
+        // Aegis Shield: absorb incoming damage (granted by Aegis Field legendary power on perfect parry)
+        if (this._shield > 0 && amount > 0) {
+            const absorb = Math.min(this._shield, amount);
+            this._shield -= absorb;
             amount -= absorb;
             if (this.scene && this.scene.userData && this.scene.userData.spawnDamageNumber) {
                 const pos = this.position.clone(); pos.y += 1.5;

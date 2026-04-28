@@ -476,9 +476,8 @@ export class ChallengeSystem {
 
         document.body.appendChild(this.gradeScreen);
 
-        this._gradeKeyHandler = () => this.hideGradeScreen();
-        document.addEventListener("keydown", this._gradeKeyHandler);
-        this.gradeScreen.addEventListener("click", this._gradeKeyHandler);
+        // Handler stored for add/remove — registered in showGradeScreen, not here
+        this._gradeKeyHandler = null;
     }
 
     showGradeScreen(grade, stats) {
@@ -511,6 +510,11 @@ export class ChallengeSystem {
         if (sprintEl) sprintEl.textContent = Math.floor(stats.sprintTime) + "s / " + Math.floor(totalTime) + "s";
 
         this.gradeScreen.style.display = "flex";
+
+        // Register dismiss listeners fresh each time the screen is shown
+        this._gradeKeyHandler = () => this.hideGradeScreen();
+        document.addEventListener("keydown", this._gradeKeyHandler);
+        this.gradeScreen.addEventListener("click", this._gradeKeyHandler);
     }
 
     _gradeColor(grade) {

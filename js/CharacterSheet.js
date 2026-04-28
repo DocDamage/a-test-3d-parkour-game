@@ -306,6 +306,16 @@ export class CharacterSheet {
             }
         }
 
+        // Legacy dynasty bonus — flat attribute points from retired runners
+        if (this.legacySystem && typeof this.legacySystem.getDynastyAttributeBonus === 'function') {
+            const dynastyBonus = this.legacySystem.getDynastyAttributeBonus();
+            if (dynastyBonus > 0) {
+                for (const key of ['mob', 'ref', 'syn', 'for', 'tec', 'gut']) {
+                    if (typeof stats[key] === 'number') stats[key] += dynastyBonus;
+                }
+            }
+        }
+
         // Derived compound stats
         stats.critChance = (stats.critChance || 0) + (stats.ref * 0.005);
         stats.critDamage = (stats.critDamage || 0) + 1.5;

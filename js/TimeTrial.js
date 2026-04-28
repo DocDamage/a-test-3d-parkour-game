@@ -553,11 +553,13 @@ export class TimeTrial {
      * Edge detection for T / R / Escape is handled internally.
      */
     handleInput(input) {
-        const t = input.isPressed('KeyT');
-        const r = input.isPressed('KeyR');
-        const esc = input.isPressed('Escape');
+        // Use edge-detection through InputManager so consumeKey() works
+        const t = input.wasPressed('KeyT');
+        const r = input.wasPressed('KeyR');
+        const esc = input.wasPressed('Escape');
 
-        if (t && !this._wasT) {
+        if (t) {
+            input.consumeKey('KeyT'); // prevent other systems (ApexRift) from also acting on T
             if (this.state === 'IDLE' || this.state === 'FINISHED') {
                 this.startRace();
             } else if (this.state === 'RACING' || this.state === 'COUNTDOWN') {
@@ -565,14 +567,11 @@ export class TimeTrial {
             }
         }
 
-        if ((r && !this._wasR) || (esc && !this._wasEsc)) {
+        if (r || esc) {
+            if (r) input.consumeKey('KeyR');
             if (this.state === 'RACING' || this.state === 'COUNTDOWN') {
                 this.cancelRace();
             }
         }
-
-        this._wasT = t;
-        this._wasR = r;
-        this._wasEsc = esc;
     }
 }

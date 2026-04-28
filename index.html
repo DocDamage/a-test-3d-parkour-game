@@ -1645,6 +1645,7 @@
     <div id="loading-overlay">
         <div class="loading-spinner"></div>
         <div class="loading-text">Loading...</div>
+        <div id="loading-progress" style="font-size:13px;color:#888;margin-top:8px;letter-spacing:1px;"></div>
     </div>
 
     <!-- Character Creation Overlay -->
@@ -1701,6 +1702,7 @@
             <span>SHIFT+F</span> Parry<br>
             <span>E</span> Drop / Interact<br>
             <span>T</span> Time Trial<br>
+            <span>SHIFT+T</span> Arena Selector<br>
             <span>O</span> Settings Panel<br>
             <span>SHIFT+O</span> Rising Tide<br>
             <span>P</span> Passive Tree<br>
@@ -1715,6 +1717,8 @@
             <span>SHIFT+I</span> Key Items<br>
             <span>M</span> Implants<br>
             <span>N</span> Day/Night cycle<br>
+            <span>[</span> Weapon Loadout Panel<br>
+            <span>]</span> Inventory (Consumables)<br>
             <span>F12</span> Photo Mode<br>
             <span>V</span> Runner Vision<br>
             <span>1-4</span> Speedrun ILs (Rooftop/Freezer/Server/Hangar)<br>
@@ -1934,13 +1938,14 @@
 
         confirmBtn.addEventListener('click', () => {
             if (!selectedOrigin || !selectedArchetype) return;
-            sessionStorage.setItem('rpg_origin', selectedOrigin);
-            sessionStorage.setItem('rpg_archetype', selectedArchetype);
+            // M8: use localStorage so character persists across sessions (not just this tab)
+            localStorage.setItem('rpg_origin', selectedOrigin);
+            localStorage.setItem('rpg_archetype', selectedArchetype);
             charCreate.style.display = 'none';
             startScreen.style.display = 'flex';
         });
 
-        if (sessionStorage.getItem('rpg_origin') && sessionStorage.getItem('rpg_archetype')) {
+        if (localStorage.getItem('rpg_origin') && localStorage.getItem('rpg_archetype')) {
             charCreate.style.display = 'none';
             startScreen.style.display = 'flex';
         } else {
@@ -2024,11 +2029,23 @@
         <div id="stash-list"></div>
     </div>
 
+    <!-- Weapon Loadout Panel -->
+    <div id="weapon-loadout-panel" style="display:none;position:fixed;top:10%;left:50%;transform:translateX(-50%);background:rgba(10,10,20,0.95);border:1px solid #333;padding:20px;z-index:200;color:#fff;min-width:420px;max-width:600px;border-radius:8px;box-shadow:0 0 24px rgba(0,200,255,0.15);">
+        <h2 style="position:relative;margin:0 0 14px;font-family:monospace;color:#00ffcc;">Weapon Loadout <span class="panel-close" style="cursor:pointer;position:absolute;right:0;top:0;font-size:20px;" onclick="document.getElementById('weapon-loadout-panel').style.display='none'">×</span></h2>
+        <p style="font-family:monospace;font-size:11px;color:#888;margin:0 0 12px;">Click a slot to cycle equipped weapon from your pool. Press N to toggle.</p>
+        <div id="loadout-slots" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+        <h3 style="font-family:monospace;font-size:13px;color:#aaa;margin:0 0 8px;">Weapon Pool (unlocked)</h3>
+        <div id="loadout-pool" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
     <!-- Inventory Panel -->
-    <div id="inventory-panel" style="display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);padding:20px;z-index:100;color:#fff;max-width:400px;">
-        <h3>Inventory</h3>
-        <div id="inventory-list"></div>
-        <button id="inventory-close">Close</button>
+    <div id="inventory-panel" style="display:none;position:fixed;top:10%;left:50%;transform:translateX(-50%);background:rgba(10,10,20,0.95);border:1px solid #2a4a2a;padding:20px;z-index:200;color:#fff;min-width:380px;max-width:480px;border-radius:8px;box-shadow:0 0 24px rgba(0,255,128,0.1);font-family:monospace;">
+        <h2 style="position:relative;margin:0 0 4px;color:#00ff80;">Inventory <span class="panel-close" style="cursor:pointer;position:absolute;right:0;top:0;font-size:20px;" onclick="document.getElementById('inventory-panel').style.display='none'">×</span></h2>
+        <p style="font-size:11px;color:#888;margin:0 0 12px;">Press ] to toggle. Press 6-9 to use quick slots.</p>
+        <div id="inventory-list" style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;"></div>
+        <div style="margin-top:12px;border-top:1px solid #333;padding-top:8px;display:flex;justify-content:flex-end;">
+            <button id="inventory-close" style="font-family:monospace;font-size:12px;padding:5px 14px;background:#1a3a2a;color:#00ff80;border:1px solid #00ff80;border-radius:4px;cursor:pointer;">Close []]</button>
+        </div>
     </div>
 
     <!-- RPG Safehouse Panel -->

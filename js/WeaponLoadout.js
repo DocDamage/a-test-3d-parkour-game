@@ -65,6 +65,14 @@ export function setupWeaponLoadout(scene, world, player, weaponSystem, WEAPON_SL
     weaponSystem.equip(energySword, WEAPON_SLOTS.MELEE);
     weaponSystem.switchSlot(WEAPON_SLOTS.MELEE);
 
+    // Register unlockable weapons in the weapon pool (accessible via loadout UI)
+    weaponSystem.registerUnlocked(subMachineGun);
+    weaponSystem.registerUnlocked(rocketLauncher);
+    weaponSystem.registerUnlocked(flamethrower);
+    weaponSystem.registerUnlocked(plasmaRifle);
+    weaponSystem.registerUnlocked(crossbow);
+    weaponSystem.registerUnlocked(grenadeLauncher);
+
     const miniBosses = [];
     const gatekeeper = new Gatekeeper(scene, world, player, new THREE.Vector3(15, 0, 15));
     gatekeeper.start();

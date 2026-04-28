@@ -217,29 +217,29 @@ export class NephalemGlory {
     this._clearTier();
   }
 
-  _updateMultipliers() {
-    switch (this.tier) {
-      case 1:
-        this.damageMultiplier = 2.0;
-        this.moveSpeedMultiplier = 1.5;
-        this.trailActive = true;
-        break;
-      case 2:
-        this.damageMultiplier = 2.0;
-        this.moveSpeedMultiplier = 1.5;
-        this.trailActive = true;
-        break;
-      case 3:
-        this.damageMultiplier = 2.0;
-        this.moveSpeedMultiplier = 1.5;
-        this.trailActive = true;
-        break;
-      default:
-        this.damageMultiplier = 1.0;
-        this.moveSpeedMultiplier = 1.0;
-        this.trailActive = false;
+    _updateMultipliers() {
+        switch (this.tier) {
+            case 1:
+                this.damageMultiplier = 1.25;
+                this.moveSpeedMultiplier = 1.1;
+                this.trailActive = true;
+                break;
+            case 2:
+                this.damageMultiplier = 1.6;
+                this.moveSpeedMultiplier = 1.25;
+                this.trailActive = true;
+                break;
+            case 3:
+                this.damageMultiplier = 2.0;
+                this.moveSpeedMultiplier = 1.5;
+                this.trailActive = true;
+                break;
+            default:
+                this.damageMultiplier = 1.0;
+                this.moveSpeedMultiplier = 1.0;
+                this.trailActive = false;
+        }
     }
-  }
 
   _updateVisuals(dt) {
     // Fade screen tint

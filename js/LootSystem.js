@@ -26,6 +26,12 @@ export class LootSystem {
 
         this._nextId = 1;
         this._tempVec = new THREE.Vector3();
+        this._inventorySystem = null; // set via setInventorySystem()
+    }
+
+    /** Wire in the InventorySystem after construction. */
+    setInventorySystem(inv) {
+        this._inventorySystem = inv;
     }
 
     /**
@@ -439,8 +445,15 @@ export class LootSystem {
     }
 
     _pickupConsumable(drop) {
-        // Consumables go to an inventory pouch if one exists.
-        // For now this is a no-op stub.
+        if (!this._inventorySystem) return;
+        // Map consumableType to the InventorySystem item id
+        const typeMap = {
+            grenade:  'smoke_bomb',
+            mine:     'smoke_bomb',
+            scanner:  'health_potion',
+        };
+        const itemId = (drop.consumableType && typeMap[drop.consumableType]) || 'health_potion';
+        this._inventorySystem.addItem(itemId, drop.quantity || 1);
     }
 
     _removeDrop(id) {

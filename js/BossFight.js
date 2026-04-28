@@ -903,6 +903,11 @@ export default class BossFight {
         if (this.challengeSystem) {
             this.challengeSystem.unlock('firstBossKill');
         }
+
+        // Fire external victory callback (used by main.js to unlock NG+ / CollapseMode)
+        if (typeof this.onVictory === 'function') {
+            this.onVictory();
+        }
     }
 
     _showVictoryUI() {

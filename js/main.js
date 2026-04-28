@@ -24,6 +24,7 @@ import { RisingTide } from './RisingTide.js';
 import { ParticleEffects } from './ParticleEffects.js';
 import { setupLighting } from './LightingSetup.js';
 import { setupWeaponLoadout } from './WeaponLoadout.js';
+import { WeaponLoadoutUI } from './WeaponLoadoutUI.js';
 import { createHintSystem } from './HintSystem.js';
 import { GamepadController } from './GamepadController.js';
 import { keyBindings } from './KeyBindings.js';
@@ -120,6 +121,7 @@ import { DamageNumbers } from './DamageNumbers.js';
 import { UIManager } from './UIManager.js';
 import { MenuNavigator } from './MenuNavigator.js';
 import { wireEditorUI } from './EditorUI.js';
+import { GameContext } from './GameContext.js';
 
 const __DEV__ = window.location.hash === '#dev';
 window.__DEV__ = __DEV__;
@@ -127,12 +129,38 @@ window.__DEV__ = __DEV__;
 import { DEFAULT_SETTINGS, wireSettings } from './SettingsUI.js';
 import { wireKeybindings } from './KeybindingsUI.js';
 
-// Scene setup
+// ── GameContext — dependency injection container ──────────────────────────
+const ctx = new GameContext();
+
+// Scene-level singletons (no deps)
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151520);
 scene.fog = new THREE.Fog(0x151520, 20, 70);
+ctx.register('scene', [], () => scene);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+ctx.register('camera', [], () => camera);
+
+// H15 — WebGL 2 fallback: show a clear error before Three.js fails cryptically
+(function checkWebGL2() {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2');
+    if (!gl) {
+        const overlay = document.getElementById('loading-overlay') || document.body;
+        const msg = document.createElement('div');
+        msg.style.cssText = 'position:fixed;inset:0;background:#111;color:#f66;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;font-size:18px;z-index:99999;text-align:center;padding:20px;';
+        msg.innerHTML = '<b>WebGL 2 Required</b><br><br>Your browser or GPU does not support WebGL 2.<br>Please try Chrome, Firefox, or Edge on a device with GPU acceleration enabled.';
+        document.body.appendChild(msg);
+        throw new Error('WebGL 2 not supported');
+    }
+})();
+
+function setLoadProgress(text) {
+    const el = document.getElementById('loading-progress');
+    if (el) el.textContent = text;
+}
+
+setLoadProgress('Initializing renderer...');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -140,32 +168,50 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 document.body.appendChild(renderer.domElement);
+ctx.register('renderer', [], () => renderer);
 
 // Post-processing
 const postProcessing = new PostProcessing(renderer, scene, camera);
+ctx.register('postProcessing', ['scene', 'camera', 'renderer'], () => postProcessing);
 
 // Lighting
 const { ambient, sun, fill, pointLights, lensFlare } = setupLighting(scene, camera, postProcessing);
+ctx.register('ambientLight', [], () => ambient);
+ctx.register('sunLight', [], () => sun);
+ctx.register('fillLight', [], () => fill);
+ctx.register('pointLights', [], () => pointLights);
+ctx.register('lensFlare', [], () => lensFlare);
 
 // World
+setLoadProgress('Building world...');
 const world = new World(scene);
+ctx.register('world', ['scene'], () => world);
 const projectileManager = new ProjectileManager(scene, world);
+ctx.register('projectileManager', ['scene', 'world'], () => projectileManager);
 
 // Audio
 const audio = new AudioManager(scene, world);
+ctx.register('audio', ['scene', 'world'], () => audio);
 
-// Player first (camera controller wired after tpc is created)
+// Player (camera controller wired after tpc is created later)
+setLoadProgress('Creating player...');
 const player = new Player(scene, world, camera, audio, null);
+ctx.register('player', ['scene', 'world', 'camera', 'audio'], () => player);
 
-// Unified save system (instantiated early; registrations happen after subsystems exist)
+// Unified save system
 const saveSystem = new SaveSystem();
+ctx.register('saveSystem', [], () => saveSystem);
 
 // RPG Phase 1 systems
 const characterSheet = new CharacterSheet(player);
 characterSheet._load();
+ctx.register('characterSheet', ['player'], () => characterSheet);
 const progression = new ProgressionSystem(characterSheet);
+ctx.register('progression', ['characterSheet'], () => progression);
 const archetype = new ArchetypeSystem(player, characterSheet);
+ctx.register('archetype', ['player', 'characterSheet'], () => archetype);
 const origin = new OriginSystem(player, characterSheet);
+ctx.register('origin', ['player', 'characterSheet'], () => origin);
 player.setCharacterSheet(characterSheet);
 
 // Apply stored character creation choices
@@ -182,14 +228,23 @@ if (savedArchetype) {
 const exoSuit = new ExoSuitSystem(player, characterSheet);
 exoSuit._load();
 exoSuit.onEquip = showLootToast;
+ctx.register('exoSuit', ['player', 'characterSheet'], () => exoSuit);
 const inventoryStash = new InventoryStash(player, exoSuit, characterSheet);
+ctx.register('inventoryStash', ['player', 'exoSuit', 'characterSheet'], () => inventoryStash);
 const affixSystem = new AffixSystem();
+ctx.register('affixSystem', [], () => affixSystem);
 const familiarity = new FamiliaritySystem();
+ctx.register('familiarity', [], () => familiarity);
 const companion = new CompanionDrone(scene, player, null); // eventBus placeholder
+ctx.register('companion', ['scene', 'player'], () => companion);
 const loyalty = new LoyaltySystem(companion);
+ctx.register('loyalty', ['companion'], () => loyalty);
 const factions = new FactionSystem(null); // eventBus placeholder
+ctx.register('factions', [], () => factions);
 const territory = new TerritorySystem(world, factions);
+ctx.register('territory', ['world', 'factions'], () => territory);
 const safehouse = new SafehouseSystem(player, characterSheet, progression, exoSuit, affixSystem);
+ctx.register('safehouse', ['player', 'characterSheet', 'progression', 'exoSuit', 'affixSystem'], () => safehouse);
 characterSheet.setSafehouseSystem(safehouse);
 // Wire safehouse passive effects (damageSystem hook added after damageSystem is instantiated below)
 function _updateSafehousePassives() {
@@ -198,38 +253,59 @@ function _updateSafehousePassives() {
 }
 _updateSafehousePassives();
 const bounty = new BountySystem(player, characterSheet, progression, factions, territory);
+ctx.register('bounty', ['player', 'characterSheet', 'progression', 'factions', 'territory'], () => bounty);
 const npcSystem = new NPCSystem(world, player, factions);
 const blackout = new BlackoutSystem(world, player, npcSystem, factions, territory);
+ctx.register('npcSystem', ['world', 'player', 'factions'], () => npcSystem);
 const rivals = new RivalSystem(scene, player, world, exoSuit);
+ctx.register('rivals', ['scene', 'player', 'world', 'exoSuit'], () => rivals);
 const subLevels = new SubLevelSystem(world, player, factions);
+ctx.register('subLevels', ['world', 'player', 'factions'], () => subLevels);
 const mastery = new MasterySystem(player, characterSheet);
+ctx.register('mastery', ['player', 'characterSheet'], () => mastery);
 const codex = new CodexSystem(player, characterSheet);
+ctx.register('codex', ['player', 'characterSheet'], () => codex);
 const implants = new ImplantSystem(player, characterSheet);
+ctx.register('implants', ['player', 'characterSheet'], () => implants);
 characterSheet.setImplantSystem(implants);
 const legacy = new LegacySystem(characterSheet, progression, exoSuit, familiarity);
+ctx.register('legacy', ['characterSheet', 'progression', 'exoSuit', 'familiarity'], () => legacy);
+characterSheet.legacySystem = legacy; // wire dynasty bonus into stat pipeline
 const ngPlus = new NewGamePlus(player, world, characterSheet);
+ctx.register('ngPlus', ['player', 'world', 'characterSheet'], () => ngPlus);
 const collapse = new CollapseMode(world, player, characterSheet, exoSuit, archetype);
+ctx.register('collapse', ['world', 'player', 'characterSheet', 'exoSuit', 'archetype'], () => collapse);
 const consequences = new ConsequenceSystem();
+consequences.setCharacterSheet(characterSheet); // wire trophy_buff_active into stat pipeline
+ctx.register('consequences', ['characterSheet'], () => consequences);
 // debt instantiated after enemyManager below
 
-
+// Status effects (needed by damageSystem)
+const statusEffectSystem = new StatusEffectSystem();
+ctx.register('statusEffectSystem', [], () => statusEffectSystem);
 
 // Combat systems
 const damageSystem = new DamageSystem(characterSheet, statusEffectSystem);
+ctx.register('damageSystem', ['characterSheet', 'statusEffectSystem'], () => damageSystem);
 const hitboxSystem = new HitboxSystem();
+ctx.register('hitboxSystem', [], () => hitboxSystem);
 const staminaSystem = new StaminaSystem(player);
 player.staminaSystem = staminaSystem;
+ctx.register('staminaSystem', ['player'], () => staminaSystem);
 const combatSystem = new CombatSystem(player, hitboxSystem, damageSystem, camera, audio);
-const statusEffectSystem = new StatusEffectSystem();
+ctx.register('combatSystem', ['player', 'hitboxSystem', 'damageSystem', 'camera', 'audio'], () => combatSystem);
 
 // Enemy manager + new combat subsystems (instantiated after combatSystem exists)
 const enemyManager = new EnemyManager(scene, world, player);
+ctx.register('enemyManager', ['scene', 'world', 'player'], () => enemyManager);
 if (damageSystem) enemyManager.setDamageSystem(damageSystem);
 if (damageSystem) damageSystem.setSafehouseSystem(safehouse);
 
 // Weapon system: equip starter loadout
 const weaponSystem = new WeaponSystem(player, scene, hitboxSystem, projectileManager);
+ctx.register('weaponSystem', ['player', 'scene', 'hitboxSystem', 'projectileManager'], () => weaponSystem);
 const weaponModSystem = new WeaponModSystem();
+ctx.register('weaponModSystem', [], () => weaponModSystem);
 weaponSystem.setModSystem(weaponModSystem);
 weaponSystem.setFamiliaritySystem(familiarity);
 // Pre-equip demo mods on starter loadout
@@ -379,8 +455,16 @@ const passiveTree = new PassiveTree(activeArchetypeId, skillSystem);
 passiveTree._load();
 
 progression.onLevelUp = (level, points) => {
-    if (__DEV__) console.log(`Level up! Now level ${level}. Attribute points: ${points}`);
     if (passiveTree) passiveTree.addPoints(1);
+    // Show level-up toast
+    const toast = document.getElementById('levelup-toast');
+    const msg   = document.getElementById('levelup-msg');
+    if (toast) {
+        if (msg) msg.textContent = `Level ${level} — +${points} attribute point${points !== 1 ? 's' : ''} available.`;
+        toast.style.display = 'block';
+        clearTimeout(progression._levelToastTimer);
+        progression._levelToastTimer = setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
 };
 
 saveSystem.register('passiveTree',
@@ -404,6 +488,14 @@ const {
     sniperRifle, subMachineGun, rocketLauncher, flamethrower, plasmaRifle, energySword, crossbow, grenadeLauncher,
     magicSystem, accessorySystem, inventorySystem, miniBosses
 } = setupWeaponLoadout(scene, world, player, weaponSystem, WEAPON_SLOTS, resourceSystem, characterSheet);
+
+// Wire InventorySystem into LootSystem so consumable drops go to inventory
+lootSystem.setInventorySystem(inventorySystem);
+// Wire InventorySystem into UIManager so the inventory panel can render and use items
+uiManager.inventorySystem = inventorySystem;
+
+// Weapon Loadout UI panel (toggle with N key)
+const weaponLoadoutUI = new WeaponLoadoutUI(weaponSystem);
 
 // Stash panel button wiring
 (function wireStashPanel() {
@@ -489,6 +581,10 @@ function _handleEnemyKilled(enemy, source) {
     if (nephalemGlory) nephalemGlory.onKill(enemy);
     // Apex Rift progress
     if (apexRift) apexRift.onEnemyKilled(enemy, source);
+    // Arena Mode score + kill tracking
+    if (arenaMode && arenaMode.active) arenaMode.onEnemyKilled(enemy, source);
+    // Collapse Mode kill tracking
+    if (collapse && collapse._inRun) collapse.onEnemyKilled(enemy);
     // Legendary powers
     if (legendaryPowerSystem) legendaryPowerSystem.onEnemyKilled(enemy);
     // Loot drop with difficulty scaling
@@ -767,6 +863,8 @@ const procAnim = new ProceduralAnimation(scene, player, world);
 
 // Gamepad controller
 const gamepad = new GamepadController();
+// M4: give gamepad access to keyboard so both inputs can be active simultaneously
+gamepad.setKeyboardInput(input);
 
 // Advanced movement
 const advMovement = new AdvancedMovement(player, scene, audio, tpc);
@@ -805,6 +903,12 @@ const challenges = new ChallengeSystem(scene, player);
 
 // Boss Fight (needs directorMode, bulletTime, challenges)
 const bossFight = new BossFight(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
+// Wire boss victory: unlock NG+ and CollapseMode, also trigger dungeon boss-defeat reward path
+bossFight.onVictory = () => {
+    if (ngPlus && !ngPlus.isUnlocked()) ngPlus.unlock();
+    if (collapse && !collapse.isUnlocked()) collapse.unlock();
+    showHint('BOSS DEFEATED — NG+ and Collapse Mode unlocked! Press Y for Collapse.');
+};
 const riftGuardian = new RiftGuardian(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
 const arenaMode = new ArenaMode(scene, world, player, enemyManager, bossFight);
 
@@ -921,6 +1025,11 @@ demoPuzzle.addBlockPuzzle(
         if (audio && typeof audio.playSFX === 'function') audio.playSFX('mechanical_click');
     }
 );
+// H19: wire the room-level solve callback (fires when ALL sub-puzzles are complete)
+demoPuzzle.onSolve = () => {
+    dungeonSystem._spawnPickupText && dungeonSystem._spawnPickupText('All puzzles complete!', '#44ffaa');
+    if (heartSystem && typeof heartSystem.addHeartPiece === 'function') heartSystem.addHeartPiece();
+};
 
 // ── Wave-2 Zelda systems ────────────────────────────────────────────────────
 const lightDarkWorld = new LightDarkWorldSystem(scene, player, postProcessing, ambient, sun, fill);
@@ -928,6 +1037,8 @@ const dialogueSystem = new DialogueSystem(player, npcSystem, bounty);
 const shop = new ShopSystem(scene, player, heartSystem);
 const bottleSystem = new BottleSystem(player, heartSystem, resourceSystem);
 shop.setBottleSystem(bottleSystem);
+shop.setDebtSystem(debt);
+shop.setConsequenceSystem(consequences);
 const overworldMap = new OverworldMap(player, dungeonSystem, keyItems);
 
 // UIManager — centralized UI panel toggles, updates, and dynamic DOM creation
@@ -980,6 +1091,11 @@ world.markStructuralElements(structuralCollapse);
 // Wire player to world (drones & collectibles)
 world.setPlayer(player);
 
+// Wire HeartContainerSystem to collectible heart piece pickups
+world.collectibles.onHeartPieceCollected = () => {
+    heartSystem.addHeartPiece();
+};
+
 // Input
 const input = new InputManager();
 
@@ -1017,6 +1133,9 @@ const bossVictory = document.getElementById('boss-victory');
 let gameStarted = false;
 let paused = false;
 let gameOver = false;
+// H14: expose these to window so PhotoMode's raw keydown listener can guard on them
+Object.defineProperty(window, 'gameStarted', { get: () => gameStarted });
+Object.defineProperty(window, 'paused',      { get: () => paused });
 window.gameOver = gameOver; // expose for PhotoMode/RunnerVision guards
 
 // Pause menu wiring
@@ -1195,14 +1314,20 @@ function animate() {
         
         // === PAUSE TOGGLE ===
         if (activeInput.wasPressed('Escape')) {
-            paused = !paused;
             if (paused) {
-                if (uiManager && typeof uiManager.closeAllPanels === 'function') uiManager.closeAllPanels();
-                if (pauseMenu) pauseMenu.style.display = 'flex';
-                document.exitPointerLock();
-            } else {
+                paused = false;
                 if (pauseMenu) pauseMenu.style.display = 'none';
                 document.body.requestPointerLock();
+            } else {
+                // Close the topmost open panel first; only show pause if none were open
+                const closedPanel = uiManager && typeof uiManager.closeOpenPanel === 'function'
+                    ? uiManager.closeOpenPanel() : false;
+                if (!closedPanel) {
+                    paused = true;
+                    if (uiManager && typeof uiManager.closeAllPanels === 'function') uiManager.closeAllPanels();
+                    if (pauseMenu) pauseMenu.style.display = 'flex';
+                    document.exitPointerLock();
+                }
             }
         }
         
@@ -1243,7 +1368,7 @@ function animate() {
         }
 
         // === SKILL BAR INPUTS (RMB / E / R) ===
-        if (skillSystem && player && !player.isDead) {
+        if (skillSystem && player && !player.isDead && !player._empDisabled) {
             if (activeInput.wasPressed('Mouse2')) skillSystem.useSkill('RMB');
             if (activeInput.wasPressed('KeyE') && player.state !== 'CLIMB' && player.state !== 'HANG') skillSystem.useSkill('E');
             if (activeInput.wasPressed('KeyR')) skillSystem.useSkill('R');
@@ -1342,15 +1467,29 @@ function animate() {
             ui.style.display = 'none';
         }
         
-        // === APEX RIFT TOGGLE (T) ===
-        if (activeInput.wasPressed('KeyT') && apexRift && !apexRift.active && !bossFight.isActive() && !levelEditor.isActive()) {
+        // === DIFFICULTY TIER CYCLE (Shift+T) ===
+        if (activeInput.wasPressed('KeyT') && activeInput.isPressed('ShiftLeft')) {
+            arenaMode.toggleSelector();
+        }
+        
+        // === APEX RIFT TOGGLE (T) — only fire if Shift is NOT held ===
+        if (activeInput.wasPressed('KeyT') && !activeInput.isPressed('ShiftLeft') && apexRift && !apexRift.active && !bossFight.isActive() && !levelEditor.isActive()) {
             apexRift.startRift();
             showHint('Press T to enter the Apex Rift — endgame awaits.');
         }
-        
-        // === DIFFICULTY TIER CYCLE (M) ===
-        if (activeInput.wasPressed('KeyT') && activeInput.isPressed('ShiftLeft')) {
-            arenaMode.toggleSelector();
+
+        // === COLLAPSE MODE (Y) ===
+        if (activeInput.wasPressed('KeyY')) {
+            // Auto-unlock once all dungeons are complete or if already unlocked
+            if (dungeonSystem && dungeonSystem.allDungeonsComplete && dungeonSystem.allDungeonsComplete()) {
+                if (collapse && !collapse.isUnlocked()) collapse.unlock();
+            }
+            if (collapse && collapse.isUnlocked()) {
+                collapse.startRun();
+                showHint('COLLAPSE MODE — survive all 10 floors!');
+            } else {
+                showHint('Collapse Mode locked — complete all dungeons first.');
+            }
         }
 
         if (activeInput.wasPressed('KeyM')) {
@@ -1384,8 +1523,9 @@ function animate() {
             autoSaveTimer = 0;
         }
 
-        // Overclock / Heat (compute early for finalDt) — gated by key item
-        const timeScale = player.overclockUnlocked !== false ? overclock.update(dt, activeInput) : 1.0;
+        // Overclock / Heat (compute early for finalDt) — gated by key item and EMP disable
+        const _empBlocked = player._empDisabled === true;
+        const timeScale = (!_empBlocked && player.overclockUnlocked !== false) ? overclock.update(dt, activeInput) : 1.0;
         const slowMo = droneTakedown.update(dt, player, activeInput, world.drones.drones);
         if (droneTakedown.slowMoTimer > 0) bulletTime.trigger(player.position, 5);
         const finalDt = dt * Math.min(timeScale, slowMo);
@@ -1699,6 +1839,7 @@ function animate() {
         dialogueSystem.update(finalDt, activeInput);
         shop.update(finalDt, activeInput);
         bottleSystem.update(finalDt, activeInput);
+        weaponLoadoutUI.update(finalDt, activeInput);
         overworldMap.update(finalDt, activeInput);
 
         dungeonSystem.update(finalDt, activeInput);
@@ -1752,7 +1893,8 @@ function animate() {
         // Damage numbers
         if (damageNumbers) damageNumbers.update(dt);
 
-        // Inventory quick-use (keys 6-9)
+        // Inventory quick-use (keys 6-9) — inventorySystem handles RPG consumables
+        // BottleSystem also listens on 6-9 for Zelda-style bottle slots (independent)
         if (activeInput.wasPressed('Digit6')) inventorySystem.useItem('health_potion');
         if (activeInput.wasPressed('Digit7')) inventorySystem.useItem('mana_potion');
         if (activeInput.wasPressed('Digit8')) inventorySystem.useItem('stamina_vial');
@@ -1781,8 +1923,13 @@ function animate() {
     }
 }
 
-// Hide loading overlay once init completes
+// H16: Hide loading overlay after the first rendered frame, not synchronously during init.
+// This ensures the GPU has actually produced a frame before the overlay disappears.
+setLoadProgress('Ready!');
 const loadingOverlay = document.getElementById('loading-overlay');
-if (loadingOverlay) loadingOverlay.style.display = 'none';
-
-animate();
+requestAnimationFrame(() => {
+    animate();
+    requestAnimationFrame(() => {
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+    });
+});

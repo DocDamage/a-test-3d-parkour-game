@@ -141,6 +141,15 @@ export class InputManager {
     }
 
     /**
+     * Inject synthetic mouse movement (e.g. from touch look joystick).
+     * Accumulates into the same delta buffer that consumeMouse() drains.
+     */
+    addMouseDelta(dx, dy) {
+        this.mouse.dx += dx;
+        this.mouse.dy += dy;
+    }
+
+    /**
      * Programmatically set a key state. Used by TouchControls to inject
      * synthetic keyboard input without mutating internals directly.
      */

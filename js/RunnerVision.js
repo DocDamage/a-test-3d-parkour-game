@@ -44,18 +44,10 @@ export class RunnerVision {
 
 		// Pre-scan world objects
 		this._scanWorld();
-
-		// Own key listener so we don't need InputManager changes
-		this._onKey = (e) => {
-			if (!window.gameStarted || window.paused) return;
-			if (e.code === 'KeyV') this.toggle();
-		};
-		document.addEventListener('keydown', this._onKey);
 	}
 
-	/** Call before discarding to remove listeners. */
+	/** Call before discarding to clean up. */
 	dispose() {
-		document.removeEventListener('keydown', this._onKey);
 		this._restoreAll();
 	}
 

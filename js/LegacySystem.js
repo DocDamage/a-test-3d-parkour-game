@@ -162,6 +162,12 @@ export class LegacySystem {
     return { totalKills, heirloomCount };
   }
 
+  /* ---------- Per-frame update ---------- */
+
+  update(dt) {
+    // Nothing to tick per-frame; dynasty bonus is queried passively by CharacterSheet.
+  }
+
   /* ---------- Serialization ---------- */
 
   serialize() {

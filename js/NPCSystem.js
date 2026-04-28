@@ -209,6 +209,18 @@ const DIALOGUE_TREES = {
 };
 
 export class NPCSystem {
+  // H20: known sector anchors (world-space XZ centre, Y at floor level)
+  // Any sectorId appearing in schedules MUST have an entry here or a __DEV__ warning fires.
+  static SECTOR_POSITIONS = {
+    safehouse:      { x:  0, y: 0, z:  0 },
+    sector_4:       { x: 20, y: 0, z: -10 },
+    sector_7:       { x:-20, y: 0, z:  15 },
+    break_room:     { x:  8, y: 0, z: -18 },
+    rooftops:       { x:  0, y:12, z:   5 },
+    shooting_range: { x:-12, y: 0, z: -5 },
+    offline:        { x:  0, y: 0, z:   0 }, // NPC is off-map/unreachable intentionally
+  };
+
   constructor(world, player, factionSystem, weatherSystem = null) {
     this.world = world;
     this.player = player;
@@ -220,11 +232,27 @@ export class NPCSystem {
       this._npcs.set(def.id, { ...def, memory: {}, lastDialogueChoice: null });
     }
 
+    // H20: validate that every sectorId in NPC schedules has a known world position
+    if (window.__DEV__) {
+      for (const [npcId, npc] of this._npcs) {
+        for (const [timeBlock, slot] of Object.entries(npc.schedule || {})) {
+          if (slot && slot.sectorId && !(slot.sectorId in NPCSystem.SECTOR_POSITIONS)) {
+            console.warn(`NPCSystem: NPC "${npcId}" schedule[${timeBlock}] references unknown sectorId "${slot.sectorId}". Add it to NPCSystem.SECTOR_POSITIONS.`);
+          }
+        }
+      }
+    }
+
     this._gameTimeHours = 8;
     this._weatherCache = null;
   }
 
   /* ---------- Schedule Queries ---------- */
+
+  /** Returns the world-space anchor {x,y,z} for a sector, or null if unknown. */
+  getSectorPosition(sectorId) {
+    return NPCSystem.SECTOR_POSITIONS[sectorId] || null;
+  }
 
   getNPCsAtLocation(sectorId, timeOfDay = null) {
     const block = timeOfDay || resolveTimeBlock(this._gameTimeHours);

@@ -284,6 +284,12 @@ export class CollapseMode {
 
   /* ---------- Update ---------- */
 
+  /** Call from _handleEnemyKilled when collapse run is active. */
+  onEnemyKilled(enemy) {
+    if (!this._inRun) return;
+    this._runStats.kills = (this._runStats.kills || 0) + 1;
+  }
+
   update(dt, player) {
     if (!this._inRun) return;
     if (dt <= 0) return;

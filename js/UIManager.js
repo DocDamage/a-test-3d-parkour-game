@@ -16,6 +16,7 @@ export class UIManager {
             mastery: false
         };
         this._lastStashHash = '';
+        this._invCloseWired = false;
     }
 
     /* ------------------------------------------------------------------ */
@@ -154,7 +155,7 @@ export class UIManager {
             if (ip) ip.style.display = (ip.style.display === 'block') ? 'none' : 'block';
             return true;
         }
-        if (activeInput.wasPressed('KeyB')) {
+        if (activeInput.wasPressed('BracketRight')) {
             const ip = document.getElementById('inventory-panel');
             if (ip) {
                 const showing = ip.style.display === 'block';
@@ -184,6 +185,29 @@ export class UIManager {
             if (el) el.style.display = 'none';
         });
         this._panelState = {};
+    }
+
+    /**
+     * Close the topmost visible panel. Returns true if any panel was closed.
+     * Used by Escape key handler to dismiss panels before showing pause menu.
+     */
+    closeOpenPanel() {
+        const ids = [
+            'settings-panel','stash-panel','shop-panel','inventory-panel',
+            'passive-tree-panel','codex-panel','mastery-panel','faction-panel',
+            'character-sheet-panel','safehouse-panel','bounty-panel',
+            'implants-panel','gear-panel','companion-panel','keyitem-panel',
+            'passive-tree','character-panel','weapon-loadout-panel',
+            'rift-result-overlay','difficulty-popup',
+        ];
+        for (const id of ids) {
+            const el = document.getElementById(id);
+            if (el && el.style.display !== 'none' && el.style.display !== '') {
+                el.style.display = 'none';
+                return true;
+            }
+        }
+        return false;
     }
 
     /* ------------------------------------------------------------------ */
@@ -360,8 +384,6 @@ export class UIManager {
     _updateBountyPanel(d) {
         const bp = document.getElementById('bounty-panel');
         if (!bp || bp.style.display !== 'block' || !d.bounty) return;
-        if (!this._panelDirty.bounty) return;
-        this._panelDirty.bounty = false;
         const rankEl = document.getElementById('bounty-rank');
         const contractsEl = document.getElementById('bounty-contracts');
         if (rankEl && d.bounty.getRunnerRank) rankEl.textContent = 'Rank: ' + d.bounty.getRunnerRank();
@@ -373,9 +395,8 @@ export class UIManager {
     }
 
     refreshBountyPanel() {
-        this._panelDirty = this._panelDirty || {};
-        this._panelDirty.bounty = true;
-        if (document.getElementById('bounty-contracts') && document.getElementById('bounty-contracts').style.display !== 'none') {
+        const bp = document.getElementById('bounty-panel');
+        if (bp && bp.style.display === 'block') {
             this._updateBountyPanel(this.deps);
         }
     }
@@ -427,14 +448,55 @@ export class UIManager {
     }
 
     _updateInventoryPanel() {
+        const panel = document.getElementById('inventory-panel');
+        if (!panel || panel.style.display === 'none') return;
         const container = document.getElementById('inventory-list');
         if (!container) return;
+
+        // Wire close button once
+        if (!this._invCloseWired) {
+            this._invCloseWired = true;
+            const closeBtn = document.getElementById('inventory-close');
+            if (closeBtn) closeBtn.addEventListener('click', () => {
+                panel.style.display = 'none';
+            });
+        }
+
         const items = this.inventorySystem ? this.inventorySystem.getItems() : [];
         if (!items || !items.length) {
-            container.innerHTML = '<p class="empty-state">Inventory is empty.</p>';
+            container.innerHTML = '<p style="color:#666;font-size:12px;padding:8px 0;">Inventory is empty.</p>';
             return;
         }
-        container.innerHTML = items.map((item, i) => `<div class="inventory-item">${item.name || 'Item'} x${item.quantity || 1}</div>`).join('');
+        container.innerHTML = '';
+        items.forEach((item) => {
+            if (!item || !item.quantity) return;
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);border:1px solid #2a3a2a;border-radius:4px;padding:7px 10px;gap:8px;';
+
+            const info = document.createElement('span');
+            info.style.cssText = 'font-size:13px;flex:1;';
+            info.innerHTML = `<b style="color:#cfc">${item.name || item.id}</b> <span style="color:#666;">x${item.quantity}</span>`;
+            if (item.desc) {
+                const desc = document.createElement('div');
+                desc.style.cssText = 'font-size:10px;color:#777;margin-top:2px;';
+                desc.textContent = item.desc;
+                info.appendChild(desc);
+            }
+
+            const useBtn = document.createElement('button');
+            useBtn.textContent = 'Use';
+            useBtn.style.cssText = 'font-family:monospace;font-size:11px;padding:3px 10px;background:#1a3a1a;color:#88ff88;border:1px solid #4a7a4a;border-radius:3px;cursor:pointer;';
+            useBtn.addEventListener('click', () => {
+                if (this.inventorySystem && typeof this.inventorySystem.useItem === 'function') {
+                    this.inventorySystem.useItem(item.id);
+                    this._updateInventoryPanel();
+                }
+            });
+
+            row.appendChild(info);
+            row.appendChild(useBtn);
+            container.appendChild(row);
+        });
     }
 
     _updateCharacterPanel(d) {

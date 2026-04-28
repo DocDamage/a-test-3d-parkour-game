@@ -19,6 +19,8 @@ export class ShopSystem {
         this._player      = player;
         this._heartSystem = heartSystem;
         this._bottleSystem = null;
+        this._debtSystem   = null;
+        this._consequences = null;
         this._open         = false;
         this._msgTimer     = null;
 
@@ -32,6 +34,8 @@ export class ShopSystem {
     get isOpen() { return this._open; }
 
     setBottleSystem(bottleSystem) { this._bottleSystem = bottleSystem; }
+    setDebtSystem(debt) { this._debtSystem = debt; }
+    setConsequenceSystem(cs) { this._consequences = cs; }
 
     checkProximity(playerPos) {
         const dx = playerPos.x - SHOP_POS.x;
@@ -132,29 +136,42 @@ export class ShopSystem {
 
     _refresh() {
         const p = this._player;
-        document.getElementById('shop-scrap').textContent = `Scrap: ${p.scrap} 🔩`;
+        const discountActive = this._consequences && this._consequences.getWorldFlag('shop_bonus_chips');
+        let scrapeInfo = `Scrap: ${p.scrap} 🔩`;
+        if (discountActive) scrapeInfo += ' <span style="color:#ffdd00;font-size:11px">[10% OFF]</span>';
+        if (this._debtSystem) {
+            const summary = this._debtSystem.getSummary();
+            if (summary && summary.totalDebt > 0) {
+                scrapeInfo += ` <span style="color:#ff6666;font-size:11px">| Debt: ${summary.totalDebt}</span>`;
+            }
+        }
+        document.getElementById('shop-scrap').innerHTML = scrapeInfo;
 
         const itemsDiv  = document.getElementById('shop-items');
         itemsDiv.innerHTML = '';
 
         for (const item of ITEMS) {
-            const canAfford = p.scrap >= item.cost;
+            const cost      = this._effectiveCost(item);
+            const canAfford = p.scrap >= cost ||
+                (this._debtSystem && this._debtSystem.getSummary && this._debtSystem.getSummary().maxLoan > 0);
             const row       = document.createElement('div');
             row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px';
 
             const label = document.createElement('span');
             label.style.fontSize = '13px';
-            label.innerHTML = `<b>${item.name}</b> — ${item.cost} 🔩 <span style="color:#888;font-size:11px">${item.desc}</span>`;
+            const costDisplay = cost < item.cost
+                ? `<s style="color:#888">${item.cost}</s> <b style="color:#ffdd00">${cost}</b>`
+                : `${cost}`;
+            label.innerHTML = `<b>${item.name}</b> — ${costDisplay} 🔩 <span style="color:#888;font-size:11px">${item.desc}</span>`;
 
             const btn = document.createElement('button');
-            btn.textContent = 'Buy';
-            btn.disabled    = !canAfford;
+            btn.textContent = p.scrap >= cost ? 'Buy' : 'Borrow & Buy';
             Object.assign(btn.style, {
                 padding: '4px 12px', borderRadius: '4px', fontSize: '12px',
-                background: canAfford ? '#0d2b0d' : '#1a1a1a',
-                color:      canAfford ? '#aaffaa' : '#444',
-                border:     `1px solid ${canAfford ? '#aaffaa' : '#333'}`,
-                cursor:     canAfford ? 'pointer' : 'default',
+                background: p.scrap >= cost ? '#0d2b0d' : '#2b1800',
+                color:      p.scrap >= cost ? '#aaffaa' : '#ffaa44',
+                border:     `1px solid ${p.scrap >= cost ? '#aaffaa' : '#ffaa44'}`,
+                cursor:     'pointer',
             });
             btn.addEventListener('click', () => this._buy(item));
 
@@ -164,11 +181,36 @@ export class ShopSystem {
         }
     }
 
+    _effectiveCost(item) {
+        let cost = item.cost;
+        if (this._consequences && this._consequences.getWorldFlag('shop_bonus_chips')) {
+            cost = Math.floor(cost * 0.9); // 10% discount when bonus chips flag set
+        }
+        return cost;
+    }
+
     _buy(item) {
-        const p  = this._player;
-        const hs = this._heartSystem;
-        if (p.scrap < item.cost) return;
-        p.scrap -= item.cost;
+        const p    = this._player;
+        const hs   = this._heartSystem;
+        const cost = this._effectiveCost(item);
+
+        if (p.scrap < cost) {
+            // Attempt to borrow from DebtSystem
+            if (this._debtSystem) {
+                const shortfall = cost - p.scrap;
+                const result = this._debtSystem.borrow(shortfall);
+                if (!result || !result.success) {
+                    this._showMsg('Cannot afford — debt cap reached!');
+                    return;
+                }
+                p.scrap += shortfall;
+                this._showMsg(`Borrowed ${shortfall} chips (debt incurred)!`);
+            } else {
+                this._showMsg('Not enough scrap!');
+                return;
+            }
+        }
+        p.scrap -= cost;
 
         switch (item.id) {
             case 'red_potion':

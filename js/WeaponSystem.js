@@ -16,6 +16,7 @@
  */
 
 import * as THREE from 'three';
+import { Hitbox } from './HitboxSystem.js';
 
 export const WEAPON_SLOTS = {
     MELEE: 1,
@@ -43,6 +44,7 @@ export class WeaponSystem {
         this.audioManager = audioManager;
 
         this.slots = new Map();
+        this._unlocked = [];
         this.currentSlot = WEAPON_SLOTS.MELEE;
         this.ammo = {
             [AMMO_TYPES.PISTOL]: { clip: 0, reserve: 0 },
@@ -104,6 +106,16 @@ export class WeaponSystem {
     /* ------------------------------------------------------------------ */
     /*  Inventory                                                         */
     /* ------------------------------------------------------------------ */
+
+    /** Register a weapon as owned/unlocked but not yet assigned to a slot. */
+    registerUnlocked(weapon) {
+        if (weapon && !this._unlocked.includes(weapon)) {
+            this._unlocked.push(weapon);
+        }
+    }
+
+    /** Return all unlocked (pool) weapons. */
+    getUnlocked() { return this._unlocked; }
 
     equip(weapon, slot) {
         if (!weapon || !slot) return false;
@@ -296,8 +308,6 @@ export class WeaponSystem {
 
     _fireMelee(weapon, origin, direction) {
         if (!this.hitboxSystem) return;
-        const { Hitbox } = this._getHitboxCtor();
-        if (!Hitbox) return;
         const eff = this._getEffectiveStats();
         const damage = eff ? eff.damage : (weapon.damage || 15);
         const range = eff ? eff.range : (weapon.range || 1.2);
@@ -354,8 +364,6 @@ export class WeaponSystem {
     _fireHitscan(weapon, origin, direction) {
         // Simple raycast hitscan — for now, approximate with short-lived hitbox
         if (!this.hitboxSystem) return;
-        const { Hitbox } = this._getHitboxCtor();
-        if (!Hitbox) return;
         const eff = this._getEffectiveStats();
         const damage = eff ? eff.damage : (weapon.damage || 20);
         const range = eff ? eff.range : (weapon.range || 20);
@@ -391,15 +399,6 @@ export class WeaponSystem {
         ammo.reserve -= taken;
         this.isReloading = false;
         this._updateUI();
-    }
-
-    _getHitboxCtor() {
-        // Lazy access to avoid circular import issues
-        try {
-            return { Hitbox: null }; // main.js passes hitboxSystem, we use it directly
-        } catch (e) {
-            return { Hitbox: null };
-        }
     }
 
     /* ------------------------------------------------------------------ */

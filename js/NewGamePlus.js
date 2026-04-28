@@ -125,6 +125,86 @@ export class NewGamePlus {
     return this._enemyLevelOffset;
   }
 
+  /* ---------- Per-frame update — apply active corruption modifiers ---------- */
+
+  update(dt) {
+    if (!this._unlocked || this._corruptionModifiers.length === 0) return;
+
+    // static_field: EMP burst every 120 real seconds
+    if (this._hasModifier('static_field')) {
+      this._staticFieldTimer = (this._staticFieldTimer || 0) + dt;
+      if (this._staticFieldTimer >= 120) {
+        this._staticFieldTimer = 0;
+        if (this.player && !this.player.isDead) {
+          this.player._empDisabled = true;
+          setTimeout(() => { if (this.player) this.player._empDisabled = false; }, 3000);
+          window.__DEV__ && console.log('NG+ Static Field: EMP burst!');
+        }
+      }
+    }
+
+    // rapid_respawn: respawn dead drones after 30s
+    if (this._hasModifier('rapid_respawn')) {
+      this._respawnTimers = this._respawnTimers || new Map();
+      if (this.world && this.world.drones && this.world.drones.drones) {
+        for (const drone of this.world.drones.drones) {
+          if (!drone) continue;
+          if (drone.isDead || drone.health <= 0) {
+            if (!this._respawnTimers.has(drone)) {
+              this._respawnTimers.set(drone, 30);
+            }
+          }
+        }
+        for (const [drone, timeLeft] of this._respawnTimers) {
+          const newTime = timeLeft - dt;
+          if (newTime <= 0) {
+            // Respawn: reset health and state
+            drone.health = drone.maxHealth || 50;
+            drone.isDead = false;
+            drone.state = 'patrol';
+            drone.detection = 0;
+            if (drone.mesh) drone.mesh.visible = true;
+            this._respawnTimers.delete(drone);
+          } else {
+            this._respawnTimers.set(drone, newTime);
+          }
+        }
+      }
+    }
+
+    // director_watches: all drones become elite (set once)
+    if (this._hasModifier('director_watches') && !this._directorApplied) {
+      this._directorApplied = true;
+      if (this.world && this.world.drones && this.world.drones.drones) {
+        for (const drone of this.world.drones.drones) {
+          if (drone) {
+            drone.isElite = true;
+            drone.maxHealth = Math.ceil((drone.maxHealth || 50) * 1.5);
+            drone.health = drone.maxHealth;
+            drone.meleeDamage = Math.ceil((drone.meleeDamage || 10) * 1.3);
+          }
+        }
+      }
+    }
+
+    // gravity_shifts: change gravity every 60s (visual hint only — actual physics stays intact)
+    if (this._hasModifier('gravity_shifts')) {
+      this._gravityTimer = (this._gravityTimer || 0) + dt;
+      if (this._gravityTimer >= 60) {
+        this._gravityTimer = 0;
+        // Apply a brief upward impulse to the player as a "gravity shift" feel
+        if (this.player && !this.player.isDead && this.player.velocity) {
+          this.player.velocity.y += 8;
+        }
+        window.__DEV__ && console.log('NG+ Gravity Shifts: upward impulse!');
+      }
+    }
+  }
+
+  _hasModifier(id) {
+    return this._corruptionModifiers.some(m => m.id === id || m.id.startsWith(id));
+  }
+
   /* ---------- Serialization ---------- */
 
   serialize() {

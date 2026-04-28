@@ -162,6 +162,7 @@ export class Collectibles {
         this.chips = [];
         this.count = 0;
         this.respawnEnabled = false;
+        this._heartPieces = [];
 
         // Build a minimal UI counter and inject it into the existing HUD
         this.uiWrapper = document.createElement('div');
@@ -180,8 +181,20 @@ export class Collectibles {
         this.updateUI();
     }
 
+    /** Spawn a heart piece collectible. Calls this.onHeartPieceCollected() when picked up. */
+    addHeartPiece(x, y, z) {
+        // Reuse Chip geometry but use a pink/red tinted material to distinguish
+        const geo = new THREE.OctahedronGeometry(0.35, 0);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xff4466, emissive: 0xff0033, emissiveIntensity: 0.6, metalness: 0.2, roughness: 0.4 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, z);
+        this.scene.add(mesh);
+        this._heartPieces.push({ mesh, collected: false });
+    }
+
     /** Call every frame. */
     update(dt, player) {
+        // Chip updates
         for (const chip of this.chips) {
             if (!chip.collected) {
                 chip.updateAnimation(dt);
@@ -199,6 +212,23 @@ export class Collectibles {
                 chip.respawnTimer -= dt;
                 if (chip.respawnTimer <= 0) {
                     chip.respawn();
+                }
+            }
+        }
+
+        // Heart piece updates
+        if (player) {
+            for (const hp of this._heartPieces) {
+                if (hp.collected) continue;
+                hp.mesh.rotation.y += dt * 1.5;
+                hp.mesh.position.y += Math.sin(Date.now() * 0.002) * 0.002;
+                const dist = hp.mesh.position.distanceTo(player.position);
+                if (dist < 1.2) {
+                    hp.collected = true;
+                    this.scene.remove(hp.mesh);
+                    hp.mesh.geometry.dispose();
+                    hp.mesh.material.dispose();
+                    if (typeof this.onHeartPieceCollected === 'function') this.onHeartPieceCollected();
                 }
             }
         }

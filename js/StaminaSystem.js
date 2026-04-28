@@ -81,9 +81,17 @@ export class StaminaSystem {
         // If stamina hits 0 while sprinting, force walk
         if (this.stamina <= 0 && isSprinting && player) {
             player.wasSprinting = false;
+            this._staminaExhausted = true;
+        } else if (this.stamina > this.costs.sprint * 0.5) {
+            this._staminaExhausted = false;
         }
 
         this._updateUI();
+    }
+
+    /** Check if the player has enough stamina to start sprinting. */
+    canSprint() {
+        return this.stamina > this.costs.sprint * 0.5;
     }
 
     /* ------------------------------------------------------------------ */

@@ -10,6 +10,9 @@ export class GamepadController {
         this.deadZone = 0.15;
         this.rumbleEnabled = true;
         
+        // M4: reference to InputManager so keyboard stays active when gamepad is connected
+        this._keyboard = null;
+        
         // Virtual keyboard state (mirrors InputManager)
         this.keys = {};
         this.prevKeys = {};
@@ -39,13 +42,14 @@ export class GamepadController {
         const gp = this._getGamepad();
         if (!gp) return;
         
-        // Left stick -> WASD
+        // Left stick -> WASD (OR with real keyboard state so keyboard always takes priority)
         const lx = gp.axes[0];
         const ly = gp.axes[1];
-        const kbW = this.keys['KeyW'];
-        const kbA = this.keys['KeyA'];
-        const kbS = this.keys['KeyS'];
-        const kbD = this.keys['KeyD'];
+        const kb = this._keyboard ? this._keyboard.keys : {};
+        const kbW = kb['KeyW'];
+        const kbA = kb['KeyA'];
+        const kbS = kb['KeyS'];
+        const kbD = kb['KeyD'];
         this.keys['KeyW'] = kbW || (ly < -this.deadZone);
         this.keys['KeyS'] = kbS || (ly > this.deadZone);
         this.keys['KeyA'] = kbA || (lx < -this.deadZone);
@@ -63,11 +67,12 @@ export class GamepadController {
             const code = keyBindings.getGamepadBinding(idx);
             if (!code) continue;
             const pressed = gp.buttons[idx] && gp.buttons[idx].pressed;
+            const kbPressed = this._keyboard ? !!this._keyboard.keys[code] : false;
             if (code === 'Mouse2') {
-                this.mouse2Down = pressed;
-                this.keys['Mouse2'] = pressed;
+                this.mouse2Down = pressed || kbPressed;
+                this.keys['Mouse2'] = this.mouse2Down;
             } else {
-                this.keys[code] = pressed;
+                this.keys[code] = pressed || kbPressed;
             }
         }
         
@@ -86,6 +91,11 @@ export class GamepadController {
     wasReleased(code) { return !this.keys[code] && !!this.prevKeys[code]; }
     consumeKey(code) {
         this.prevKeys[code] = true;
+    }
+
+    /** M4: call this once after both InputManager and GamepadController are created */
+    setKeyboardInput(inputManager) {
+        this._keyboard = inputManager;
     }
     isMouse2Pressed() { return this.mouse2Down; }
     wasMouse2Pressed() { return this.mouse2Down && !this.prevMouse2Down; }

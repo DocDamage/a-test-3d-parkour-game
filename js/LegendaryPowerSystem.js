@@ -46,6 +46,13 @@ export class LegendaryPowerSystem {
                 if (bar) bar.alwaysVisible = false;
             }
         }
+
+        // Loot Beacon: sync pickup radius to player so LootSystem auto-pickup range reflects the power
+        if (this._hasPower('loot_beacon')) {
+            this.player._lootPickupRadius = this._getPowerValue('loot_beacon', 10);
+        } else {
+            this.player._lootPickupRadius = 0;
+        }
     }
 
     _hasPower(id) {

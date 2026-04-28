@@ -92,7 +92,11 @@ export class InventorySystem {
         setTimeout(() => { this.player.isInvisible = false; }, (def.duration || 5) * 1000);
         return true;
       case 'teleport':
-        // Teleport to safehouse
+        // Return player to the warehouse default spawn point
+        if (this.player.position) {
+          this.player.position.set(0, 2, 0);
+          if (this.player.velocity) this.player.velocity.set(0, 0, 0);
+        }
         return true;
       default:
         return false;

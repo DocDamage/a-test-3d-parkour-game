@@ -868,5 +868,15 @@ export class World {
         this.collectibles.addChip(20, 2, 10);         // inside slide tunnel (crouch)
         this.collectibles.addChip(-27.5, 6, 0);       // high wall-jump corridor
         this.collectibles.addChip(31, 4, -20);        // mid-air between moving platforms
+
+        // Heart pieces — 8 placed in challenging locations (4 pieces = 1 heart container)
+        this.collectibles.addHeartPiece(0, 9.5, -20);     // top of tallest pillar
+        this.collectibles.addHeartPiece(-27.5, 6.8, 0);   // high wall-jump corridor peak
+        this.collectibles.addHeartPiece(38, 2, -16);      // end of moving platform gauntlet
+        this.collectibles.addHeartPiece(33.5, 2, 11);     // laser corridor exit
+        this.collectibles.addHeartPiece(-30, 10, -25);    // fan shaft very top
+        this.collectibles.addHeartPiece(25, 2, 28);       // wrecking ball room high ledge
+        this.collectibles.addHeartPiece(15, 6.5, -15);    // top of tall climb wall
+        this.collectibles.addHeartPiece(-19, 5, 16);      // corner climb peak
     }
 }

@@ -36,6 +36,7 @@ class Drone {
         this.team = 'enemy';
         this.isElite = false;
         this.attackCooldown = 0;
+        this.rangedCooldown = 0;   // separate cooldown for ranged shot
         this._feared = false;
         this._disabled = false;
         this._hackExpiry = 0;
@@ -110,6 +111,8 @@ class Drone {
 
         // Status effect timers
         if (this._disabled) return;
+        // EMP-disabled (from ArenaMode or NG+ static_field)
+        if (player && player._empDisabled) return;
         if (this._hackExpiry > 0) {
             this._hackExpiry -= dt;
             if (this._hackExpiry <= 0) {
@@ -240,6 +243,18 @@ class Drone {
             }
         }
 
+        // Ranged attack cooldown tick
+        if (this.rangedCooldown > 0) this.rangedCooldown = Math.max(0, this.rangedCooldown - dt);
+
+        // Ranged attack at medium range (4-8 m) — makes Firewall interception meaningful
+        if (this.state === 'CHASE' && player && !this.isDead && this.team !== 'player') {
+            const distToPlayer = this.group.position.distanceTo(player.position);
+            if (distToPlayer >= 2.5 && distToPlayer <= 8 && this.rangedCooldown <= 0) {
+                this._fireRangedShot(player);
+                this.rangedCooldown = 3.0;
+            }
+        }
+
         // Hacked drone attacks enemies
         if (this.team === 'player' && !this.isDead) {
             const drones = this.scene?.userData?.allDrones || [];
@@ -281,6 +296,9 @@ class Drone {
     /*  Vision cone + line-of-sight                                         */
     /* ------------------------------------------------------------------ */
     checkVision(player) {
+        // Invisible players (smoke bomb, Operative skill) break line of sight
+        if (player && player.isInvisible) return false;
+
         const toPlayer = new THREE.Vector3().subVectors(player.position, this.group.position);
         const dist = toPlayer.length();
         if (dist > this.visionRange) return false;
@@ -428,6 +446,50 @@ class Drone {
         }
         if (this.onDamageTaken) this.onDamageTaken(amount, type, source);
         return amount;
+    }
+
+    _fireRangedShot(player) {
+        const fromPos = this.group.position.clone().add(new THREE.Vector3(0, 0.3, 0));
+        const toPos = player.position.clone().add(new THREE.Vector3(0, 0.8, 0));
+
+        // Firewall intercept: reflect the shot back at the drone
+        if (player._firewallActive) {
+            this._spawnShotVisual(fromPos, toPos, 0x00aaff);
+            if (this._damageSystem) {
+                this._damageSystem.applyDamage(player, this, 8, 'energy');
+            } else {
+                this.takeDamage(8, 'energy', player);
+            }
+            return;
+        }
+
+        // Normal shot: visual first, then delayed hitscan (simulates travel time)
+        this._spawnShotVisual(fromPos, toPos, 0xff4400);
+        const self = this;
+        setTimeout(() => {
+            if (!player.isDead) {
+                if (self._damageSystem) {
+                    self._damageSystem.applyDamage(self, player, 8, 'energy');
+                } else if (player.takeDamage) {
+                    player.takeDamage(8, 'energy', self);
+                }
+            }
+        }, 300);
+    }
+
+    _spawnShotVisual(from, to, color) {
+        const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
+        const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+        const line = new THREE.Line(geo, mat);
+        this.scene.add(line);
+        let life = 0.25;
+        const tick = () => {
+            life -= 0.016;
+            mat.opacity = Math.max(0, life / 0.25);
+            if (life > 0) requestAnimationFrame(tick);
+            else { this.scene.remove(line); geo.dispose(); mat.dispose(); }
+        };
+        tick();
     }
 
     die(source) {

@@ -860,7 +860,7 @@ export class InteractiveEnvironment {
             gain.connect(dest);
             noise.start(t);
             noise.stop(t + 0.35);
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('InteractiveEnvironment: audio error', e); }
     }
 
     _playSteamHiss(x, y, z) {
@@ -889,7 +889,7 @@ export class InteractiveEnvironment {
             gain.connect(dest);
             noise.start(t);
             noise.stop(t + 1.3);
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('InteractiveEnvironment: audio error', e); }
     }
 
     _playMechanicalClick(x, y, z) {
@@ -914,6 +914,6 @@ export class InteractiveEnvironment {
             gain.connect(dest);
             osc.start(t);
             osc.stop(t + 0.08);
-        } catch (e) {}
+        } catch (e) { if (window.__DEV__) console.warn('InteractiveEnvironment: audio error', e); }
     }
 }
