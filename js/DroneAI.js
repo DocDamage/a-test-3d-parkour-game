@@ -4,7 +4,7 @@ import * as THREE from 'three';
  * Single patrol drone with vision-cone detection.
  */
 class Drone {
-    constructor(scene, world, config, damageSystem = null) {
+    constructor(scene, world, config, damageSystem = null, assetManager = null) {
         this.scene = scene;
         this.world = world;
         this._damageSystem = damageSystem;
@@ -35,6 +35,8 @@ class Drone {
         this.faction = 'vanguard';
         this.team = 'enemy';
         this.isElite = false;
+        this.assetManager = assetManager;
+        this.authoredModel = null;
         this.attackCooldown = 0;
         this.rangedCooldown = 0;   // separate cooldown for ranged shot
         this._feared = false;
@@ -97,6 +99,7 @@ class Drone {
         // Start at first waypoint, facing the second (or +Z if only one)
         this.group.position.copy(this.waypoints[0]);
         this.orientToNextWaypoint();
+        this.setAssetManager(assetManager);
     }
 
     /* ------------------------------------------------------------------ */
@@ -104,6 +107,28 @@ class Drone {
     /* ------------------------------------------------------------------ */
     setDamageSystem(ds) {
         this._damageSystem = ds;
+    }
+
+    setAssetManager(assetManager) {
+        this.assetManager = assetManager;
+        if (!assetManager || this.authoredModel) return;
+        assetManager.loadModel('enemy.drone.robot').then(() => {
+            if (this.isDead || this.authoredModel) return;
+            const model = assetManager.instantiateModel('enemy.drone.robot', {
+                scale: 1,
+                castShadow: true,
+                receiveShadow: false,
+                emissiveTint: 0x00ccff
+            });
+            if (!model) return;
+            model.rotation.y = Math.PI;
+            this.authoredModel = model;
+            this.group.add(model);
+            if (this.body) this.body.visible = false;
+            if (this.ring) this.ring.scale.setScalar(0.72);
+        }).catch(err => {
+            if (window.__DEV__) console.warn('DroneAI: authored drone model failed', err);
+        });
     }
 
     update(dt, player) {
@@ -208,6 +233,9 @@ class Drone {
         if (this.state === 'ALERT' && prevState !== 'ALERT') {
             this.alertBaseRotation = this.group.rotation.y;
             this.alertScanAngle = 0;
+        }
+        if ((this.state === 'ALERT' || this.state === 'CHASE') && prevState === 'PATROL') {
+            this._playAlertSound();
         }
 
         // Colours / light
@@ -431,6 +459,14 @@ class Drone {
         this.spotLight.color.setHex(s.light);
         this.body.material.emissive.setHex(s.bodyEmissive);
         this.ring.material.color.setHex(s.ring);
+        if (this.authoredModel) {
+            this.authoredModel.traverse(obj => {
+                if (obj.isMesh && obj.material?.emissive) {
+                    obj.material.emissive.setHex(s.bodyEmissive);
+                    obj.material.emissiveIntensity = this.state === 'CHASE' ? 0.9 : 0.45;
+                }
+            });
+        }
     }
 
     getMeshes() {
@@ -492,6 +528,12 @@ class Drone {
         tick();
     }
 
+    _playAlertSound() {
+        const audio = window.audioManager;
+        if (!audio || typeof audio.playAudioAsset !== 'function') return;
+        audio.playAudioAsset('enemy.drone.alert', this.group ? this.group.position : null);
+    }
+
     die(source) {
         this.isDead = true;
         this.state = 'DEAD';
@@ -540,6 +582,7 @@ export class DroneAI {
         this.player = player;
         this.drones = [];
         this._damageSystem = null;
+        this.assetManager = null;
         this.openingGraceTimer = 0;
     }
 
@@ -554,6 +597,11 @@ export class DroneAI {
         for (const d of this.drones) d.setDamageSystem(ds);
     }
 
+    setAssetManager(assetManager) {
+        this.assetManager = assetManager;
+        for (const d of this.drones) d.setAssetManager(assetManager);
+    }
+
     /**
      * Add a new drone.
      * @param {Object} config
@@ -563,7 +611,7 @@ export class DroneAI {
      * @param {number}     [config.pauseTime=1.5]
      */
     addDrone(config) {
-        const drone = new Drone(this.scene, this.world, config, this._damageSystem);
+        const drone = new Drone(this.scene, this.world, config, this._damageSystem, this.assetManager);
         this.drones.push(drone);
         return drone;
     }

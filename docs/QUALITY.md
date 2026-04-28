@@ -53,6 +53,7 @@
 |--------|-------|-------|
 | DifficultyTierSystem | B | 9 tiers, persistent unlocks, scales HP/dmg/XP/loot. `#difficulty-badge` + popup added. |
 | ApexRiftSystem | B | Arena, progress bar, guardian spawn, time limits. `#rift-hud` with live timer, progress fill, wave/kill counters, guardian flash, and result overlay added. |
+| ApexRunLoopDirector | B | Adds an actual first-session loop: orient, scavenge, hunt, gear up, and enter Apex Rift. Uses LootSystem and scene-only asset dressing; needs deeper browser scenario coverage. |
 | NephalemGlory | B | Kill streak tracking, 3 tiers, multipliers. `#glory-overlay` DOM tint added (gold/orange/red per tier). Floating text at tier 3. |
 | Rift Guardian | B | Unique `RiftGuardian` boss now drives Apex Rift directly, has its own core damage model, attacks, cleanup, combat hurtbox, and rift-aware HP/damage scaling. |
 | Difficulty UI | B | `#difficulty-badge` top-right with tier color classes. Click opens popup listing all tiers with lock states. |
@@ -74,7 +75,10 @@
 | System | Grade | Notes |
 |--------|-------|-------|
 | Post-Processing | B | Full chain + `setEffectEnabled(name, bool)` + `setFOV(degrees)`. Settings panel wired. |
-| Audio | B | Procedural synthesis. Added `setSFXVolume()` and `setMusicVolume()`. Settings panel wired. |
+| Audio | B | Procedural synthesis plus curated authored OGG cues. Added `setSFXVolume()` and `setMusicVolume()`. Settings panel wired. |
+| Asset Pipeline | B | `AssetManager`, `VisualAssetRegistry`, loot visuals, character creator visuals, editor asset props, industrial kit props, and conversion scripts are in place. Needs final art direction pass and license cleanup on candidate packs. |
+| Character Creator | B | Asset-backed body bases, modular part/limb slots, gear/weapon previews, colors, save/load, randomize, and seam armor. Needs authored animation retargeting for the imported character bodies. |
+| Level Editor | B | Dev-mode primitive and asset prop placement, local save/load, import/export, and curated sci-fi/industrial palettes. Needs transform gizmos and collision authoring UI. |
 | Particles | B | ParticleEffects module. Could use more hit/death FX. Grenade and EMP now use particle explosions. |
 
 ## Infrastructure
@@ -90,15 +94,19 @@
 
 1. **Economy telemetry** — Ancient/Primal odds are simulated and capped, but real run data should still be collected over longer sessions.
 2. **Scenario depth** — Browser smoke now covers boot, stash comparison, gem buttons, and safehouse identify UI; rift entry and combat scenarios can still go deeper.
-3. **Lifecycle migration** — `Lifecycle.js` centralizes mixed update signatures; individual subsystems can now migrate toward `update(dt, context)` over time.
-4. **Combat performance profiling** — `HitboxSystem` now has spatial hashing, but heavy combat scenes should still be profiled with real enemy density.
+3. **Asset licensing** — Industrial Cyberpunk assets are CC0; the corridor kit and several candidate enemy/prop packs still need final license confirmation before becoming core shipped content.
+4. **Animation retargeting** — Imported player bases share useful skeleton structure, but authored external animation clips still need a proper Blender retarget/export pass.
+5. **Lifecycle migration** — `Lifecycle.js` centralizes mixed update signatures; individual subsystems can now migrate toward `update(dt, context)` over time.
+6. **Combat performance profiling** — `HitboxSystem` now has spatial hashing, but heavy combat scenes should still be profiled with real enemy density.
 
 ## Action Priority
 
 | Priority | Task | Estimated Effort |
 |----------|------|-----------------|
 | P1 | Add rift-entry and combat interaction scenarios to browser smoke | 4 hours |
+| P1 | Add smoke coverage for the guided run-loop objective and level editor asset placement | 4 hours |
 | P1 | Add live economy telemetry export for long sessions | 4 hours |
+| P2 | Confirm licenses for candidate corridor/enemy/prop packs | 2 hours |
 | P2 | Profile dense combat scenes with spatial hash enabled | 3 hours |
 | P2 | Migrate expansion subsystems toward `update(dt, context)` | 4 hours |
 
@@ -120,3 +128,8 @@
 - Added `Lifecycle.js` and routed expansion updates through a shared lifecycle adapter.
 - Added HitboxSystem spatial hashing for broadphase checks once active hitboxes exceed the performance threshold.
 - Expanded browser smoke to seed stash/gem data and assert stash comparison, socket/unsocket controls, and safehouse identify UI render after boot.
+- Added the asset pipeline foundation: `AssetManager`, `VisualAssetRegistry`, authored OGG cue registry, loot pickup visuals, sprite impact hooks, and environment dressing.
+- Converted/imported character bases, modular character parts, anatomical limb pieces, sci-fi weapons, loot pickups, drones/enemies, skyline props, modular sci-fi kit assets, and Industrial Cyberpunk CC0 environment pieces.
+- Added a robust character creator UI with body bases, body parts, limb slots, gear silhouettes, weapon preview, colors, randomization, save/load, and runtime seam armor to smooth modular joins.
+- Expanded the dev level editor with asset prop placement, curated palette buttons, local save/load, import/export, and industrial/corridor kit candidates.
+- Added `ApexRunLoopDirector` to make the first playable session read as orient -> scavenge -> hunt -> gear up -> Apex Rift.

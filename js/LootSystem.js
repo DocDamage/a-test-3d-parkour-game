@@ -3,6 +3,8 @@ import { RARITY } from './AffixSystem.js';
 import { SLOTS, PRE_DEFINED_ITEMS } from './ExoSuitSystem.js';
 import { rollEndgameRarity } from './BalanceModel.js';
 import { ProceduralWeaponSystem } from './ProceduralWeaponSystem.js';
+import { createLootDropVisual } from './LootDropVisualFactory.js';
+import { disposeObject3D } from './AssetManager.js';
 
 /** @typedef {'gear'|'weapon'|'gem'|'scrap'|'chips'|'health_globe'|'consumable'} DropType */
 
@@ -32,6 +34,7 @@ export class LootSystem {
         this._inventoryStash = null;
         this._gemSystem = null;
         this._proceduralWeapons = new ProceduralWeaponSystem({ defaultLevel: 10 });
+        this._assetManager = null;
     }
 
     /** Wire in the InventorySystem after construction. */
@@ -49,6 +52,10 @@ export class LootSystem {
 
     setProceduralWeaponSystem(system) {
         this._proceduralWeapons = system || this._proceduralWeapons;
+    }
+
+    setAssetManager(assetManager) {
+        this._assetManager = assetManager || null;
     }
 
     /**
@@ -151,6 +158,7 @@ export class LootSystem {
                 break;
         }
 
+        this._playPickupCue(drop);
         this._removeDrop(dropId);
         return true;
     }
@@ -198,14 +206,7 @@ export class LootSystem {
         for (const [id, drop] of this.drops) {
             if (drop.mesh) {
                 this.scene.remove(drop.mesh);
-                if (drop.mesh.geometry) drop.mesh.geometry.dispose();
-                if (drop.mesh.material) {
-                    if (Array.isArray(drop.mesh.material)) {
-                        drop.mesh.material.forEach(m => m.dispose());
-                    } else {
-                        drop.mesh.material.dispose();
-                    }
-                }
+                disposeObject3D(drop.mesh);
             }
         }
         this.drops.clear();
@@ -363,16 +364,10 @@ export class LootSystem {
     /* -------------------------------------------------------------------- */
 
     _createMeshForDrop(drop) {
-        switch (drop.type) {
-            case 'gear':      return this._createGearMesh(drop.rarity);
-            case 'weapon':    return this._createWeaponMesh(drop.rarity);
-            case 'gem':       return this._createGemMesh(drop.gemId);
-            case 'scrap':     return this._createScrapMesh();
-            case 'chips':     return this._createChipsMesh();
-            case 'health_globe': return this._createHealthGlobeMesh();
-            case 'consumable': return this._createConsumableMesh(drop.consumableType);
-            default:          return this._createScrapMesh();
-        }
+        return createLootDropVisual(drop, {
+            assetManager: this._assetManager,
+            rarityColor: rarity => this._rarityColor(rarity)
+        });
     }
 
     _createGearMesh(rarity) {
@@ -556,19 +551,19 @@ export class LootSystem {
         this._inventorySystem.addItem(itemId, drop.quantity || 1);
     }
 
+    _playPickupCue(drop) {
+        const audio = window.audioManager;
+        if (!audio || typeof audio.playSFX !== 'function') return;
+        const isRareLoot = drop.rarity >= RARITY.LEGENDARY || drop.type === 'weapon';
+        audio.playSFX(isRareLoot ? 'loot_rare' : 'loot_pickup', drop.mesh ? drop.mesh.position : null);
+    }
+
     _removeDrop(id) {
         const drop = this.drops.get(id);
         if (!drop) return;
         if (drop.mesh) {
             this.scene.remove(drop.mesh);
-            if (drop.mesh.geometry) drop.mesh.geometry.dispose();
-            if (drop.mesh.material) {
-                if (Array.isArray(drop.mesh.material)) {
-                    drop.mesh.material.forEach(m => m.dispose());
-                } else {
-                    drop.mesh.material.dispose();
-                }
-            }
+            disposeObject3D(drop.mesh);
         }
         this.drops.delete(id);
     }

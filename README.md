@@ -1,8 +1,8 @@
 # Vertical Parkour ARPG
 
-A browser-native Three.js action RPG where movement is the combat system. Wall-runs, slides, grapples, air dashes, weapons, skills, loot, and endgame rifts all run in one static ES module app with no build step.
+A browser-native Three.js action RPG where movement is the combat system. Wall-runs, slides, grapples, air dashes, authored GLB assets, weapons, skills, loot, and endgame rifts all run in one static ES module app with no build step.
 
-The current game is a large prototype/completion branch rather than a tiny demo: it has character creation, archetypes, skills, fixed and procedural weapons, gear, an infinite backpack, gems, legendary powers, bosses, rifts, safehouse systems, accessibility settings, controller support, PWA files, and automated validation.
+The current game is a large prototype/completion branch rather than a tiny demo: it has an asset-backed character creator, archetypes, skills, fixed and procedural weapons, gear, an infinite backpack, gems, legendary powers, bosses, a guided first-session run loop, rifts, safehouse systems, a dev level editor, authored audio, accessibility settings, controller support, PWA files, and automated validation.
 
 ## Quick Start
 
@@ -53,6 +53,18 @@ Examples:
 
 ## Current Feature Set
 
+### Current Game Loop
+
+`js/ApexRunLoopDirector.js` turns the sandbox into a readable first session:
+
+1. **Orient** — start in a safer breathing lane, move, climb, and learn the camera.
+2. **Scavenge** — collect starter chips or a level-10 weapon cache.
+3. **Hunt** — use parkour-combat to defeat a patrol drone.
+4. **Gear Up** — collect the reward and open the infinite backpack with `I`.
+5. **Escalate** — press `T` to enter Apex Rift when ready.
+
+The director spawns starter loot through the existing `LootSystem`, adds small asset-backed set dressing through `AssetManager`, tracks stash/chips/drone kills, and stays out of `World` ownership arrays.
+
 ### Movement
 
 - Third-person parkour controller with sprint, crouch, jump, fall, climb, slide, vault, wall-run, ledge hang, roll, stumble, ragdoll, grapple swing, grapple retract, ceiling run, and platform grab states.
@@ -70,7 +82,7 @@ Examples:
 
 ### RPG Buildcraft
 
-- Character creation with origin and archetype selection.
+- Character creation with origin, archetype, modular body bases, body-part slots, gear silhouettes, weapon preview, colors, randomize, save, and runtime seam armor.
 - Archetype resources and active skills for Traceur, Operative, Saboteur, Specimen, and Netrunner.
 - Progression, attributes, passive tree, skill bar, implants, mastery, codex, familiarity, companion, faction, territory, rivalry, and legacy systems.
 - Exo-suit gear with rarity tiers, base stats, affixes, set bonuses, legendary powers, and persistent equipment.
@@ -94,14 +106,14 @@ Examples:
 
 - Time Trial, Speedrun ILs, Rising Tide, Arena Mode, Collapse Mode, Apex Rift, New Game+, Legacy, Difficulty Tiers, Nephalem Glory, bounty systems, photo bounties, escort events, rhythm parkour, trap crafting, and predator drone encounters.
 - Dungeon, puzzle room, key item, safehouse, shop, debt, dialogue, NPC schedule, light/dark world, and overworld map systems.
-- Level editor in dev mode for placing/exporting/importing scene objects.
+- Level editor in dev mode for placing/exporting/importing scene objects, saving local layouts, and dropping asset-backed props from the sci-fi, megakit, corridor, and industrial palettes.
 
 ### Accessibility And Platform
 
 - PWA manifest and service worker.
 - Keyboard/mouse, controller, touch controls, remappable key bindings, controller prompts, rumble, trigger thresholds, and hot-swap support.
 - Accessibility manager with colorblind filters, UI scale, high contrast, reduced motion, subtitle support, screen reader toggles, motor assists, photosensitive mode, and dyslexia-friendly font option.
-- Procedural Web Audio synthesis with no external audio files.
+- Web Audio synthesis plus curated authored OGG cues for UI, weapons, loot, combat, and drones.
 
 ## Controls
 
@@ -178,6 +190,27 @@ js/ProceduralWeaponSystem.js
 js/ProceduralWeaponAdapter.js
   Runtime bridge from generated weapon loot objects into the existing WeaponSystem behavior contract
 
+js/ApexRunLoopDirector.js
+  First-session objective loop: orient, scavenge, hunt, gear up, and escalate into Apex Rift
+
+js/AssetManager.js / js/VisualAssetRegistry.js
+  GLB/texture loading, caching, stable asset IDs, and future real-asset paths
+
+js/CharacterCustomizationSystem.js / js/CharacterCreatorUI.js
+  Asset-backed create-a-character flow with body bases, modular parts, gear previews, colors, save/load, and randomization
+
+js/EditorAssetPalette.js / js/LevelEditor.js / js/EditorUI.js
+  Dev level editor with primitive placement, asset prop placement, import/export, local save/load, and curated palette entries
+
+js/AudioAssetRegistry.js / js/AudioManager.js
+  Curated OGG cue manifest, decoded buffer playback, positional SFX, and procedural fallbacks
+
+js/LootDropVisualFactory.js
+  Asset-backed loot pickup visuals with procedural fallbacks
+
+js/EnvironmentDressing.js / js/SpriteSheetEffects.js
+  Visual-only skyline/prop dressing and sprite-sheet projectile impact effects
+
 js/BalanceModel.js
   Shared rift scaling and Ancient/Primal rarity tuning
 
@@ -188,7 +221,7 @@ docs/
   Architecture, design notes, quality scorecard, and execution plans
 
 scripts/
-  Validation, browser smoke, unit tests, and balance simulation
+  Validation, browser smoke, unit tests, balance simulation, asset conversion, and asset validation
 ```
 
 One subsystem generally lives in one `js/*.js` file. New gameplay modules should not be folded into `Player.js` or `World.js`.
@@ -199,7 +232,7 @@ The game is pure browser JavaScript:
 
 - Renderer: Three.js r160 via CDN import map
 - Post-processing: EffectComposer chain
-- Audio: Web Audio API procedural synthesis
+- Audio: Web Audio API synthesis plus decoded OGG runtime cues
 - Persistence: `localStorage`
 - Build system: none
 - Platform: browser only
@@ -218,6 +251,7 @@ Read more:
 - [Design](docs/DESIGN.md)
 - [Quality Scorecard](docs/QUALITY.md)
 - [Roadmap to 100%](docs/plans/ROADMAP_TO_100_PERCENT.md)
+- [Asset Production List](docs/assets/ASSET_PRODUCTION_LIST.md)
 
 ## Validation
 

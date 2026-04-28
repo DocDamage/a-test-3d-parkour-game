@@ -12,6 +12,18 @@ This is not a Diablo clone with parkour tacked on. It is a parkour game where ev
 
 The skill bar (LMB/RMB/Q/E/R) is the primary interface. Parkour state transitions are the "animation frames" of our combat system.
 
+## First-Session Loop
+
+The current playable loop is intentionally direct:
+
+1. **Orient** — give the player a safer start lane, camera time, and vertical space before pressure ramps.
+2. **Scavenge** — teach loot pickup with chips and a starter weapon cache.
+3. **Hunt** — ask for one drone kill using movement, weapons, and the current camera mode.
+4. **Gear Up** — route rewards into the infinite backpack and invite equipment decisions.
+5. **Escalate** — open Apex Rift when the player chooses to push into endgame pressure.
+
+`ApexRunLoopDirector` owns this guidance layer. It should stay light: spawn through existing systems, show objectives, add small visual landmarks, and never become a second game director.
+
 ## Skill Design Philosophy
 
 | Slot | Role | Resource Pattern |
@@ -65,6 +77,7 @@ We follow Diablo conventions so players immediately understand drop quality:
 
 - **Skill bar is always visible** when in-game (bottom center)
 - **Player health bar** is always visible (bottom center, below skill bar)
+- **Run loop objective** is visible during the first session so the sandbox has a readable next action
 - **Enemy health bars** appear when damaged; always visible if Omniscience legendary power is equipped
 - **Damage numbers** float upward, color-coded by type, larger for crits
 - **RPG panels** toggle with single keys:
@@ -82,6 +95,13 @@ We follow Diablo conventions so players immediately understand drop quality:
   - **Shift+O** — Rising Tide toggle
   - **T** — Apex Rift
   - **M** — Cycle Difficulty Tier
+
+## Asset Direction
+
+- Real assets should improve readability first: traversal edges, pickup type, enemy threat, weapon family, and character silhouette.
+- Character creation uses modular body bases, limb/part slots, gear overlays, colors, and runtime seam armor. Stats still come from origin, archetype, gear, and RPG systems rather than from cosmetic body choices.
+- The level editor should feel like a toy box: fast placement, visible previews, curated asset palettes, local save/load, and export/import for sharing layouts.
+- Authored OGG sounds should be curated into short runtime cues. Source WAV/MP3 libraries stay outside the browser load path.
 
 ## Progression Pacing
 

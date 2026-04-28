@@ -59,8 +59,22 @@ index.html (UI shell, canvas, CSS)
         ├── ENDGAME MODULES (Phase 4)
         │   ├── DifficultyTierSystem│
         │   ├── ApexRiftSystem      │
+        │   ├── ApexRunLoopDirector │ (first-session objective loop)
         │   └── NephalemGlory       │
         │                           │
+        ├── ASSET PIPELINE
+        │   ├── AssetManager        │ (GLB/texture loading, caching, cloning)
+        │   ├── VisualAssetRegistry │ (stable runtime asset IDs)
+        │   ├── AudioAssetRegistry  │ (authored OGG cue manifest)
+        │   ├── LootDropVisualFactory
+        │   ├── CharacterCustomizationSystem
+        │   ├── CharacterCreatorUI
+        │   ├── CharacterBaseVisuals
+        │   ├── PlayerAnimationController
+        │   ├── EditorAssetPalette
+        │   ├── EnvironmentDressing
+        │   └── SpriteSheetEffects
+        │
         └── PARKOUR / FEATURE MODULES
             ├── DroneTakedown
             ├── BulletTime
@@ -96,6 +110,8 @@ index.html (UI shell, canvas, CSS)
 3. **Game loop contract:** All gameplay updates receive `finalDt` (time-dilated). Visual FX can use `dt`.
 4. **Parkour = Combat.** Movement abilities are skills on the skill bar. The "Vertical ARPG" identity is preserved.
 5. **Data-first RPG modules.** The 24 RPG modules are data-only shells with UI panels. Combat integration happens gradually (Phase 1-3).
+6. **Asset IDs over raw paths.** Runtime systems should ask `VisualAssetRegistry` for stable IDs and let `AssetManager` own loading/caching.
+7. **Guidance without ownership theft.** `ApexRunLoopDirector` may spawn drops through `LootSystem` and scene-only dressing through `AssetManager`, but it must not mutate `World` arrays directly.
 
 ## Critical Integration Points
 
@@ -152,11 +168,11 @@ const finalDt = dt * Math.min(timeScale, slowMo);
 | File | Target | Current |
 |------|--------|---------|
 | Player.js | < 2000 lines | ~1743 |
-| main.js | < 1500 lines | ~1970 ⚠️ |
+| main.js | < 1500 lines | ~2140 ⚠️ |
 | World.js | < 1500 lines | ~900 |
 | New modules | < 500 lines each | varies |
 
-> **Note:** `main.js` exceeded 1500 lines after wiring 20 skill callbacks, hint system, settings wiring, and gamepad rumble. Consider extracting skill callbacks to `js/SkillCallbacks.js` or per-archetype files if it grows further.
+> **Note:** `main.js` exceeded 1500 lines after wiring skills, asset loading, character creation, editor wiring, run-loop guidance, settings, and gamepad rumble. Future large feature work should extract startup wiring into focused composition modules.
 
 ## Performance Budgets
 

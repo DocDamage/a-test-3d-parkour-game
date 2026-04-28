@@ -4,6 +4,7 @@ import { Player } from './Player.js';
 import { World } from './World.js';
 import { ThirdPersonCamera } from './ThirdPersonCamera.js';
 import { AudioManager } from './AudioManager.js';
+import { AUDIO_TAGS } from './AudioAssetRegistry.js';
 import { PostProcessing } from './PostProcessing.js';
 import { TimeTrial } from './TimeTrial.js';
 import { PhotoMode } from './PhotoMode.js';
@@ -43,6 +44,14 @@ import { EnemyManager } from './EnemyManager.js';
 import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
 import { WeaponModSystem } from './WeaponModSystem.js';
 import { ProceduralWeaponSystem } from './ProceduralWeaponSystem.js';
+import { AssetManager } from './AssetManager.js';
+import { ASSET_TAGS } from './VisualAssetRegistry.js';
+import { getCharacterBase } from './CharacterBaseVisuals.js';
+import { CharacterCustomizationSystem } from './CharacterCustomizationSystem.js';
+import { CharacterCreatorUI } from './CharacterCreatorUI.js';
+import { ApexRunLoopDirector } from './ApexRunLoopDirector.js';
+import { EnvironmentDressing } from './EnvironmentDressing.js';
+import { SpriteSheetEffects } from './SpriteSheetEffects.js';
 import { ArenaMode } from './ArenaMode.js';
 import { BossFabricator } from './bosses/BossFabricator.js';
 import { BossWarden } from './bosses/BossWarden.js';
@@ -251,6 +260,33 @@ ctx.register('saveSystem', [], () => saveSystem);
 // Hint / loot toast UI is needed by gear setup and later onboarding hooks.
 const { showHint, showLootToast } = createHintSystem();
 
+// Visual assets: real GLB/texture files can be dropped into /assets and
+// enabled in VisualAssetRegistry without changing gameplay systems.
+const assetManager = new AssetManager({ dev: __DEV__ });
+ctx.register('assetManager', [], () => assetManager);
+if (__DEV__) window.assetManager = assetManager;
+if (__DEV__) window.assetStatus = () => assetManager.getStatus();
+if (__DEV__) window.audioStatus = () => audio.getAudioStatus();
+world.drones?.setAssetManager?.(assetManager);
+assetManager.preloadTagged(ASSET_TAGS.BOOT).catch(err => {
+    if (__DEV__) console.warn('AssetManager boot preload failed', err);
+});
+const environmentDressing = new EnvironmentDressing(scene, assetManager);
+ctx.register('environmentDressing', ['scene', 'assetManager'], () => environmentDressing);
+environmentDressing.init().catch(err => {
+    if (__DEV__) console.warn('Environment dressing failed', err);
+});
+const spriteSheetEffects = new SpriteSheetEffects(scene, camera, assetManager);
+ctx.register('spriteSheetEffects', ['scene', 'camera', 'assetManager'], () => spriteSheetEffects);
+projectileManager.setSpriteEffects(spriteSheetEffects);
+spriteSheetEffects.preload().catch(err => {
+    if (__DEV__) console.warn('Sprite sheet VFX preload failed', err);
+});
+const characterCustomization = new CharacterCustomizationSystem(assetManager, player);
+ctx.register('characterCustomization', ['assetManager', 'player'], () => characterCustomization);
+const characterCreatorUI = new CharacterCreatorUI(characterCustomization);
+ctx.register('characterCreatorUI', ['characterCustomization'], () => characterCreatorUI);
+
 // Souls-like risk layer (echo shards + healing vials + safehouse rest)
 const soulsSystem = new SoulsSystem(scene, player);
 ctx.register('soulsSystem', ['scene', 'player'], () => soulsSystem);
@@ -277,6 +313,11 @@ if (savedArchetype) {
     try { archetype.setPrimary(savedArchetype); } catch (e) { if (__DEV__) console.warn('ArchetypeSystem.setPrimary missing', e); }
 }
 
+applyCharacterBaseVisual(localStorage.getItem('character_base') || 'drizzel');
+window.addEventListener('apex-character-base-selected', event => {
+    applyCharacterBaseVisual(event.detail?.baseId || 'drizzel');
+});
+
 // RPG Phase 2-4 systems
 const exoSuit = new ExoSuitSystem(player, characterSheet);
 exoSuit._load();
@@ -291,6 +332,7 @@ const affixSystem = new AffixSystem();
 ctx.register('affixSystem', [], () => affixSystem);
 const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
 ctx.register('lootSystem', ['scene', 'player', 'exoSuit', 'affixSystem'], () => lootSystem);
+lootSystem.setAssetManager(assetManager);
 const familiarity = new FamiliaritySystem();
 ctx.register('familiarity', [], () => familiarity);
 const companion = new CompanionDrone(scene, player, null); // eventBus placeholder
@@ -367,6 +409,7 @@ ctx.register('weaponModSystem', [], () => weaponModSystem);
 const proceduralWeaponSystem = new ProceduralWeaponSystem({ defaultLevel: 10 });
 ctx.register('proceduralWeaponSystem', [], () => proceduralWeaponSystem);
 lootSystem.setProceduralWeaponSystem(proceduralWeaponSystem);
+weaponSystem.setAssetManager(assetManager);
 inventoryStash.setWeaponSystem(weaponSystem, scene);
 if (__DEV__) {
     window.proceduralWeaponSystem = proceduralWeaponSystem;
@@ -495,6 +538,11 @@ saveSystem.register('archetype',
     }
 );
 
+saveSystem.register('characterCustomization',
+    () => characterCustomization.serialize(),
+    (data) => characterCustomization.deserialize(data)
+);
+
 // Auto-load existing unified save (overrides piecemeal localStorage loads)
 if (saveSystem.hasSave()) {
     saveSystem.load();
@@ -599,6 +647,7 @@ stickyBomb.onExplode = (data) => {
     hb.damage = data.damage; hb.team = 'player';
     hitboxSystem.registerHitbox(hb);
     if (particleEffects) particleEffects.explosion(data.position.clone(), 0xff3300, 20);
+    if (spriteSheetEffects) spriteSheetEffects.spawn('explosion', data.position.clone(), { size: Math.max(1.8, data.radius || 2.2) });
 };
 
 // Arena mode will be instantiated after bossFight is created (see below)
@@ -848,7 +897,7 @@ if (audio && typeof audio.attachToCamera === 'function') {
 }
 
 // Level Editor
-const levelEditor = new LevelEditor(scene, camera, renderer, world, player);
+const levelEditor = new LevelEditor(scene, camera, renderer, world, player, assetManager);
 
 // Time trial
 const timeTrial = new TimeTrial(scene, player);
@@ -1023,6 +1072,18 @@ for (const boss of bosses) {
 const difficultyTier = new DifficultyTierSystem(challenges);
 const apexRift = new ApexRiftSystem(scene, world, player, riftGuardian, challenges, lootSystem, difficultyTier, enemyManager);
 const nephalemGlory = new NephalemGlory(player, challenges);
+const apexRunLoop = new ApexRunLoopDirector(scene, player, world, {
+    assetManager,
+    lootSystem,
+    inventoryStash,
+    showHint,
+    activeArchetypeId
+});
+ctx.register('apexRunLoop', ['scene', 'player', 'world', 'assetManager', 'lootSystem', 'inventoryStash'], () => apexRunLoop);
+saveSystem.register('apexRunLoop',
+    () => apexRunLoop.serialize(),
+    (data) => apexRunLoop.deserialize(data)
+);
 
 gameDirector = new GameDirector({
     ctx, player, progression, familiarity, weaponSystem, factions, companion,
@@ -1298,6 +1359,7 @@ function enterGameplay() {
         clearTimeout(player._invincibilityTimer);
         player._invincibilityTimer = setTimeout(() => { player.isInvincible = false; }, 6000);
         showHint('Safe start: get your bearings, then move when ready.');
+        apexRunLoop.start();
     }
     startScreen.style.display = 'none';
     if (paused) {
@@ -1314,6 +1376,9 @@ function enterGameplay() {
         if (skillBarUI) skillBarUI.show();
     }
     if (!audio._ambiencePlaying) audio.playAmbience();
+    audio.preloadTagged(AUDIO_TAGS.BOOT).catch(err => {
+        if (__DEV__) console.warn('Audio boot preload failed', err);
+    });
 }
 
 // Pause menu wiring
@@ -1913,6 +1978,7 @@ function animate() {
         
         // Update particles
         particleEffects.update(finalDt);
+        spriteSheetEffects.update(dt);
         
         // Update ziplines — gated by key item
         if (player.ziplineKitUnlocked !== false) ziplines.update(finalDt, player, activeInput);
@@ -2045,6 +2111,7 @@ function animate() {
             hitboxSystem.checkCollisions(damageSystem);
         }
         if (lootSystem) lootSystem.update(finalDt, player.position);
+        if (apexRunLoop) apexRunLoop.update(finalDt, activeInput, apexRift);
         enemyHealthBars.forEach(bar => { if (bar && bar.update) bar.update(finalDt); });
 
         // Legendary power: refresh when gear changes
@@ -2108,6 +2175,17 @@ function applyKeyboardCameraLook(activeInput, mouseDelta, dt) {
     if (activeInput.isPressed('ArrowRight')) mouseDelta.x += yawSpeed * dt;
     if (activeInput.isPressed('ArrowUp')) mouseDelta.y -= pitchSpeed * dt;
     if (activeInput.isPressed('ArrowDown')) mouseDelta.y += pitchSpeed * dt;
+}
+
+async function applyCharacterBaseVisual(baseId) {
+    const base = getCharacterBase(baseId);
+    if (!base || !assetManager || !player) return;
+    if (characterCustomization) {
+        characterCustomization.setConfig({ baseId: base.id });
+        characterCreatorUI?.refresh?.();
+        player.characterBaseId = base.id;
+        return;
+    }
 }
 
 // H16: Hide loading overlay after the first rendered frame, not synchronously during init.

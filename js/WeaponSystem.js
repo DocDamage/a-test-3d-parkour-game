@@ -17,6 +17,7 @@
 
 import * as THREE from 'three';
 import { Hitbox } from './HitboxSystem.js';
+import { getWeaponModelId, MANUFACTURER_VISUALS } from './VisualAssetRegistry.js';
 
 export const WEAPON_SLOTS = {
     MELEE: 1,
@@ -61,8 +62,16 @@ export class WeaponSystem {
         this.modSystem = null;
         this.familiaritySystem = null;
         this.trickSystem = null;
+        this.assetManager = null;
+        this._visualOffset = new THREE.Vector3(0.32, 0.82, 0.28);
+        this._visualForward = new THREE.Vector3(0, 0, 1);
 
         this._buildUI();
+    }
+
+    setAssetManager(assetManager) {
+        this.assetManager = assetManager || null;
+        for (const weapon of this.slots.values()) this._ensureWeaponVisual(weapon);
     }
 
     setModSystem(modSystem) {
@@ -127,13 +136,19 @@ export class WeaponSystem {
         weapon.mods = weapon.mods || [];
         this.slots.set(slot, weapon);
         const equipped = this.slots.get(slot);
+        this._ensureWeaponVisual(equipped);
         this._primeAmmoForWeapon(equipped);
+        this._syncWeaponVisibility();
         this._updateUI();
         return true;
     }
 
     unequip(slot) {
+        const weapon = this.slots.get(slot);
+        if (weapon?.setVisible) weapon.setVisible(false);
+        else if (weapon?.mesh) weapon.mesh.visible = false;
         this.slots.delete(slot);
+        this._syncWeaponVisibility();
     }
 
     getWeapon(slot) {
@@ -147,6 +162,7 @@ export class WeaponSystem {
     switchSlot(slot) {
         if (this.slots.has(slot)) {
             this.currentSlot = slot;
+            this._syncWeaponVisibility();
             this._updateUI();
             if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
                 window.audioManager.playSFX('weapon_switch');
@@ -164,6 +180,7 @@ export class WeaponSystem {
         if (next < 0) next = keys.length - 1;
         if (next >= keys.length) next = 0;
         this.currentSlot = keys[next];
+        this._syncWeaponVisibility();
         this._updateUI();
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
             window.audioManager.playSFX('weapon_switch');
@@ -312,6 +329,8 @@ export class WeaponSystem {
         // Update active weapon visual / cooldowns
         const w = this.getCurrentWeapon();
         if (w && w.update && typeof w.update === 'function') w.update(dt);
+        this._updateManagedWeaponVisual(w);
+        this._syncWeaponVisibility();
 
         // Input: scroll wheel cycles
         if (input && input.wasPressed && input.wasPressed('ScrollUp')) this.cycleSlot(-1);
@@ -461,6 +480,59 @@ export class WeaponSystem {
             return;
         }
         ammo.clip = Math.min(Math.max(ammo.clip, 1), clipSize);
+    }
+
+    _ensureWeaponVisual(weapon) {
+        if (!weapon || weapon.mesh || !this.assetManager) return;
+        const modelId = getWeaponModelId(weapon);
+        if (!modelId) return;
+        const manufacturerVisual = MANUFACTURER_VISUALS[weapon.manufacturer] || null;
+        this.assetManager.loadModel(modelId).then(() => {
+            if (weapon.mesh || !this._isWeaponEquipped(weapon)) return;
+            const model = this.assetManager.instantiateModel(modelId, {
+                castShadow: true,
+                scale: 0.8,
+                materialTint: manufacturerVisual?.color,
+                emissiveTint: manufacturerVisual?.emissive
+            });
+            if (!model) return;
+            model.visible = false;
+            model.rotation.set(0, 0, 0);
+            model.userData.managedWeaponVisual = true;
+            weapon.mesh = model;
+            weapon._visualManagedByWeaponSystem = true;
+            this.scene.add(model);
+            this._syncWeaponVisibility();
+        });
+    }
+
+    _isWeaponEquipped(weapon) {
+        for (const equipped of this.slots.values()) {
+            if (equipped === weapon) return true;
+        }
+        return false;
+    }
+
+    _syncWeaponVisibility() {
+        for (const [slot, weapon] of this.slots) {
+            const visible = slot === this.currentSlot;
+            if (weapon?.setVisible && !weapon._visualManagedByWeaponSystem) weapon.setVisible(visible);
+            else if (weapon?.mesh) weapon.mesh.visible = visible;
+        }
+    }
+
+    _updateManagedWeaponVisual(weapon) {
+        if (!weapon?._visualManagedByWeaponSystem || !weapon.mesh || !this.player) return;
+        const yaw = this.player.facing || 0;
+        const offset = this._visualOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+        weapon.mesh.position.copy(this.player.position).add(offset);
+        weapon.mesh.rotation.set(0, yaw, 0);
+        if (weapon.weaponType === 'Energy Sword') {
+            weapon.mesh.position.y += 0.15;
+            weapon.mesh.rotation.z = -0.65;
+        } else {
+            weapon.mesh.rotation.x = -0.08;
+        }
     }
 
     _applySplashDamage(primaryTarget, damage, damageType, blastRadius) {

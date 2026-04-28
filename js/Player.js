@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PlayerAnimationController } from './PlayerAnimationController.js';
 import { Trajectory } from './Trajectory.js';
 import { GrapplingHook } from './GrapplingHook.js';
 import { ComboSystem } from './ComboSystem.js';
@@ -185,6 +186,10 @@ export class Player {
 
         // Visuals
         this.mesh = this.createMesh();
+        this._baseMesh = this.mesh;
+        this._customVisual = null;
+        this._customAnimation = null;
+        this._customVisualScale = 1;
         this.shadow = this.createShadow();
         this.trajectory = new Trajectory(scene);
 
@@ -248,6 +253,42 @@ export class Player {
 
         this.scene.add(group);
         return group;
+    }
+
+    setVisualModel(model, options = {}) {
+        if (!model) return false;
+        if (this._customVisual) {
+            this.mesh.remove(this._customVisual);
+        }
+        for (const child of [...this._baseMesh.children]) {
+            child.visible = false;
+        }
+        model.position.set(0, options.yOffset ?? 0, 0);
+        model.rotation.set(0, options.rotationY ?? Math.PI, 0);
+        const scale = options.scale ?? 1;
+        model.scale.setScalar(scale);
+        model.traverse(obj => {
+            if (obj.isMesh) {
+                obj.castShadow = true;
+                obj.receiveShadow = false;
+            }
+        });
+        this._baseMesh.add(model);
+        this._customVisual = model;
+        this._customAnimation = new PlayerAnimationController(model, this);
+        this._customVisualScale = scale;
+        return true;
+    }
+
+    clearVisualModel() {
+        if (this._customVisual) {
+            this.mesh.remove(this._customVisual);
+            this._customVisual = null;
+            this._customAnimation = null;
+        }
+        for (const child of [...this._baseMesh.children]) {
+            child.visible = true;
+        }
     }
 
     createShadow() {
@@ -1861,6 +1902,10 @@ export class Player {
             const bobAmount = this.state === 'SPRINT' ? 0.04 : 0.02;
             const bobSpeed = this.state === 'SPRINT' ? 18 : 12;
             this.mesh.position.y += Math.sin(time * 0.1 * bobSpeed) * bobAmount;
+        }
+
+        if (this._customAnimation) {
+            this._customAnimation.update(dt, moveDir.length());
         }
 
         if (this.bunnyHopFlashTimer > 0) {

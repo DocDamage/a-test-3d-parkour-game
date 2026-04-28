@@ -12,10 +12,15 @@ export class ProjectileManager {
         this.projectiles = [];
         this._tempVec = new THREE.Vector3();
         this._interactiveEnv = null;
+        this._spriteEffects = null;
     }
 
     setInteractiveEnvironment(ie) {
         this._interactiveEnv = ie;
+    }
+
+    setSpriteEffects(spriteEffects) {
+        this._spriteEffects = spriteEffects || null;
     }
 
     /**
@@ -475,6 +480,7 @@ export class ProjectileManager {
             }
 
             if (hit) {
+                this._spawnImpact(p.mesh.position, p.damageType);
                 this._removeProjectile(i);
             }
         }
@@ -566,6 +572,16 @@ export class ProjectileManager {
             else { this.scene.remove(points); geo.dispose(); mat.dispose(); }
         };
         anim();
+    }
+
+    _spawnImpact(pos, damageType = 'kinetic') {
+        if (this._spriteEffects) {
+            this._spriteEffects.spawnForDamageType(damageType, pos.clone(), {
+                size: damageType === 'explosive' ? 2.0 : 1.0
+            });
+        } else {
+            this._spawnSpark(pos, damageType === 'electric' ? 0x66ccff : 0xffffff);
+        }
     }
 
     dispose() {

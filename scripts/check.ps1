@@ -43,6 +43,13 @@ if ($LASTEXITCODE -ne 0) {
     $errors++
 }
 
+Write-Host "=== Asset Manifest Check ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "validate-assets.mjs")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  FAIL: asset manifest" -ForegroundColor Red
+    $errors++
+}
+
 Write-Host "=== Docs Freshness Check ===" -ForegroundColor Cyan
 $docs = @("ARCHITECTURE.md", "DESIGN.md", "QUALITY.md")
 foreach ($doc in $docs) {

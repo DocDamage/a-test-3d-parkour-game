@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MovingPlatform } from './MovingPlatform.js';
+import { DEFAULT_EDITOR_ASSET_ID, getEditorAssetOption, getEditorAssetPlacementProps } from './EditorAssetPalette.js';
 
 /**
  * LevelEditor - Browser-based 3D parkour level editor using Three.js.
@@ -26,7 +27,8 @@ const DEFAULT_PROPS = {
     vent:           { width: 1.5, height: 1.5 },
     mirror:         { rotationSnap: 90 },
     checkpoint:     { zoneName: 'zone_1' },
-    spawnPoint:     {}
+    spawnPoint:     {},
+    assetProp:      getEditorAssetPlacementProps(DEFAULT_EDITOR_ASSET_ID)
 };
 
 const TYPE_COLORS = {
@@ -43,20 +45,23 @@ const TYPE_COLORS = {
     vent: 0x556655,
     mirror: 0xccffff,
     checkpoint: 0x00ff00,
-    spawnPoint: 0x00ff00
+    spawnPoint: 0x00ff00,
+    assetProp: 0x66aaff
 };
 
 export default class LevelEditor {
-    constructor(scene, camera, renderer, world, player) {
+    constructor(scene, camera, renderer, world, player, assetManager = null) {
         this.scene = scene;
         this.camera = camera;
         this.renderer = renderer;
         this.world = world;
         this.player = player;
+        this.assetManager = assetManager;
 
         this.mode = 'play';
         this.selectedObject = null;
         this.placementType = 'platform';
+        this.placementProps = null;
         this.tool = 'place';
         this.gridSize = 1;
         this.snapToGrid = true;
@@ -377,7 +382,7 @@ export default class LevelEditor {
     onLeftClick() {
         if (this.tool === 'place') {
             const pos = this.getPlacementPosition();
-            this.createObject(this.placementType, pos);
+            this.createObject(this.placementType, pos, this.placementProps);
         } else if (this.tool === 'select') {
             const hits = this.getRaycastIntersects(this.editorObjects.map(e => e.root));
             if (hits.length > 0) {
@@ -514,6 +519,9 @@ export default class LevelEditor {
             case 'spawnPoint':
                 root = this._createSpawnPointMesh(position);
                 break;
+            case 'assetProp':
+                root = this._createAssetProp(position, props);
+                break;
             default:
                 if (window.__DEV__) console.warn('Unknown placement type:', type);
                 return;
@@ -523,7 +531,9 @@ export default class LevelEditor {
 
         root.userData.editorObject = true;
         root.userData.type = type;
-        root.userData.props = this._buildProps(position, root.rotation, root.scale, TYPE_COLORS[type] || 0xffffff, props);
+        root.userData.usesSharedAssetGeometry = type === 'assetProp';
+        const storedProps = type === 'assetProp' && root.userData.resolvedAssetProps ? root.userData.resolvedAssetProps : props;
+        root.userData.props = this._buildProps(position, root.rotation, root.scale, TYPE_COLORS[type] || 0xffffff, storedProps);
 
         this.scene.add(root);
         this.editorObjects.push({ type, root, instance, props: root.userData.props });
@@ -558,6 +568,71 @@ export default class LevelEditor {
         mesh.receiveShadow = true;
         mesh.userData.size = { x: w, y: h, z: d };
         return mesh;
+    }
+
+    _createAssetProp(pos, props) {
+        const option = getEditorAssetOption(props.assetId || DEFAULT_EDITOR_ASSET_ID);
+        const resolvedProps = { ...getEditorAssetPlacementProps(option.id), ...props, assetId: option.id };
+        const root = new THREE.Group();
+        root.position.copy(pos);
+        root.userData.assetId = resolvedProps.assetId;
+        root.userData.assetLabel = option.label;
+        root.userData.assetDimensions = {
+            width: resolvedProps.width,
+            height: resolvedProps.height,
+            depth: resolvedProps.depth
+        };
+        root.userData.resolvedAssetProps = resolvedProps;
+        root.userData.isClimbable = !!resolvedProps.climbable;
+
+        const placeholder = this._createAssetPlaceholder(resolvedProps);
+        root.add(placeholder);
+        this._loadAssetPropVisual(root, resolvedProps.assetId);
+        return root;
+    }
+
+    _createAssetPlaceholder(props) {
+        const w = props.width || 1;
+        const h = props.height || 1;
+        const d = props.depth || 1;
+        const geo = new THREE.BoxGeometry(w, h, d);
+        const mat = new THREE.MeshBasicMaterial({
+            color: TYPE_COLORS.assetProp,
+            transparent: true,
+            opacity: 0.28,
+            wireframe: true,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.y = h / 2;
+        mesh.userData.editorAssetPlaceholder = true;
+        return mesh;
+    }
+
+    _loadAssetPropVisual(root, assetId) {
+        if (!this.assetManager || !assetId) return;
+        root.userData.assetId = assetId;
+        const token = Symbol(assetId);
+        root.userData.assetLoadToken = token;
+
+        this.assetManager.loadModel(assetId).then(() => {
+            if (!root.parent || root.userData.assetLoadToken !== token) return;
+            const model = this.assetManager.instantiateModel(assetId, {
+                castShadow: true,
+                receiveShadow: true
+            });
+            if (!model) return;
+
+            for (const child of [...root.children]) {
+                if (child.userData.editorAssetPlaceholder || child.userData.editorAssetModel) {
+                    root.remove(child);
+                    this._disposeEditorTree(child, { disposeGeometry: !child.userData.editorAssetModel });
+                }
+            }
+            model.userData.editorAssetModel = true;
+            root.add(model);
+            this.updateSelectionBox();
+        });
     }
 
     _createRampMesh(pos, props) {
@@ -942,16 +1017,8 @@ export default class LevelEditor {
         // Remove from scene
         this.scene.remove(entry.root);
 
-        // Dispose geometries/materials recursively
-        entry.root.traverse((child) => {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-                if (Array.isArray(child.material)) {
-                    child.material.forEach(m => m.dispose());
-                } else {
-                    child.material.dispose();
-                }
-            }
+        this._disposeEditorTree(entry.root, {
+            disposeGeometry: !entry.root.userData.usesSharedAssetGeometry
         });
 
         // Clean up associated lights stored on userData
@@ -965,6 +1032,20 @@ export default class LevelEditor {
                 if (entry.instance.spotTarget) this.scene.remove(entry.instance.spotTarget);
             }
         }
+    }
+
+    _disposeEditorTree(root, options = {}) {
+        const disposeGeometry = options.disposeGeometry !== false;
+        root.traverse((child) => {
+            if (disposeGeometry && child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material.forEach(m => m.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        });
     }
 
     updateSelectionBox() {
@@ -994,7 +1075,7 @@ export default class LevelEditor {
         if (this.mode !== 'edit' || this.tool !== 'place') return;
 
         const pos = this.getPlacementPosition();
-        const ghost = this._createGhostForType(this.placementType, pos);
+        const ghost = this._createGhostForType(this.placementType, pos, this.placementProps);
         if (ghost) {
             this.ghostMesh = ghost;
             this.scene.add(ghost);
@@ -1004,17 +1085,15 @@ export default class LevelEditor {
     clearGhost() {
         if (this.ghostMesh) {
             this.scene.remove(this.ghostMesh);
-            this.ghostMesh.traverse(c => {
-                if (c.geometry) c.geometry.dispose();
-                if (c.material) c.material.dispose();
-            });
+            this._disposeEditorTree(this.ghostMesh);
             this.ghostMesh = null;
         }
     }
 
-    _createGhostForType(type, pos) {
+    _createGhostForType(type, pos, placementProps = null) {
         let geo, mat, mesh;
         const color = TYPE_COLORS[type] || 0xffffff;
+        const props = placementProps || DEFAULT_PROPS[type] || {};
 
         switch (type) {
             case 'platform':
@@ -1059,6 +1138,9 @@ export default class LevelEditor {
             case 'spawnPoint':
                 geo = new THREE.ConeGeometry(0.15, 0.3, 8);
                 break;
+            case 'assetProp':
+                geo = new THREE.BoxGeometry(props.width || 1, props.height || 1, props.depth || 1);
+                break;
             default:
                 return null;
         }
@@ -1068,6 +1150,7 @@ export default class LevelEditor {
         mesh.position.copy(pos);
         if (type === 'ramp') mesh.position.y += 1;
         if (type === 'spawnPoint') mesh.position.y += 1.15;
+        if (type === 'assetProp') mesh.position.y += (props.height || 1) / 2;
         mesh.userData.isGhost = true;
         return mesh;
     }
@@ -1126,6 +1209,23 @@ export default class LevelEditor {
                     c.material.color.setHex(hex);
                 }
             });
+        } else if (type === 'assetProp' && key === 'assetId') {
+            const option = getEditorAssetOption(value);
+            const placement = getEditorAssetPlacementProps(option.id);
+            Object.assign(obj.userData.props, placement);
+            obj.userData.assetDimensions = {
+                width: placement.width,
+                height: placement.height,
+                depth: placement.depth
+            };
+            obj.userData.assetLabel = option.label;
+            obj.userData.isClimbable = !!placement.climbable;
+            this._loadAssetPropVisual(obj, option.id);
+            this.syncWorldArrays();
+        } else if (type === 'assetProp' && (key === 'collidable' || key === 'climbable')) {
+            if (obj.userData.props) obj.userData.props[key] = value;
+            if (key === 'climbable') obj.userData.isClimbable = !!value;
+            this.syncWorldArrays();
         } else {
             if (obj.userData.props) obj.userData.props[key] = value;
         }
@@ -1352,6 +1452,14 @@ export default class LevelEditor {
                         }
                     }
                     break;
+                case 'assetProp':
+                    if (root.userData.props?.collidable && !this.world.collidables.includes(root)) {
+                        this.world.collidables.push(root);
+                    }
+                    if (root.userData.props?.climbable && !this.world.climbables.includes(root)) {
+                        this.world.climbables.push(root);
+                    }
+                    break;
                 case 'vent':
                     if (!this.world.collidables.includes(root)) this.world.collidables.push(root);
                     break;
@@ -1411,6 +1519,17 @@ export default class LevelEditor {
         if (this.mode === 'edit') {
             this.updateGhost();
         }
+    }
+
+    setPlacementProps(props = null) {
+        this.placementProps = props ? { ...props } : null;
+        if (this.mode === 'edit') {
+            this.updateGhost();
+        }
+    }
+
+    setAssetManager(assetManager) {
+        this.assetManager = assetManager || null;
     }
 
     setTool(tool) {

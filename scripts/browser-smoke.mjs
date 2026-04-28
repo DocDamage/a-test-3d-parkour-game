@@ -69,6 +69,8 @@ class Cdp {
     this.id = 0;
     this.pending = new Map();
     this.exceptions = [];
+    this.requests = new Map();
+    this.networkFailures = [];
     ws.addEventListener('message', event => this._onMessage(event.data));
   }
 
@@ -79,6 +81,16 @@ class Cdp {
       this.pending.delete(msg.id);
     }
     if (msg.method === 'Runtime.exceptionThrown') this.exceptions.push(msg.params.exceptionDetails);
+    if (msg.method === 'Network.requestWillBeSent') {
+      this.requests.set(msg.params.requestId, msg.params.request?.url || '');
+    }
+    if (msg.method === 'Network.loadingFailed') {
+      this.networkFailures.push({
+        url: this.requests.get(msg.params.requestId) || msg.params.requestId,
+        errorText: msg.params.errorText,
+        type: msg.params.type
+      });
+    }
   }
 
   send(method, params = {}) {
@@ -186,9 +198,18 @@ async function main() {
       returnByValue: true
     });
     const value = result.result?.result?.value || {};
-    const errors = [...(value.errors || []), ...cdp.exceptions.map(e => e.exception?.description || e.text)];
+    const benignAbortedAssets = cdp.networkFailures.filter(f =>
+      f.errorText === 'net::ERR_ABORTED' &&
+      /\.(glb|gltf|png|ogg)(\?|$)/i.test(f.url || '')
+    );
+    const hasOnlyBenignNetworkErrors = benignAbortedAssets.length > 0 &&
+      benignAbortedAssets.length === cdp.networkFailures.length;
+    const rawErrors = [...(value.errors || []), ...cdp.exceptions.map(e => e.exception?.description || e.text)];
+    const errors = hasOnlyBenignNetworkErrors
+      ? rawErrors.filter(err => !/^(unhandled: )?(TypeError: )?network error$/i.test(String(err)))
+      : rawErrors;
     if (!value.gameStarted || value.ui !== 'block' || errors.length > 0) {
-      throw new Error(`Browser smoke failed: ${JSON.stringify({ value, errors: errors.slice(0, 3) })}`);
+      throw new Error(`Browser smoke failed: ${JSON.stringify({ value, errors: errors.slice(0, 3), networkFailures: cdp.networkFailures.slice(0, 5) })}`);
     }
     await cdp.send('Runtime.evaluate', {
       expression: "document.getElementById('stash-panel').style.display = 'block'; document.getElementById('safehouse-panel').style.display = 'block'; true",

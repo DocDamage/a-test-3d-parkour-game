@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AUDIO_ASSET_MANIFEST, getAudioAsset, getAudioCueVariants } from './AudioAssetRegistry.js';
 
 export let sharedAudioContext = null;
 export function getSharedAudioContext() {
@@ -23,6 +24,10 @@ export class AudioManager {
         this._ambiencePlaying = false;
         this.initialized = false;
         this.listener = null;
+        this.audioBuffers = new Map();
+        this.audioBufferPromises = new Map();
+        this.audioFailures = new Set();
+        this._cueCursor = new Map();
     }
 
     init() {
@@ -107,6 +112,129 @@ export class AudioManager {
         this.ensureInit();
         if (this.uiGain) {
             this.uiGain.gain.setTargetAtTime(Math.max(0, vol), this.ctx.currentTime, 0.05);
+        }
+    }
+
+    getAudioStatus() {
+        return {
+            buffersLoaded: this.audioBuffers.size,
+            bufferIds: Array.from(this.audioBuffers.keys()).sort(),
+            failures: Array.from(this.audioFailures).sort(),
+            pending: Array.from(this.audioBufferPromises.keys()).sort()
+        };
+    }
+
+    preloadTagged(tag) {
+        const ids = Object.entries(AUDIO_ASSET_MANIFEST)
+            .filter(([, def]) => Array.isArray(def.tags) && def.tags.includes(tag))
+            .map(([id]) => id);
+        return this.preloadAudio(ids);
+    }
+
+    async preloadAudio(ids = []) {
+        this.ensureInit();
+        const results = await Promise.allSettled(ids.map(id => this.loadAudio(id)));
+        return results.filter(result => result.status === 'fulfilled').map(result => result.value);
+    }
+
+    async loadAudio(id) {
+        this.ensureInit();
+        if (this.audioBuffers.has(id)) return this.audioBuffers.get(id);
+        if (this.audioBufferPromises.has(id)) return this.audioBufferPromises.get(id);
+
+        const def = getAudioAsset(id);
+        if (!def?.path) {
+            this.audioFailures.add(id);
+            return null;
+        }
+
+        const promise = fetch(def.path)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status} ${def.path}`);
+                return response.arrayBuffer();
+            })
+            .then(data => this.ctx.decodeAudioData(data))
+            .then(buffer => {
+                this.audioBuffers.set(id, buffer);
+                return buffer;
+            })
+            .catch(err => {
+                this.audioFailures.add(id);
+                if (window.__DEV__) console.warn(`AudioManager: failed to load ${id}`, err);
+                return null;
+            })
+            .finally(() => this.audioBufferPromises.delete(id));
+
+        this.audioBufferPromises.set(id, promise);
+        return promise;
+    }
+
+    playAudioAsset(id, position = null, options = {}) {
+        this.ensureInit();
+        const def = getAudioAsset(id);
+        const buffer = this.audioBuffers.get(id);
+        if (!def || !buffer) {
+            if (def && !this.audioBufferPromises.has(id) && !this.audioFailures.has(id)) this.loadAudio(id);
+            return false;
+        }
+
+        const t = this.ctx.currentTime;
+        const source = this.ctx.createBufferSource();
+        const gain = this.ctx.createGain();
+        const playbackRate = options.playbackRate || def.playbackRate || 1;
+        const volume = options.volume ?? def.volume ?? 1;
+        source.buffer = buffer;
+        source.playbackRate.setValueAtTime(playbackRate, t);
+        gain.gain.setValueAtTime(Math.max(0, volume), t);
+
+        const dest = this._destinationForCategory(def.category);
+        if (position) {
+            const panner = this.ctx.createPanner();
+            panner.panningModel = 'HRTF';
+            panner.distanceModel = 'inverse';
+            panner.refDistance = options.refDistance || def.refDistance || 8;
+            panner.maxDistance = options.maxDistance || def.maxDistance || 80;
+            panner.rolloffFactor = options.rolloff || def.rolloff || 1.2;
+            this._setPannerPosition(panner, position);
+            source.connect(gain);
+            gain.connect(panner);
+            panner.connect(dest);
+            source.onended = () => {
+                try { source.disconnect(); gain.disconnect(); panner.disconnect(); } catch(e) { if (window.__DEV__) console.warn(e); }
+            };
+        } else {
+            source.connect(gain);
+            gain.connect(dest);
+            source.onended = () => {
+                try { source.disconnect(); gain.disconnect(); } catch(e) { if (window.__DEV__) console.warn(e); }
+            };
+        }
+        source.start(t);
+        return true;
+    }
+
+    playAudioCue(cueId, position = null, options = {}) {
+        const variants = getAudioCueVariants(cueId);
+        if (!variants || variants.length === 0) return false;
+        const index = this._cueCursor.get(cueId) || 0;
+        this._cueCursor.set(cueId, (index + 1) % variants.length);
+        return this.playAudioAsset(variants[index % variants.length], position, options);
+    }
+
+    _destinationForCategory(category) {
+        if (category === 'ui') return this.uiGain || this.masterGain;
+        if (category === 'music') return this.musicGain || this.masterGain;
+        if (category === 'voice') return this.voiceGain || this.masterGain;
+        return this.dryGain || this.masterGain;
+    }
+
+    _setPannerPosition(panner, position) {
+        if ('positionX' in panner) {
+            panner.positionX.setValueAtTime(position.x || 0, this.ctx.currentTime);
+            panner.positionY.setValueAtTime(position.y || 0, this.ctx.currentTime);
+            panner.positionZ.setValueAtTime(position.z || 0, this.ctx.currentTime);
+        } else {
+            panner.setPosition(position.x || 0, position.y || 0, position.z || 0);
         }
     }
 
@@ -265,6 +393,7 @@ export class AudioManager {
     // Jump
     // ------------------------------------------------------------
     playJump() {
+        if (this.playAudioAsset('player.jump', null)) return;
         this.ensureInit();
         const t = this.ctx.currentTime;
         const dest = this._makeDestination();
@@ -593,6 +722,7 @@ export class AudioManager {
     // UI
     // ------------------------------------------------------------
     playUIClick() {
+        if (this.playAudioCue('mechanical_click')) return;
         this.ensureInit();
         const t = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
@@ -608,6 +738,7 @@ export class AudioManager {
     }
 
     playHitSound(type = 'generic', position = null) {
+        if (this.playAudioAsset(type === 'explosion' ? 'combat.explosion' : 'combat.hit', position)) return;
         this.ensureInit();
         if (position && this.listener) {
             const freq = type === 'explosion' ? 80 : 150;
@@ -634,6 +765,7 @@ export class AudioManager {
     }
 
     playDeathSound(position = null) {
+        if (this.playAudioAsset('enemy.drone.death', position)) return;
         this.ensureInit();
         if (position && this.listener) {
             this.playPositionalSound(position, {
@@ -659,6 +791,7 @@ export class AudioManager {
     }
 
     playWeaponFire(weaponName = 'default', position = null) {
+        if (this.playAudioAsset(weaponName.includes('melee') ? 'weapon.sword.swing' : 'weapon.fire.generic', position)) return;
         this.ensureInit();
         if (position && this.listener) {
             const baseFreq = weaponName.includes('pistol') ? 600 : weaponName.includes('rifle') ? 400 : 200;
@@ -686,6 +819,7 @@ export class AudioManager {
     }
 
     playSFX(id, position = null) {
+        if (this.playAudioCue(id, position)) return;
         switch(id) {
             case 'mechanical_click': this.playUIClick(); break;
             case 'weapon_switch':

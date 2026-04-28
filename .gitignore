@@ -15,6 +15,9 @@ Thumbs.db
 *.tmp
 *.bak
 
+# Local source art packs. Runtime-ready converted assets live in /assets.
+my game assets/
+
 # Python artifacts (if any scripts added later)
 __pycache__/
 *.pyc

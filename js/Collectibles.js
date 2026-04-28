@@ -13,6 +13,9 @@ function getAudioContext() {
 
 function playCollectSound() {
     try {
+        if (window.audioManager && typeof window.audioManager.playAudioCue === 'function') {
+            if (window.audioManager.playAudioCue('loot_pickup')) return;
+        }
         const ctx = getAudioContext();
         if (!ctx) return;
         if (ctx.state === 'suspended') ctx.resume();

@@ -1937,6 +1937,8 @@
             <div class="cc-step-dot" id="cc-dot-3">3</div>
             <div class="cc-step-line"></div>
             <div class="cc-step-dot" id="cc-dot-4">4</div>
+            <div class="cc-step-line"></div>
+            <div class="cc-step-dot" id="cc-dot-5">5</div>
         </div>
 
         <!-- Step 1: Name -->
@@ -1951,43 +1953,56 @@
             </div>
         </div>
 
-        <!-- Step 2: Origin -->
+        <!-- Step 2: Body -->
         <div class="cc-step" id="cc-step-2">
-            <h2>Choose Your Origin</h2>
-            <p class="cc-subtitle">Your background defines your passive bonuses and starting equipment.</p>
-            <div class="cc-cards" id="origin-cards"></div>
-            <p class="cc-lore" id="origin-lore">Select an origin to see its story.</p>
+            <h2>Choose Your Body</h2>
+            <p class="cc-subtitle">Your base model changes appearance only. Stats still come from origin and archetype.</p>
+            <div class="cc-cards" id="body-cards"></div>
+            <p class="cc-lore" id="body-lore">Select a body base to preview its role.</p>
             <div class="cc-nav">
                 <button class="secondary" id="cc-back-2">← Back</button>
                 <button class="primary" id="cc-next-2" disabled>Next →</button>
             </div>
         </div>
 
-        <!-- Step 3: Archetype -->
+        <!-- Step 3: Origin -->
         <div class="cc-step" id="cc-step-3">
-            <h2>Choose Your Archetype</h2>
-            <p class="cc-subtitle">Your playstyle determines your unique resource and skill tree access.</p>
-            <div class="cc-cards" id="archetype-cards"></div>
-            <p class="cc-lore" id="archetype-lore">Select an archetype to see its description.</p>
+            <h2>Choose Your Origin</h2>
+            <p class="cc-subtitle">Your background defines your passive bonuses and starting equipment.</p>
+            <div class="cc-cards" id="origin-cards"></div>
+            <p class="cc-lore" id="origin-lore">Select an origin to see its story.</p>
             <div class="cc-nav">
                 <button class="secondary" id="cc-back-3">← Back</button>
                 <button class="primary" id="cc-next-3" disabled>Next →</button>
             </div>
         </div>
 
-        <!-- Step 4: Summary & Confirm -->
+        <!-- Step 4: Archetype -->
         <div class="cc-step" id="cc-step-4">
+            <h2>Choose Your Archetype</h2>
+            <p class="cc-subtitle">Your playstyle determines your unique resource and skill tree access.</p>
+            <div class="cc-cards" id="archetype-cards"></div>
+            <p class="cc-lore" id="archetype-lore">Select an archetype to see its description.</p>
+            <div class="cc-nav">
+                <button class="secondary" id="cc-back-4">← Back</button>
+                <button class="primary" id="cc-next-4" disabled>Next →</button>
+            </div>
+        </div>
+
+        <!-- Step 5: Summary & Confirm -->
+        <div class="cc-step" id="cc-step-5">
             <h2>Your Runner</h2>
             <div class="cc-summary">
                 <div class="cc-summary-name" id="sum-name"></div>
                 <div class="cc-summary-row">
+                    <div class="cc-summary-card" id="sum-body"></div>
                     <div class="cc-summary-card" id="sum-origin"></div>
                     <div class="cc-summary-card" id="sum-archetype"></div>
                 </div>
                 <table class="cc-stat-table" id="sum-stats"></table>
             </div>
             <div class="cc-nav">
-                <button class="secondary" id="cc-back-4">← Back</button>
+                <button class="secondary" id="cc-back-5">← Back</button>
                 <button class="primary" id="cc-confirm">Begin →</button>
             </div>
         </div>
@@ -2122,6 +2137,25 @@
             <button class="tool-btn" data-type="mirror">Mirror</button>
             <button class="tool-btn" data-type="checkpoint">Checkpoint</button>
             <button class="tool-btn" data-type="spawnPoint">Spawn Point</button>
+            <div class="cat-label">Asset Props</div>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.kit.crate">Crate</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.kit.barrelClosed">Barrel</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.kit.locker">Locker</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.megakit.computer">Computer</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.megakit.wallAstraStraight">Wall Panel</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.megakit.platformMetal">Metal Platform</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.megakit.platformStairs4">Stairs</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="loot.gear.sciFiChest">Loot Chest</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="enemy.essentials.eyeDrone">Eye Drone Model</button>
+            <div class="cat-label">Industrial Kit</div>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.gratedPowerFloor">Grated Floor</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.markedMetalWalkway">Walkway</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.markedWalkwayJunction">Junction</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.reinforcedMetalWall">Reinforced Wall</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.powerLineWall">Power Wall</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.cablePanel">Cable Panel</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.ridgedLightPanel">Light Panel</button>
+            <button class="tool-btn" data-type="assetProp" data-asset-id="environment.industrial.wallCameraHal">Wall Camera</button>
         </div>
         <div id="editor-properties">
             <h3>Properties</h3>
@@ -2133,6 +2167,8 @@
             <button id="tool-delete">Delete</button>
             <button id="editor-export">Export</button>
             <button id="editor-import">Import</button>
+            <button id="editor-save-local">Save Local</button>
+            <button id="editor-load-local">Load Local</button>
             <button id="editor-playtest">Playtest</button>
         </div>
         <div id="editor-hints">
@@ -2233,6 +2269,15 @@
 
         // ── Data (IDs match OriginSystem.js / ArchetypeSystem.js) ──────────────
 
+        var BODY_BASES = [
+            { id: 'drizzel',  name: 'Drizzel',  icon: 'DRZ', tag: 'Agile Frame',    lore: 'Lean runner silhouette for fast parkour reads.' },
+            { id: 'gekkou',   name: 'Gekkou',   icon: 'GEK', tag: 'Night Frame',    lore: 'Stealthy profile with a sharp combat stance.' },
+            { id: 'kasa',     name: 'Kasa',     icon: 'KSA', tag: 'Balanced Frame', lore: 'Balanced base body for general-purpose builds.' },
+            { id: 'kurenai',  name: 'Kurenai',  icon: 'KUR', tag: 'Assault Frame',  lore: 'Aggressive silhouette for close-range combat builds.' },
+            { id: 'samidale', name: 'Samidale', icon: 'SMD', tag: 'Heavy Frame',    lore: 'Sturdier base body for tankier runner fantasies.' },
+            { id: 'shogun',   name: 'Shogun',   icon: 'SHG', tag: 'Duelist Frame',  lore: 'Blade-forward silhouette for melee and precision builds.' }
+        ];
+
         var ORIGINS = [
             {
                 id: 'corporate_defector',
@@ -2323,6 +2368,7 @@
         // ── State ──────────────────────────────────────────────────────────────
 
         var currentStep = 0;
+        var selectedBody = null;
         var selectedOrigin = null;
         var selectedArchetype = null;
         var runnerName = '';
@@ -2333,7 +2379,7 @@
         // ── Step navigation ────────────────────────────────────────────────────
 
         function goStep(n) {
-            for (var i = 1; i <= 4; i++) {
+            for (var i = 1; i <= 5; i++) {
                 var s = document.getElementById('cc-step-' + i);
                 if (s) {
                     s.classList.toggle('active', i === n);
@@ -2386,11 +2432,38 @@
             startScreen.style.display = 'flex';
         });
 
-        // ── Step 2: Origin ─────────────────────────────────────────────────────
+        // ── Step 2: Body ───────────────────────────────────────────────────────
+
+        var bodyCards = document.getElementById('body-cards');
+        var bodyLore = document.getElementById('body-lore');
+        var next2 = document.getElementById('cc-next-2');
+
+        BODY_BASES.forEach(function(b) {
+            var card = document.createElement('div');
+            card.className = 'cc-card';
+            card.innerHTML =
+                '<div class="cc-card-icon">' + b.icon + '</div>' +
+                '<div class="cc-card-name">' + b.name + '</div>' +
+                '<div class="cc-card-tag">'  + b.tag  + '</div>' +
+                '<div class="cc-card-bonus">Visual base only<br>No stat changes</div>';
+            card.addEventListener('click', function() {
+                bodyCards.querySelectorAll('.cc-card').forEach(function(c) { c.classList.remove('selected'); });
+                card.classList.add('selected');
+                selectedBody = b;
+                bodyLore.textContent = b.lore;
+                next2.disabled = false;
+            });
+            bodyCards.appendChild(card);
+        });
+
+        document.getElementById('cc-back-2').addEventListener('click', function() { goStep(1); });
+        next2.addEventListener('click', function() { goStep(3); });
+
+        // ── Step 3: Origin ─────────────────────────────────────────────────────
 
         var originCards = document.getElementById('origin-cards');
         var originLore  = document.getElementById('origin-lore');
-        var next2       = document.getElementById('cc-next-2');
+        var next3       = document.getElementById('cc-next-3');
 
         ORIGINS.forEach(function(o) {
             var card = document.createElement('div');
@@ -2405,19 +2478,19 @@
                 card.classList.add('selected');
                 selectedOrigin = o;
                 originLore.textContent = o.lore;
-                next2.disabled = false;
+                next3.disabled = false;
             });
             originCards.appendChild(card);
         });
 
-        document.getElementById('cc-back-2').addEventListener('click', function() { goStep(1); });
-        next2.addEventListener('click', function() { goStep(3); });
+        document.getElementById('cc-back-3').addEventListener('click', function() { goStep(2); });
+        next3.addEventListener('click', function() { goStep(4); });
 
-        // ── Step 3: Archetype ──────────────────────────────────────────────────
+        // ── Step 4: Archetype ──────────────────────────────────────────────────
 
         var archetypeCards = document.getElementById('archetype-cards');
         var archetypeLore  = document.getElementById('archetype-lore');
-        var next3          = document.getElementById('cc-next-3');
+        var next4          = document.getElementById('cc-next-4');
 
         ARCHETYPES.forEach(function(a) {
             var card = document.createElement('div');
@@ -2432,18 +2505,24 @@
                 card.classList.add('selected');
                 selectedArchetype = a;
                 archetypeLore.textContent = a.lore;
-                next3.disabled = false;
+                next4.disabled = false;
             });
             archetypeCards.appendChild(card);
         });
 
-        document.getElementById('cc-back-3').addEventListener('click', function() { goStep(2); });
-        next3.addEventListener('click', function() { buildSummary(); goStep(4); });
+        document.getElementById('cc-back-4').addEventListener('click', function() { goStep(3); });
+        next4.addEventListener('click', function() { buildSummary(); goStep(5); });
 
-        // ── Step 4: Summary ────────────────────────────────────────────────────
+        // ── Step 5: Summary ────────────────────────────────────────────────────
 
         function buildSummary() {
             document.getElementById('sum-name').textContent = runnerName;
+
+            document.getElementById('sum-body').innerHTML =
+                '<div class="cc-card-icon">' + selectedBody.icon + '</div>' +
+                '<div class="cc-card-name">' + selectedBody.name + '</div>' +
+                '<div class="cc-card-tag">'  + selectedBody.tag  + '</div>' +
+                '<div class="cc-card-bonus" style="margin-top:6px;">Visual base</div>';
 
             document.getElementById('sum-origin').innerHTML =
                 '<div class="cc-card-icon">' + selectedOrigin.icon    + '</div>' +
@@ -2489,10 +2568,10 @@
             document.getElementById('sum-stats').innerHTML = html;
         }
 
-        document.getElementById('cc-back-4').addEventListener('click', function() { goStep(3); });
+        document.getElementById('cc-back-5').addEventListener('click', function() { goStep(4); });
 
         document.getElementById('cc-confirm').addEventListener('click', function() {
-            if (!selectedOrigin || !selectedArchetype || !runnerName) return;
+            if (!selectedBody || !selectedOrigin || !selectedArchetype || !runnerName) return;
 
             // Compute starting stats from base + origin + archetype deltas
             var startStats = {};
@@ -2503,8 +2582,10 @@
             });
 
             localStorage.setItem('runner_name',    runnerName);
+            localStorage.setItem('character_base', selectedBody.id);
             localStorage.setItem('rpg_origin',     selectedOrigin.id);
             localStorage.setItem('rpg_archetype',  selectedArchetype.id);
+            window.dispatchEvent(new CustomEvent('apex-character-base-selected', { detail: { baseId: selectedBody.id } }));
 
             // Only write starting stats if no existing character save (preserves NG+ progress)
             if (!localStorage.getItem('apex_character')) {
@@ -2529,8 +2610,10 @@
             if (!confirm('Start a new runner? This will reset your character choices (not your save progress).')) return;
             localStorage.removeItem('rpg_origin');
             localStorage.removeItem('rpg_archetype');
+            localStorage.removeItem('character_base');
             localStorage.removeItem('runner_name');
             localStorage.removeItem('apex_character');
+            selectedBody      = null;
             selectedOrigin    = null;
             selectedArchetype = null;
             runnerName        = '';
@@ -2541,6 +2624,8 @@
             document.querySelectorAll('.cc-card').forEach(function(c) { c.classList.remove('selected'); });
             next2.disabled = true;
             next3.disabled = true;
+            next4.disabled = true;
+            bodyLore.textContent      = 'Select a body base to preview its role.';
             originLore.textContent    = 'Select an origin to see its story.';
             archetypeLore.textContent = 'Select an archetype to see its description.';
             startScreen.style.display = 'none';

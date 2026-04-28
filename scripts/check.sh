@@ -43,6 +43,12 @@ if ! node "${SCRIPT_DIR}/balance-sim.mjs"; then
     ERRORS=$((ERRORS + 1))
 fi
 
+echo "=== Asset Manifest Check ==="
+if ! node "${SCRIPT_DIR}/validate-assets.mjs"; then
+    echo "  FAIL: asset manifest"
+    ERRORS=$((ERRORS + 1))
+fi
+
 echo "=== Docs Freshness Check ==="
 for doc in ARCHITECTURE.md DESIGN.md QUALITY.md; do
     if [ ! -f "${REPO_ROOT}/docs/${doc}" ]; then
