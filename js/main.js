@@ -123,6 +123,7 @@ import { UIManager } from './UIManager.js';
 import { MenuNavigator } from './MenuNavigator.js';
 import { wireEditorUI } from './EditorUI.js';
 import { GameContext } from './GameContext.js';
+import { GameDirector } from './GameDirector.js';
 
 const __DEV__ = window.location.hash === '#dev';
 window.__DEV__ = __DEV__;
@@ -192,6 +193,7 @@ ctx.register('projectileManager', ['scene', 'world'], () => projectileManager);
 
 // Audio
 const audio = new AudioManager(scene, world);
+window.audioManager = audio; // expose for Player.js / WeaponSystem.js SFX hooks
 ctx.register('audio', ['scene', 'world'], () => audio);
 
 // Player (camera controller wired after tpc is created later)
@@ -551,59 +553,18 @@ combatSystem.onHitbox = (data) => {
 const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
 const enemyHealthBars = []; // tracks EnemyHealthBar instances
 
-// Unified enemy kill handler — wired to both drones and EnemyManager enemies
+// GameDirector — gameplay orchestration
+const gameDirector = new GameDirector({
+    ctx, player, progression, familiarity, weaponSystem, factions, companion,
+    nephalemGlory, apexRift, arenaMode, collapse, legendaryPowerSystem, soulsSystem,
+    lootSystem, difficultyTier, inventoryStash, activeArchetypeId, showLootToast, showHint,
+    bossFight, statusEffectSystem, saveSystem
+});
+ctx.register('gameDirector', ['player', 'progression', 'weaponSystem', 'factions', 'companion', 'nephalemGlory', 'apexRift', 'arenaMode', 'collapse', 'legendaryPowerSystem', 'soulsSystem', 'lootSystem', 'difficultyTier', 'inventoryStash', 'bossFight', 'statusEffectSystem', 'saveSystem'], () => gameDirector);
+
+// Unified enemy kill handler — delegates to GameDirector
 function _handleEnemyKilled(enemy, source) {
-    // Progression XP
-    if (progression && typeof progression.addXP === 'function') {
-        const xpBase = enemy.isElite ? 100 : 50;
-        const xpScaled = difficultyTier ? difficultyTier.scaleXP(xpBase) : xpBase;
-        const sourceType = enemy.type || 'enemy_kill';
-        progression.addXP(Math.floor(xpScaled), sourceType);
-    }
-    // Familiarity: track kill for current weapon
-    if (familiarity && weaponSystem) {
-        const w = weaponSystem.getCurrentWeapon();
-        const weaponId = w ? (w.id || w.name || 'melee') : 'melee';
-        familiarity.addKill(weaponId);
-    }
-    // Factions
-    if (factions && enemy && enemy.faction) {
-        factions.onDroneKilled(enemy.faction, enemy.isElite);
-    }
-    // Companion synergy
-    if (companion && typeof companion.triggerSynergy === 'function') {
-        companion.triggerSynergy();
-    }
-    // Nephalem Glory kill streak
-    if (nephalemGlory) nephalemGlory.onKill(enemy);
-    // Apex Rift progress
-    if (apexRift) apexRift.onEnemyKilled(enemy, source);
-    // Arena Mode score + kill tracking
-    if (arenaMode && arenaMode.active) arenaMode.onEnemyKilled(enemy, source);
-    // Collapse Mode kill tracking
-    if (collapse && collapse._inRun) collapse.onEnemyKilled(enemy);
-    // Legendary powers
-    if (legendaryPowerSystem) legendaryPowerSystem.onEnemyKilled(enemy);
-    // Echo Shards (souls-like currency)
-    if (soulsSystem) {
-        const shards = SoulsSystem.getShardYield(enemy.type || 'drone', enemy.isElite);
-        soulsSystem.addShards(shards);
-    }
-    // Loot drop with difficulty scaling
-    const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
-    const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId);
-    if (drop) {
-        if (drop.type === 'gear') {
-            const acquired = inventoryStash.acquireItem(drop.itemData);
-            if (acquired) {
-                showLootToast(drop.itemData);
-                if (drop.rarity >= 4) showHint('LEGENDARY! Check your stash (I key).');
-            }
-        } else {
-            lootSystem.spawnDrop(drop, enemy.position || (enemy.mesh && enemy.mesh.position));
-        }
-        showHint('Loot drops! Walk over items to pick them up.');
-    }
+    gameDirector.handleEnemyKilled(enemy, source);
 }
 
 // Wire drone death
@@ -960,6 +921,7 @@ autoRegister('ghostRacing',    ghostRacing);
 autoRegister('speedrunILs',    speedrunILs);
 autoRegister('timeTrial',      timeTrial);
 autoRegister('inventoryStash', inventoryStash);
+autoRegister('weaponSystem', weaponSystem);
 
 // Show a brief HUD indicator after every save (auto-save and manual).
 saveSystem.onSave = (meta) => {
@@ -1154,9 +1116,8 @@ const btnQuit = document.getElementById('pause-quit');
 
 if (btnResume) {
     btnResume.addEventListener('click', () => {
-        paused = false;
-        if (pauseMenu) pauseMenu.style.display = 'none';
-        document.body.requestPointerLock();
+        gameDirector.resume();
+        paused = gameDirector.paused;
     });
 }
 if (btnSettings) {
@@ -1167,28 +1128,10 @@ if (btnSettings) {
 }
 if (btnQuit) {
     btnQuit.addEventListener('click', () => {
-        paused = false;
-        gameOver = false;
-        gameStarted = false;
-        if (bossFight && typeof bossFight.cleanup === 'function') bossFight.cleanup();
-        if (apexRift && typeof apexRift.endRun === 'function') apexRift.endRun();
-        if (player) {
-            player.isDead = false;
-            player.health = player.maxHealth || 100;
-            player.state = 'idle';
-        }
-        if (statusEffectSystem && typeof statusEffectSystem.clearAll === 'function') statusEffectSystem.clearAll();
-        // Hide any overlays
-        const overlays = ['rift-result-overlay','death-screen','boss-victory','celebration'];
-        overlays.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-        if (pauseMenu) pauseMenu.style.display = 'none';
-        startScreen.style.display = 'flex';
-        ui.style.display = 'none';
-        crosshair.style.display = 'none';
-        const hcr = document.getElementById('heart-container-row');
-        if (hcr) hcr.style.display = 'none';
-        const skb = document.getElementById('sector-key-bar');
-        if (skb) skb.style.display = 'none';
+        gameDirector.quitToMenu();
+        gameStarted = gameDirector.gameStarted;
+        paused = gameDirector.paused;
+        gameOver = gameDirector.gameOver;
         if (skillBarUI) skillBarUI.hide();
     });
 }
@@ -1200,11 +1143,14 @@ startScreen.addEventListener('click', () => {
 
 document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement) {
-        if (!gameStarted) gameStarted = true;
+        if (!gameStarted) {
+            gameStarted = true;
+            gameDirector.start();
+        }
         startScreen.style.display = 'none';
         if (paused) {
-            paused = false;
-            if (pauseMenu) pauseMenu.style.display = 'none';
+            gameDirector.resume();
+            paused = gameDirector.paused;
         }
         if (!levelEditor.isActive()) {
             ui.style.display = 'block';
@@ -1219,10 +1165,10 @@ document.addEventListener('pointerlockchange', () => {
     } else {
         // Do NOT conflate pointer lock loss with pause or game stop
         if (paused) {
-            paused = false;
-            if (pauseMenu) pauseMenu.style.display = 'none';
+            gameDirector.resume();
+            paused = gameDirector.paused;
         }
-        audio._ambiencePlaying = false;
+        audio.stopAmbience();
     }
 });
 
@@ -1247,14 +1193,15 @@ document.getElementById('boss-exit').addEventListener('click', () => {
         player.state = 'idle';
     }
     if (statusEffectSystem && typeof statusEffectSystem.clearAll === 'function') statusEffectSystem.clearAll();
+    gameDirector._deathHandled = false;
+    gameDirector.gameOver = false;
+    gameOver = false;
 });
 
 // Death screen respawn button
 document.getElementById('death-respawn').addEventListener('click', () => {
-    gameOver = false;
-    if (player) player.respawn();
-    document.getElementById('death-screen').style.display = 'none';
-    document.body.requestPointerLock();
+    gameDirector.onPlayerRespawn();
+    gameOver = gameDirector.gameOver;
 });
 
 // Safehouse "Rest" button
@@ -1304,6 +1251,25 @@ window.settingsStore = settings;
 wireSettings(settings, { postProcessing, audio, assistMode, player, touchControls, saveSystem });
 const keybindingsGamepadCheck = wireKeybindings(gamepad);
 
+// Wire Save/Load buttons with confirmation dialogs (C2)
+(function wireSaveLoadButtons() {
+    const btnSave = document.getElementById('btn-save-game');
+    const btnLoad = document.getElementById('btn-load-game');
+    if (btnSave) {
+        btnSave.addEventListener('click', () => {
+            if (confirm('Overwrite current save?')) saveSystem.save();
+        });
+    }
+    if (btnLoad) {
+        btnLoad.addEventListener('click', () => {
+            if (confirm('Load saved game? Unsaved progress will be lost.')) {
+                saveSystem.load();
+                location.reload();
+            }
+        });
+    }
+})();
+
 window.settingsStore = settings;
 
 // Game loop
@@ -1335,18 +1301,15 @@ function animate() {
         // === PAUSE TOGGLE ===
         if (activeInput.wasPressed('Escape')) {
             if (paused) {
-                paused = false;
-                if (pauseMenu) pauseMenu.style.display = 'none';
-                document.body.requestPointerLock();
+                gameDirector.resume();
+                paused = gameDirector.paused;
             } else {
                 // Close the topmost open panel first; only show pause if none were open
                 const closedPanel = uiManager && typeof uiManager.closeOpenPanel === 'function'
                     ? uiManager.closeOpenPanel() : false;
                 if (!closedPanel) {
-                    paused = true;
-                    if (uiManager && typeof uiManager.closeAllPanels === 'function') uiManager.closeAllPanels();
-                    if (pauseMenu) pauseMenu.style.display = 'flex';
-                    document.exitPointerLock();
+                    gameDirector.pause();
+                    paused = gameDirector.paused;
                 }
             }
         }
@@ -1358,7 +1321,7 @@ function animate() {
         }
         
         // === EDITOR MODE TOGGLE (F1) ===
-        if (__DEV__ && activeInput.wasPressed('F1')) {
+        if (gameDirector.allowEditor() && activeInput.wasPressed('F1')) {
             levelEditor.toggle();
             if (levelEditor.isActive()) {
                 document.exitPointerLock();
@@ -1374,17 +1337,14 @@ function animate() {
             }
         }
         
-        // Death screen
-        if (player && player.isDead) {
-            const deathScreen = document.getElementById('death-screen');
-            if (deathScreen && deathScreen.style.display !== 'flex') {
-                deathScreen.style.display = 'flex';
-                if (document.pointerLockElement) document.exitPointerLock();
-                // Drop echo shards at death position
-                if (soulsSystem) soulsSystem.onPlayerDeath(player.position);
-            }
-            gameOver = true;
-        } else {
+        // Death screen — delegated to GameDirector
+        if (player && player.isDead && !gameDirector._deathHandled) {
+            gameDirector.onPlayerDeath();
+            gameOver = gameDirector.gameOver;
+        } else if (player && !player.isDead && gameDirector._deathHandled) {
+            gameDirector._deathHandled = false;
+            gameDirector.gameOver = false;
+            gameOver = false;
             const deathScreen = document.getElementById('death-screen');
             if (deathScreen && deathScreen.style.display === 'flex') deathScreen.style.display = 'none';
         }
@@ -1487,6 +1447,9 @@ function animate() {
             if (handled) activeInput.consumeKey('KeyF');
         }
         
+        // === TIME TRIAL INPUT (must come before T-key checks so consumeKey works) ===
+        timeTrial.handleInput(activeInput);
+
         // === BOSS FIGHT TOGGLE (B) ===
         if (activeInput.wasPressed('KeyB') && !bossFight.isActive() && !levelEditor.isActive()) {
             bossFight.start();
@@ -1545,11 +1508,8 @@ function animate() {
         
         // Track playtime and auto-save every 30 seconds
         saveSystem.tickPlaytime(dt);
-        autoSaveTimer += dt;
-        if (autoSaveTimer >= 30) {
-            saveSystem.save();
-            autoSaveTimer = 0;
-        }
+        gameDirector.update(dt, finalDt);
+        autoSaveTimer = gameDirector.autoSaveTimer;
 
         // Overclock / Heat (compute early for finalDt) — gated by key item and EMP disable
         const _empBlocked = player._empDisabled === true;
@@ -1574,9 +1534,6 @@ function animate() {
         
         // Update hazards
         world.hazards.update(finalDt, player);
-        
-        // Time trial input & update
-        timeTrial.handleInput(activeInput);
         
         // Photo mode update
         photoMode.update(dt, input);

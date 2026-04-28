@@ -688,6 +688,23 @@ export class AudioManager {
     playSFX(id, position = null) {
         switch(id) {
             case 'mechanical_click': this.playUIClick(); break;
+            case 'weapon_switch':
+                this.playTone(880, 0.06, 'sine');
+                break;
+            case 'reload':
+                this.ensureInit();
+                const t2 = this.ctx.currentTime;
+                const osc2 = this.ctx.createOscillator();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(400, t2);
+                osc2.frequency.exponentialRampToValueAtTime(600, t2 + 0.15);
+                const g2 = this.ctx.createGain();
+                g2.gain.setValueAtTime(0.12, t2);
+                g2.gain.exponentialRampToValueAtTime(0.001, t2 + 0.2);
+                osc2.connect(g2).connect(this.dryGain);
+                osc2.start(t2);
+                osc2.stop(t2 + 0.25);
+                break;
             case 'boss_phase':
                 if (position && this.listener) {
                     this.playPositionalSound(position, { freq: 300, duration: 1.2, type: 'sawtooth', refDistance: 15, rolloff: 1.0 });

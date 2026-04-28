@@ -1,4 +1,4 @@
-# Agent Guide — Apex Rift (Warehouse Parkour Playground)
+# Agent Guide — Vertical Parkour ARPG
 
 This file is the **map**, not the encyclopedia. For deeper context, see:
 - `docs/ARCHITECTURE.md` — module graph, dependency rules, performance budgets

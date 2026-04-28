@@ -1,17 +1,28 @@
-# Apex Rift — Warehouse Parkour Playground
+# Vertical Parkour ARPG
 
-A browser-based 3D parkour-RPG built with **Three.js r160** (ES modules). No build step — serve the files and play.
+A browser-based **Vertical Parkour ARPG** built with **Three.js r160** (ES modules). No build step — serve the files and play.
+
+> **Core Identity:** Movement is combat. Parkour, melee, guns, magic/powers, and exo-suit abilities chain together through vertical combat arenas.
 
 > **Play now:** `python -m http.server 8080` → `http://localhost:8080`
 > **Dev mode:** append `#dev` to the URL for verbose console logging.
 
 ---
 
-## Gameplay Loop
+## Core Loop
 
 ```
-Character Creation → Explore Warehouse → Collect & Fight → Progress → Endgame
+Start → Parkour/Combat → Kill Enemies → Loot/XP → Upgrade Build → Save → Harder Encounters
 ```
+
+**Pillars:**
+- **Parkour is Combat** — wallruns, dives, slides, and aerials are attacks
+- **Skill Bar Drives Combat** — 5 active slots with resource/cooldown gameplay
+- **Exo-Suit is Always On** — baseline identity, not an accessory
+- **Magic/Powers are Combat Kit** — integrated into the skill bar, not bolted on
+- **Loot Supports Builds** — gear with affixes and legendary powers
+- **RPG Stats Support Movement/Combat/Survival** — 6 attributes with clear combat consequences
+- **Enemies, Bosses, Arena, Rift** — content exists to test the loop
 
 ### 1. Character Creation
 On first launch you choose an **Origin** (background story that grants passive stat bonuses) and a **Primary Archetype** (Drifter, Ghost, Brawler, Technician — each with a unique skill tree). Choices persist in `localStorage` and carry through New Game+.
@@ -210,8 +221,8 @@ All audio procedurally synthesised via **Web Audio API** — no external files.
 - **Photo Mode** (`F12`) — free-orbit camera, depth-of-field, 5 filter presets. Pauses game.
 - **Director Mode** — AI camera predicts highlight moments and records a 30s rolling buffer.
 
-### Level Editor (`F1`)
-Full in-browser 3D editor. 14 object types, live properties panel, undo, export/import JSON. Intentionally uses raw DOM events (separate from InputManager) because pointer lock is released in editor mode.
+### Level Editor (`F1` — Dev Only)
+Full in-browser 3D editor. 14 object types, live properties panel, undo, export/import JSON. Gated behind `#dev` URL hash in release builds.
 
 ### Accessibility
 - **Assist Mode** (`Shift+P`) — extended coyote time, auto-vault, halved knockback, slower drones and Rising Tide.
@@ -270,7 +281,6 @@ Full in-browser 3D editor. 14 object types, live properties panel, undo, export/
 | `V` | Runner Vision |
 | `Z` | Phase Mirror |
 | `` ` `` | Overworld Map |
-| `F1` | Level Editor |
 | `F12` | Photo Mode |
 | `1-4` | Speedrun ILs |
 | `6-9` | Quick-use consumables |
@@ -318,7 +328,8 @@ Full in-browser 3D editor. 14 object types, live properties panel, undo, export/
 
 ```
 index.html              — UI panels, canvas, importmap, CSS
-js/main.js              — Game loop hub; composition root
+js/main.js              — Renderer/scene setup, system creation, loop startup
+js/GameDirector.js      — Gameplay orchestration: start, pause, death, save, release gating
 js/GameContext.js       — DI container: register, topological sort, event bus
 js/Player.js            — 16-state parkour controller (~1700 lines)
 js/World.js             — Warehouse geometry, zones, collectibles, hazards

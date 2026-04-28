@@ -462,7 +462,7 @@ export class UIManager {
             });
         }
 
-        const items = this.inventorySystem ? this.inventorySystem.getItems() : [];
+        const items = this.inventorySystem ? this.inventorySystem.getAllItems() : [];
         if (!items || !items.length) {
             container.innerHTML = '<p style="color:#666;font-size:12px;padding:8px 0;">Inventory is empty.</p>';
             return;

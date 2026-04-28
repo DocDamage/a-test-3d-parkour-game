@@ -444,4 +444,29 @@ export class WeaponSystem {
             }
         }
     }
+
+    serialize() {
+        const ammoData = {};
+        for (const [key, val] of Object.entries(this.ammo)) {
+            ammoData[key] = { clip: val.clip, reserve: val.reserve };
+        }
+        return {
+            currentSlot: this.currentSlot,
+            ammo: ammoData
+        };
+    }
+
+    deserialize(data) {
+        if (!data) return;
+        if (data.currentSlot) this.currentSlot = data.currentSlot;
+        if (data.ammo) {
+            for (const [key, val] of Object.entries(data.ammo)) {
+                if (this.ammo[key]) {
+                    this.ammo[key].clip = val.clip ?? this.ammo[key].clip;
+                    this.ammo[key].reserve = val.reserve ?? this.ammo[key].reserve;
+                }
+            }
+        }
+        this._updateUI();
+    }
 }

@@ -62,6 +62,12 @@ export class GamepadController {
         if (Math.abs(rx) > this.deadZone) this.mouse.dx += rx * sens;
         if (Math.abs(ry) > this.deadZone) this.mouse.dy += ry * sens;
         
+        // R2/RT -> Overclock (Shift+Q chord) — C6 fix
+        if (gp.buttons[7] && gp.buttons[7].pressed) {
+            this.keys['ShiftLeft'] = true;
+            this.keys['KeyQ'] = true;
+        }
+
         // Buttons
         for (let idx = 0; idx < gp.buttons.length; idx++) {
             const code = keyBindings.getGamepadBinding(idx);
