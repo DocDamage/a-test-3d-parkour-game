@@ -11,10 +11,8 @@ import { AirDodgeSystem } from './AirDodgeSystem.js';
 import { DoubleJumpSystem } from './DoubleJumpSystem.js';
 import { CornerKickSystem } from './CornerKickSystem.js';
 import { DiveRollSystem } from './DiveRollSystem.js';
-
+import { createBunnyHopFlashMesh, createScreenGlowMesh, createTrailMeshes, updateScreenGlow, updateTrail } from './PlayerVisualEffects.js';
 /**
- * Player Controller States & Transitions
- * ======================================
  * IDLE/WALK/SPRINT/CROUCH -> JUMP (Space, grounded)
  * IDLE/WALK/SPRINT/CROUCH -> SLIDE (C while sprinting)
  * IDLE/WALK/SPRINT/CROUCH -> FALL (walk off edge)
@@ -28,16 +26,7 @@ import { DiveRollSystem } from './DiveRollSystem.js';
  * CLIMB -> JUMP (Space, push off wall)
  * CLIMB -> FALL (E or edge of wall)
  * CLIMB -> VAULT (reach top, auto mantle)
- * WALLRUN -> JUMP (Space, wall jump)
- * WALLRUN -> FALL (release Shift or timer)
- * HANG -> VAULT (W/Space, pull up)
- * HANG -> FALL (S/E, drop)
- * SLIDE -> CROUCH (timer/speed end)
- * JUMP/FALL -> ROLL (C before hard landing)
- * JUMP/FALL -> STUMBLE (hard landing without roll)
- * JUMP/FALL -> TIC_TAC (Space between parallel walls)
- * ANY -> RAGDOLL (slam wall at >12 speed)
- * RAGDOLL -> IDLE (respawn after timer)
+ * Advanced states include wallrun, hang, roll, stumble, tic-tac, ragdoll.
  */
 
 export class Player {
@@ -200,9 +189,9 @@ export class Player {
         this.trajectory = new Trajectory(scene);
 
         // Effect meshes
-        this.bunnyHopFlashMesh = this._createBunnyHopFlashMesh();
-        this.screenGlowMesh = this._createScreenGlowMesh();
-        this.trailMeshes = this._createTrailMeshes();
+        this.bunnyHopFlashMesh = createBunnyHopFlashMesh(this);
+        this.screenGlowMesh = createScreenGlowMesh(this);
+        this.trailMeshes = createTrailMeshes(this);
         this.trailHistory = [];
     }
 
@@ -269,67 +258,6 @@ export class Player {
         mesh.position.y = 0.02;
         this.scene.add(mesh);
         return mesh;
-    }
-
-    _createBunnyHopFlashMesh() {
-        const geo = new THREE.PlaneGeometry(0.4, 0.15);
-        const mat = new THREE.MeshBasicMaterial({
-            color: 0xffff00,
-            transparent: true,
-            opacity: 0,
-            side: THREE.DoubleSide,
-            depthTest: false
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(0, 2.0, 0.35);
-        mesh.renderOrder = 100;
-        mesh.visible = false;
-        this.mesh.add(mesh);
-        return mesh;
-    }
-
-    _createScreenGlowMesh() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        const grad = ctx.createRadialGradient(128, 128, 30, 128, 128, 180);
-        grad.addColorStop(0, 'rgba(0, 255, 255, 0)');
-        grad.addColorStop(1, 'rgba(0, 255, 255, 0.45)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 256, 256);
-
-        const tex = new THREE.CanvasTexture(canvas);
-        const geo = new THREE.PlaneGeometry(4, 4);
-        const mat = new THREE.MeshBasicMaterial({
-            map: tex,
-            transparent: true,
-            opacity: 0,
-            depthTest: false,
-            side: THREE.DoubleSide
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.renderOrder = 999;
-        mesh.visible = false;
-        this.scene.add(mesh);
-        return mesh;
-    }
-
-    _createTrailMeshes() {
-        const meshes = [];
-        for (let i = 0; i < 16; i++) {
-            const geo = new THREE.SphereGeometry(0.06 + i * 0.005, 4, 4);
-            const mat = new THREE.MeshBasicMaterial({
-                color: 0x00ffff,
-                transparent: true,
-                opacity: 0
-            });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.visible = false;
-            this.scene.add(mesh);
-            meshes.push(mesh);
-        }
-        return meshes;
     }
 
     update(dt, input, cameraYaw) {
@@ -563,8 +491,8 @@ export class Player {
 
         // Update visuals
         this.updateVisuals(dt, moveDir, input);
-        this.updateTrail(dt);
-        this.updateScreenGlow();
+        updateTrail(this, dt);
+        updateScreenGlow(this);
 
         // Respawn if fell out of world
         if (this.position.y < -20) {

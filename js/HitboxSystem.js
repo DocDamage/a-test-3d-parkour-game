@@ -62,6 +62,8 @@ export class HitboxSystem {
     constructor() {
         /** @type {Hitbox[]} */
         this.hitboxes = [];
+        this.spatialHashThreshold = 15;
+        this.spatialCellSize = 4;
     }
 
     /**
@@ -99,11 +101,15 @@ export class HitboxSystem {
 
         const hurtboxes = this.hitboxes.filter(h => h.type === 'hurtbox');
         const attackers = this.hitboxes.filter(h => h.type !== 'hurtbox');
+        const broadphase = this.hitboxes.length > this.spatialHashThreshold
+            ? this._buildSpatialHash(hurtboxes)
+            : null;
 
         for (const atk of attackers) {
             if (atk._expired) continue;
 
-            for (const def of hurtboxes) {
+            const candidates = broadphase ? this._querySpatialHash(atk, broadphase) : hurtboxes;
+            for (const def of candidates) {
                 // Skip self-damage unless explicitly allowed
                 if (atk.owner === def.owner) continue;
 
@@ -230,6 +236,59 @@ export class HitboxSystem {
         const dz = Math.max(boxPos.z - half.z, Math.min(spherePos.z, boxPos.z + half.z));
         const distSq = (spherePos.x - dx) ** 2 + (spherePos.y - dy) ** 2 + (spherePos.z - dz) ** 2;
         return distSq <= radius * radius;
+    }
+
+    _buildSpatialHash(hurtboxes) {
+        const cells = new Map();
+        for (const hurtbox of hurtboxes) {
+            for (const key of this._getOccupiedCells(hurtbox)) {
+                if (!cells.has(key)) cells.set(key, []);
+                cells.get(key).push(hurtbox);
+            }
+        }
+        return cells;
+    }
+
+    _querySpatialHash(hitbox, cells) {
+        const seen = new Set();
+        const candidates = [];
+        for (const key of this._getOccupiedCells(hitbox)) {
+            const bucket = cells.get(key);
+            if (!bucket) continue;
+            for (const hurtbox of bucket) {
+                if (seen.has(hurtbox)) continue;
+                seen.add(hurtbox);
+                candidates.push(hurtbox);
+            }
+        }
+        return candidates;
+    }
+
+    _getOccupiedCells(hitbox) {
+        const pos = hitbox.getWorldPosition();
+        const radius = this._shapeBroadRadius(hitbox.shape);
+        const minX = Math.floor((pos.x - radius) / this.spatialCellSize);
+        const maxX = Math.floor((pos.x + radius) / this.spatialCellSize);
+        const minY = Math.floor((pos.y - radius) / this.spatialCellSize);
+        const maxY = Math.floor((pos.y + radius) / this.spatialCellSize);
+        const minZ = Math.floor((pos.z - radius) / this.spatialCellSize);
+        const maxZ = Math.floor((pos.z + radius) / this.spatialCellSize);
+        const keys = [];
+        for (let x = minX; x <= maxX; x++) {
+            for (let y = minY; y <= maxY; y++) {
+                for (let z = minZ; z <= maxZ; z++) {
+                    keys.push(`${x},${y},${z}`);
+                }
+            }
+        }
+        return keys;
+    }
+
+    _shapeBroadRadius(shape) {
+        if (!shape) return 0;
+        if (shape.type === 'sphere') return shape.radius || 0;
+        if (shape.type === 'box' && shape.size) return shape.size.length();
+        return 0;
     }
 
     /**

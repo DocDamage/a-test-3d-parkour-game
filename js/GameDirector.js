@@ -194,7 +194,8 @@ export class GameDirector {
         // Loot
         if (lootSystem) {
             const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
-            const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId);
+            const riftLevel = apexRift ? apexRift.riftLevel || 1 : 1;
+            const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId, { riftLevel });
             if (drop) {
                 if (drop.type === 'gear' && inventoryStash) {
                     const acquired = inventoryStash.acquireItem(drop.itemData);

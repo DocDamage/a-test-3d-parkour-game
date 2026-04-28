@@ -223,6 +223,13 @@ export class ExoSuitSystem {
           }
         }
       }
+      if (item.gems) {
+        for (const gem of item.gems) {
+          for (const [key, val] of Object.entries(gem.bonuses || {})) {
+            totals[key] = (totals[key] || 0) + val;
+          }
+        }
+      }
     }
 
     const setBonuses = this.getActiveSetBonuses();

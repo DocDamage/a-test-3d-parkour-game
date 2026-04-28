@@ -1,0 +1,20 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+      - name: Run mechanical checks
+        env:
+          CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: bash scripts/check.sh

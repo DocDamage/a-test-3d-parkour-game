@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vertical Parkour ARPG</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0a14'/%3E%3Cpath d='M15 46 31 10l18 44-17-13z' fill='%23ffaa00'/%3E%3C/svg%3E">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffaa00">
     <style>
@@ -1268,14 +1269,23 @@
             margin-bottom: 10px;
         }
         .stash-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            display: block;
             padding: 8px 10px;
             margin: 4px 0;
             background: rgba(255,255,255,0.05);
             border-radius: 6px;
             font-size: 12px;
+        }
+        .stash-topline,
+        .stash-actions,
+        .stash-gems {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .stash-topline {
+            margin-bottom: 6px;
         }
         .stash-item .stash-name {
             flex: 1;
@@ -1293,6 +1303,22 @@
             min-width: 60px;
             text-align: center;
         }
+        .stash-compare {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 3px 8px;
+            margin: 4px 0 6px;
+            font-size: 10px;
+            line-height: 1.25;
+        }
+        .stash-compare .positive { color: #66ff99; }
+        .stash-compare .negative { color: #ff7777; }
+        .stash-compare .neutral,
+        .stash-muted { color: #888; }
+        .stash-gems {
+            margin-bottom: 7px;
+            min-height: 20px;
+        }
         .stash-item button {
             padding: 4px 10px;
             font-size: 11px;
@@ -1301,6 +1327,20 @@
             cursor: pointer;
             font-weight: bold;
             transition: background 0.15s;
+        }
+        .stash-actions .stash-socket {
+            background: #22334f;
+            color: #9fc7ff;
+            border: 1px solid rgba(120, 170, 255, 0.45);
+        }
+        .stash-actions .stash-identify {
+            background: #4f3c16;
+            color: #ffd36a;
+        }
+        .stash-item .gem-chip {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid #888;
+            padding: 3px 8px;
         }
         .stash-item .stash-equip {
             background: #2a5a2a;
@@ -1355,6 +1395,18 @@
         .sh-upgrade .level {
             color: #888;
             float: right;
+        }
+        .safehouse-identify {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255, 170, 0, 0.25);
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        #btn-safehouse-identify-all:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
         }
 
         /* === RPG Bounty Panel === */
@@ -2605,6 +2657,11 @@
             🔥 Rest &amp; Recover
             <div style="font-size:11px;color:#888;font-weight:normal;margin-top:3px;">Refills vials · Saves game · Respawns enemies</div>
         </button>
+        <div class="safehouse-identify">
+            <div style="color:#ffaa00;font-weight:bold;margin-bottom:4px;">Identifier Bench</div>
+            <div id="safehouse-identify-status" style="color:#888;margin-bottom:8px;">0 unidentified items · 0 chips</div>
+            <button id="btn-safehouse-identify-all" style="width:100%;padding:8px 0;background:#3a2a12;border:1px solid #ffaa00;color:#ffd36a;font-size:12px;font-weight:bold;border-radius:5px;cursor:pointer;">Identify All</button>
+        </div>
         <div id="safehouse-upgrades"></div>
     </div>
 

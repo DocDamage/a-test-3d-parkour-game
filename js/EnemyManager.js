@@ -249,6 +249,56 @@ class SuicideEnemy extends EnemyBase {
     }
 }
 
+class SapperEnemy extends EnemyBase {
+    _buildMesh(cfg) {
+        const geo = new THREE.BoxGeometry(0.45, 0.35, 0.45);
+        const mat = new THREE.MeshStandardMaterial({
+            color: cfg.color || 0x88ff00,
+            emissive: cfg.emissive || 0x44aa00,
+            emissiveIntensity: cfg.isElite ? 1.2 : 0.6,
+            roughness: 0.45,
+            metalness: 0.55
+        });
+        this.body = new THREE.Mesh(geo, mat);
+        this.group.add(this.body);
+
+        const antenna = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.025, 0.025, 0.45, 6),
+            new THREE.MeshBasicMaterial({ color: 0xccff66 })
+        );
+        antenna.position.y = 0.35;
+        this.group.add(antenna);
+        this._sabotageCooldown = 0;
+    }
+
+    _chooseBehaviour(dt, player) {
+        if (!player) return;
+        this._sabotageCooldown = Math.max(0, this._sabotageCooldown - dt);
+
+        const dist = this.group.position.distanceTo(player.position);
+        const canSee = this.checkVision(player);
+        if (canSee || dist < 7) {
+            this.state = 'CHASE';
+            const dir = new THREE.Vector3().subVectors(player.position, this.group.position).normalize();
+            this.group.position.addScaledVector(dir, this.speed * dt);
+            this.group.lookAt(player.position.x, this.group.position.y, player.position.z);
+
+            if (dist < this._attackRange) this._tryMeleeAttack(player);
+            if (dist < 4 && this._sabotageCooldown <= 0) {
+                player._jamTimer = Math.max(player._jamTimer || 0, 2.0);
+                this._sabotageCooldown = 4.0;
+                if (this.scene?.userData?.spawnDamageNumber) {
+                    const pos = this.group.position.clone();
+                    pos.y += 1;
+                    this.scene.userData.spawnDamageNumber(pos, 'SAPPED', false, 'electric');
+                }
+            }
+        } else {
+            this.state = 'PATROL';
+        }
+    }
+}
+
 class JammerEnemy extends EnemyBase {
     _buildMesh(cfg) {
         const geo = new THREE.OctahedronGeometry(0.3, 0);
@@ -325,7 +375,7 @@ class MedicEnemy extends EnemyBase {
         if (nearest && nearestDist < this._attackRange) {
             this.state = 'HEAL';
             if (this.attackCooldown <= 0) {
-                ally.health = Math.min(ally.maxHealth, ally.health + 15);
+                nearest.health = Math.min(nearest.maxHealth, nearest.health + 15);
                 this.attackCooldown = this._attackCooldownTime;
             }
         } else if (nearest) {

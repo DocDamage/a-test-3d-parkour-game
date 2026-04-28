@@ -232,6 +232,7 @@ export class BossFabricator {
     die() {
         this.isDead = true;
         this.isActive = false;
+        if (this.onDeath) this.onDeath(this, this.player);
         // Explosion visual
         if (this.group) {
             this.group.children.forEach(c => {

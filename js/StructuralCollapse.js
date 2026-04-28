@@ -18,7 +18,9 @@ export class StructuralCollapse {
     update(dt, player) {
         // Check for wrecking ball hits on structural objects
         for (const wb of this.world.hazards.wreckingBalls) {
-            const ballPos = wb.mesh.position.clone();
+            const ballMesh = wb.ball || wb.mesh;
+            if (!ballMesh) continue;
+            const ballPos = ballMesh.position.clone();
             for (const obj of this.structuralObjects) {
                 if (!obj.userData.structural) continue;
                 const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);

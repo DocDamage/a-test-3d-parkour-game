@@ -272,6 +272,7 @@ export class WeaponSystem {
             if (did) { 
                 this.isReloading = true; 
                 this.reloadTimer = reloadTime;
+                this._enterReloadState();
                 if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
                     window.audioManager.playSFX('reload');
                 }
@@ -283,6 +284,7 @@ export class WeaponSystem {
 
         this.isReloading = true;
         this.reloadTimer = reloadTime;
+        this._enterReloadState();
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
             window.audioManager.playSFX('reload');
         }
@@ -406,9 +408,9 @@ export class WeaponSystem {
 
     _finishReload() {
         const w = this.getCurrentWeapon();
-        if (!w || !w.ammoType) { this.isReloading = false; return; }
+        if (!w || !w.ammoType) { this.isReloading = false; this._exitReloadState(); return; }
         const ammo = this.ammo[w.ammoType];
-        if (!ammo) { this.isReloading = false; return; }
+        if (!ammo) { this.isReloading = false; this._exitReloadState(); return; }
 
         const eff = this._getEffectiveStats();
         const clipSize = eff ? Math.round(eff.clipSize) : (w.clipSize || 10);
@@ -417,7 +419,22 @@ export class WeaponSystem {
         ammo.clip += taken;
         ammo.reserve -= taken;
         this.isReloading = false;
+        this._exitReloadState();
         this._updateUI();
+    }
+
+    _enterReloadState() {
+        if (!this.player || this.player.isDead) return;
+        if (!this._preReloadState) this._preReloadState = this.player.state;
+        this.player.state = 'RELOAD';
+    }
+
+    _exitReloadState() {
+        if (!this.player) return;
+        if (this.player.state === 'RELOAD') {
+            this.player.state = this.player.grounded ? 'IDLE' : 'FALL';
+        }
+        this._preReloadState = null;
     }
 
     /* ------------------------------------------------------------------ */

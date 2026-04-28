@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 
-let _sharedCtx = null;
+export let sharedAudioContext = null;
 export function getSharedAudioContext() {
-    if (!_sharedCtx) {
-        _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!sharedAudioContext) {
+        sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
-    return _sharedCtx;
+    return sharedAudioContext;
 }
 
 export class AudioManager {

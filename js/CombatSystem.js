@@ -60,6 +60,8 @@ export class CombatSystem {
             dt *= 0.1;
         }
 
+        this._updateBlockState(input);
+
         // Buffer input if pressed during an attack
         if (input.wasPressed('Mouse1')) {
             if (this.state === COMBO_STATES.IDLE) {
@@ -118,6 +120,7 @@ export class CombatSystem {
     _startAttack(type) {
         const p = this.player;
         if (!p || p.isDead) return;
+        if (p.state === 'BLOCK' || p.state === 'PARRY') return;
 
         // Grounded check for light/heavy (aerial handled by Player.js dive/groundpound)
         if (!p.grounded && type !== 'aerial') return;
@@ -150,6 +153,7 @@ export class CombatSystem {
 
         this.stateTimer = this._getStateDuration();
         this.hitRegistered = false;
+        this._setPlayerCombatState(type);
 
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
             const pos = this.player ? this.player.position : null;
@@ -172,6 +176,7 @@ export class CombatSystem {
             this.state = COMBO_STATES.IDLE;
             this.stateTimer = 0;
             this.hitRegistered = false;
+            this._restorePlayerState();
         }
     }
 
@@ -181,11 +186,42 @@ export class CombatSystem {
         this.hitRegistered = false;
         this.bufferedInput = null;
         this.bufferTimer = 0;
+        this._restorePlayerState();
     }
 
     _checkCancels(input) {
         // Dash (Q) or Jump (Space) cancels any attack
         return input.wasPressed('KeyQ') || input.wasPressed('Space');
+    }
+
+    _updateBlockState(input) {
+        const p = this.player;
+        if (!p || p.isDead || this.state !== COMBO_STATES.IDLE) return;
+        const wantsBlock = input.isPressed('ShiftLeft') && input.isPressed('KeyF') && p.grounded;
+        if (wantsBlock && (!p.staminaSystem || p.staminaSystem.canSpend(p.staminaSystem.costs.block * 0.1))) {
+            if (!this._preBlockState) this._preBlockState = p.state;
+            p.state = p._parryWindow > 0 ? 'PARRY' : 'BLOCK';
+        } else if (p.state === 'BLOCK' || p.state === 'PARRY') {
+            p.state = this._preBlockState || 'IDLE';
+            this._preBlockState = null;
+        }
+    }
+
+    _setPlayerCombatState(type) {
+        const p = this.player;
+        if (!p) return;
+        if (!this._preAttackState) this._preAttackState = p.state;
+        if (!p.grounded) p.state = 'ATTACK_AERIAL';
+        else p.state = type === 'heavy' ? 'ATTACK_HEAVY' : 'ATTACK_LIGHT';
+    }
+
+    _restorePlayerState() {
+        const p = this.player;
+        if (!p) return;
+        if (p.state === 'ATTACK_LIGHT' || p.state === 'ATTACK_HEAVY' || p.state === 'ATTACK_AERIAL') {
+            p.state = p.grounded ? 'IDLE' : 'FALL';
+        }
+        this._preAttackState = null;
     }
 
     /* ------------------------------------------------------------------ */

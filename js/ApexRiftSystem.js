@@ -12,13 +12,14 @@
  */
 
 import * as THREE from 'three';
+import { getRiftBalance } from './BalanceModel.js';
 
 export class ApexRiftSystem {
-  constructor(scene, world, player, bossFight, challengeSystem, lootSystem, difficultyTier, enemyManager = null) {
+  constructor(scene, world, player, guardian, challengeSystem, lootSystem, difficultyTier, enemyManager = null) {
     this.scene = scene;
     this.world = world;
     this.player = player;
-    this.bossFight = bossFight;
+    this.guardian = guardian;
     this.challengeSystem = challengeSystem;
     this.lootSystem = lootSystem;
     this.difficultyTier = difficultyTier;
@@ -38,8 +39,8 @@ export class ApexRiftSystem {
     this.arenaObjects = [];   // meshes to cleanup
     this._portalMesh = null;
 
-    // Scaling per rift level: +17% HP/damage
-    this.riftScaling = 1.17;
+    // Legacy field retained for saved/debug consumers; active tuning lives in BalanceModel.
+    this.riftScaling = 1.055;
 
     this._load();
   }
@@ -115,6 +116,9 @@ export class ApexRiftSystem {
       }
     }
 
+    if (this.guardianSpawned && this.guardian && typeof this.guardian.cleanup === 'function') {
+      this.guardian.cleanup();
+    }
     this._cleanupArena();
     this._save();
     return { success, timeUsed, upgrades, riftLevel: this.riftLevel };
@@ -130,9 +134,9 @@ export class ApexRiftSystem {
 
     this.elapsed += dt;
 
-    // Update guardian boss fight if active
-    if (this.guardianSpawned && this.bossFight && typeof this.bossFight.update === 'function') {
-      this.bossFight.update(dt);
+    // Update unique guardian boss if active
+    if (this.guardianSpawned && this.guardian && typeof this.guardian.update === 'function') {
+      this.guardian.update(dt);
     }
 
     // Time limit fail
@@ -151,8 +155,7 @@ export class ApexRiftSystem {
     }
 
     // Check guardian defeat
-    if (this.guardianSpawned && this.bossFight && !this.bossFight.isActive() && !this.guardianDefeated) {
-      // Boss fight ended — if we get here, boss was defeated
+    if (this.guardianSpawned && this.guardian && !this.guardian.isActive() && !this.guardianDefeated) {
       this.guardianDefeated = true;
       // Small delay then end rift
       setTimeout(() => this.endRift(true), 2000);
@@ -287,14 +290,13 @@ export class ApexRiftSystem {
 
       if (enemy) {
         // Apply difficulty + rift scaling
-        const diffMult = this.difficultyTier ? this.difficultyTier.getTierConfig().hpMult : 1.0;
-        const riftMult = Math.pow(this.riftScaling, this.riftLevel - 1);
-        const totalMult = diffMult * riftMult;
+        const diffConfig = this.difficultyTier ? this.difficultyTier.getTierConfig() : { hpMult: 1.0, dmgMult: 1.0 };
+        const tuning = getRiftBalance(this.riftLevel, diffConfig.hpMult, diffConfig.dmgMult);
 
-        enemy.maxHealth = Math.floor((enemy.maxHealth || 40) * totalMult);
+        enemy.maxHealth = Math.floor((enemy.maxHealth || 40) * tuning.enemyHpMult);
         enemy.health = enemy.maxHealth;
-        if (enemy._attackDamage !== undefined) enemy._attackDamage = Math.floor(enemy._attackDamage * (this.difficultyTier ? this.difficultyTier.getTierConfig().dmgMult : 1.0));
-        if (enemy.meleeDamage) enemy.meleeDamage *= this.difficultyTier ? this.difficultyTier.getTierConfig().dmgMult : 1.0;
+        if (enemy._attackDamage !== undefined) enemy._attackDamage = Math.floor(enemy._attackDamage * tuning.enemyDamageMult);
+        if (enemy.meleeDamage) enemy.meleeDamage *= tuning.enemyDamageMult;
 
         // Wire death callback for loot / progress
         enemy.onDeath = (deadEnemy, source) => {
@@ -309,12 +311,13 @@ export class ApexRiftSystem {
   _spawnGuardian() {
     this.guardianSpawned = true;
 
-    if (this.bossFight && typeof this.bossFight.start === 'function') {
+    if (this.guardian && typeof this.guardian.start === 'function') {
       // Scale boss health by rift level and difficulty
-      const diffMult = this.difficultyTier ? this.difficultyTier.getTierConfig().hpMult : 1.0;
-      const riftMult = Math.pow(this.riftScaling, this.riftLevel - 1);
-      this.bossFight._riftMultiplier = diffMult * riftMult;
-      this.bossFight.start();
+      const diffConfig = this.difficultyTier ? this.difficultyTier.getTierConfig() : { hpMult: 1.0, dmgMult: 1.0 };
+      const tuning = getRiftBalance(this.riftLevel, diffConfig.hpMult, diffConfig.dmgMult);
+      this.guardian._riftMultiplier = tuning.guardianHpMult;
+      this.guardian._damageMultiplier = tuning.guardianDamageMult;
+      this.guardian.start();
     }
   }
 

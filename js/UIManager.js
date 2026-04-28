@@ -16,6 +16,7 @@ export class UIManager {
             mastery: false
         };
         this._lastStashHash = '';
+        this._lastSafehouseHash = '';
         this._invCloseWired = false;
     }
 
@@ -315,10 +316,13 @@ export class UIManager {
         if (!sp || sp.style.display !== 'block' || !d.inventoryStash) return;
         const list = document.getElementById('stash-list');
         const countEl = document.getElementById('stash-count');
-        if (countEl) countEl.textContent = `${d.inventoryStash.stash.length} / ${d.inventoryStash.maxSize}`;
+        const carriedGems = d.gemSystem?.getAllGems?.() || [];
+        const gemSummary = carriedGems.map(g => `${g.name} x${g.count}`).join(', ') || 'none';
+        if (countEl) countEl.textContent = `${d.inventoryStash.stash.length} / ${d.inventoryStash.maxSize}  |  Gems: ${gemSummary}`;
         if (!list) return;
         const stash = d.inventoryStash.getStash();
-        const hash = stash.length + '|' + stash.map(i => `${i.name}:${i.rarity}:${i.slot}`).join(',');
+        const equipped = d.exoSuit?.getAllEquipped?.() || {};
+        const hash = stash.length + '|' + stash.map(i => `${i.name}:${i.rarity}:${i.slot}:${i.identified}:${i.gems?.map(g => g.id).join('.') || ''}`).join(',') + '|' + carriedGems.map(g => `${g.id}:${g.count}`).join(',') + '|' + Object.values(equipped).map(i => i ? `${i.name}:${i.rarity}:${i.gems?.length || 0}` : '-').join(',');
         if (!this._panelDirty.stash && hash === this._lastStashHash) return;
         this._panelDirty.stash = false;
         this._lastStashHash = hash;
@@ -330,13 +334,93 @@ export class UIManager {
         list.innerHTML = stash.map((item, i) => {
             const color = rarityColors[item.rarity] || '#fff';
             const slot = item.slot || 'gear';
+            const socketText = item.sockets ? `${item.gems?.length || 0}/${item.sockets}` : '0/0';
+            const equippedItem = equipped[slot] || null;
+            const comparison = this._renderComparison(item, equippedItem);
+            const socketButtons = item.sockets
+                ? carriedGems.map(g => `<button class="stash-socket" data-index="${i}" data-gem-id="${g.id}" title="${this._escapeAttr(this._formatBonuses(g.bonuses))}">${this._escapeHtml(g.name)} x${g.count}</button>`).join('')
+                : '';
+            const socketed = item.gems?.length
+                ? item.gems.map((g, gi) => `<button class="stash-unsocket gem-chip" data-index="${i}" data-gem-index="${gi}" style="border-color:${this._escapeAttr(g.color || '#888')};color:${this._escapeAttr(g.color || '#fff')};" title="Remove: ${this._escapeAttr(this._formatBonuses(g.bonuses))}">${this._escapeHtml(g.name)}</button>`).join('')
+                : '<span class="stash-muted">No gems socketed</span>';
+            const identify = item.unidentified && !item.identified ? `<button class="stash-identify" data-index="${i}">Identify</button>` : '';
             return `<div class="stash-item">
-                <span class="stash-name" style="color:${color};">${item.name || 'Unknown Item'}</span>
-                <span class="stash-slot">${slot}</span>
-                <button class="stash-equip" data-index="${i}">Equip</button>
-                <button class="stash-scrap" data-index="${i}">Scrap</button>
+                <div class="stash-topline">
+                    <span class="stash-name" style="color:${color};">${this._escapeHtml(item.name || 'Unknown Item')}</span>
+                    <span class="stash-slot">${this._escapeHtml(slot)} ${socketText}</span>
+                </div>
+                ${comparison}
+                <div class="stash-gems">${socketed}</div>
+                <div class="stash-actions">
+                    ${identify}
+                    ${socketButtons}
+                    <button class="stash-equip" data-index="${i}">Equip</button>
+                    <button class="stash-scrap" data-index="${i}">Scrap</button>
+                </div>
             </div>`;
         }).join('');
+    }
+
+    _renderComparison(item, equippedItem) {
+        if (item.unidentified && !item.identified) {
+            return '<div class="stash-compare"><span class="stash-muted">Stats hidden until identified</span></div>';
+        }
+
+        const incoming = this._collectItemStats(item);
+        const current = this._collectItemStats(equippedItem);
+        const keys = Array.from(new Set([...Object.keys(incoming), ...Object.keys(current)])).sort();
+        if (!keys.length) return '<div class="stash-compare"><span class="stash-muted">No stat rolls</span></div>';
+
+        const rows = keys.map(key => {
+            const next = incoming[key] || 0;
+            const prev = current[key] || 0;
+            const delta = next - prev;
+            const cls = delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral';
+            const sign = delta > 0 ? '+' : '';
+            return `<span class="${cls}">${this._escapeHtml(this._statLabel(key))}: ${this._formatStatValue(next)} (${sign}${this._formatStatValue(delta)})</span>`;
+        }).join('');
+
+        return `<div class="stash-compare">${rows}</div>`;
+    }
+
+    _collectItemStats(item) {
+        const totals = {};
+        if (!item) return totals;
+        for (const [key, val] of Object.entries(item.baseStats || {})) {
+            if (typeof val === 'number') totals[key] = (totals[key] || 0) + val;
+        }
+        for (const affix of item.affixes || []) {
+            if (affix && typeof affix.value === 'number' && affix.stat) {
+                totals[affix.stat] = (totals[affix.stat] || 0) + affix.value;
+            }
+        }
+        for (const gem of item.gems || []) {
+            for (const [key, val] of Object.entries(gem.bonuses || {})) {
+                if (typeof val === 'number') totals[key] = (totals[key] || 0) + val;
+            }
+        }
+        return totals;
+    }
+
+    _formatBonuses(bonuses = {}) {
+        return Object.entries(bonuses).map(([key, val]) => `${this._statLabel(key)} ${this._formatStatValue(val)}`).join(', ');
+    }
+
+    _formatStatValue(value) {
+        if (Math.abs(value) > 0 && Math.abs(value) < 1) return `${Math.round(value * 100)}%`;
+        return String(Math.round(value * 100) / 100);
+    }
+
+    _statLabel(key) {
+        return String(key).replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
+    }
+
+    _escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    _escapeAttr(value) {
+        return this._escapeHtml(value);
     }
 
     _updateCompanionPanel(d) {
@@ -366,8 +450,19 @@ export class UIManager {
     _updateSafehousePanel(d) {
         const sp = document.getElementById('safehouse-panel');
         if (!sp || sp.style.display !== 'block' || !d.safehouse) return;
-        if (!this._panelDirty.safehouse) return;
+        const unidentified = d.inventoryStash?.getUnidentifiedCount?.() || 0;
+        const chips = d.player?._chips ?? d.player?.chips ?? 0;
+        const hash = `${unidentified}:${chips}:${(d.safehouse.getAllUpgrades?.() || []).map(u => `${u.id}:${u.currentLevel}`).join(',')}`;
+        if (!this._panelDirty.safehouse && hash === this._lastSafehouseHash) return;
         this._panelDirty.safehouse = false;
+        this._lastSafehouseHash = hash;
+        const identifyStatus = document.getElementById('safehouse-identify-status');
+        const identifyBtn = document.getElementById('btn-safehouse-identify-all');
+        if (identifyStatus) identifyStatus.textContent = `${unidentified} unidentified item${unidentified === 1 ? '' : 's'} · ${chips} chips`;
+        if (identifyBtn) {
+            identifyBtn.disabled = unidentified <= 0 || chips < unidentified * 10;
+            identifyBtn.textContent = unidentified > 0 ? `Identify All (${unidentified * 10} chips)` : 'Identify All';
+        }
         const upgContainer = document.getElementById('safehouse-upgrades');
         if (upgContainer && d.safehouse.getAllUpgrades) {
             const upgrades = d.safehouse.getAllUpgrades();

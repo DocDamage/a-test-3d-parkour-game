@@ -31,6 +31,18 @@ echo "=== Module Count Check ==="
 MODULE_COUNT=$(ls -1 "${JS_DIR}"/*.js 2>/dev/null | wc -l)
 echo "  ${MODULE_COUNT} JS modules"
 
+echo "=== Unit Tests ==="
+if ! node "${SCRIPT_DIR}/unit-tests.mjs"; then
+    echo "  FAIL: unit tests"
+    ERRORS=$((ERRORS + 1))
+fi
+
+echo "=== Balance Simulation ==="
+if ! node "${SCRIPT_DIR}/balance-sim.mjs"; then
+    echo "  FAIL: balance simulation"
+    ERRORS=$((ERRORS + 1))
+fi
+
 echo "=== Docs Freshness Check ==="
 for doc in ARCHITECTURE.md DESIGN.md QUALITY.md; do
     if [ ! -f "${REPO_ROOT}/docs/${doc}" ]; then
@@ -38,6 +50,12 @@ for doc in ARCHITECTURE.md DESIGN.md QUALITY.md; do
         ERRORS=$((ERRORS + 1))
     fi
 done
+
+echo "=== Browser Smoke Check ==="
+if ! node "${SCRIPT_DIR}/browser-smoke.mjs"; then
+    echo "  FAIL: browser smoke"
+    ERRORS=$((ERRORS + 1))
+fi
 
 if [ "$ERRORS" -gt 0 ]; then
     echo ""

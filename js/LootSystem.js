@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { RARITY } from './AffixSystem.js';
 import { SLOTS, PRE_DEFINED_ITEMS } from './ExoSuitSystem.js';
+import { rollEndgameRarity } from './BalanceModel.js';
 
-/** @typedef {'gear'|'scrap'|'chips'|'health_globe'|'consumable'} DropType */
+/** @typedef {'gear'|'gem'|'scrap'|'chips'|'health_globe'|'consumable'} DropType */
 
 /**
  * LootSystem handles item drops from dead enemies, spawning 3D meshes,
@@ -27,11 +28,21 @@ export class LootSystem {
         this._nextId = 1;
         this._tempVec = new THREE.Vector3();
         this._inventorySystem = null; // set via setInventorySystem()
+        this._inventoryStash = null;
+        this._gemSystem = null;
     }
 
     /** Wire in the InventorySystem after construction. */
     setInventorySystem(inv) {
         this._inventorySystem = inv;
+    }
+
+    setInventoryStash(stash) {
+        this._inventoryStash = stash;
+    }
+
+    setGemSystem(gemSystem) {
+        this._gemSystem = gemSystem;
     }
 
     /**
@@ -42,15 +53,16 @@ export class LootSystem {
      * @param {number} [difficultyMultiplier=1.0]
      * @returns {Object|null} drop descriptor
      */
-    generateDrop(enemyType, isElite, difficultyMultiplier = 1.0, playerArchetype = null) {
+    generateDrop(enemyType, isElite, difficultyMultiplier = 1.0, playerArchetype = null, opts = {}) {
         const roll = Math.random();
+        const riftLevel = opts.riftLevel || 1;
         const magicFind = (this.player && this.player.getRPGStats)
             ? (this.player.getRPGStats().magicFind || 0)
             : 0;
         const mfRoll = roll * (1 - Math.min(0.5, magicFind)); // MF shifts roll toward better loot
 
-        if (enemyType === 'boss') {
-            return this._generateBossDrop(difficultyMultiplier, playerArchetype);
+        if (enemyType === 'boss' || enemyType === 'guardian') {
+            return this._generateBossDrop(difficultyMultiplier, playerArchetype, riftLevel);
         }
 
         if (isElite) {
@@ -58,7 +70,8 @@ export class LootSystem {
             if (mfRoll < 0.15) return null;
             if (mfRoll < 0.40) return this._makeScrap(3 + Math.floor(Math.random() * 3), difficultyMultiplier);
             if (mfRoll < 0.55) return this._makeChips(2 + Math.floor(Math.random() * 3), difficultyMultiplier);
-            if (mfRoll < 0.90) return this._makeGear(this._rollRarity(0.55, true), difficultyMultiplier, playerArchetype);
+            if (mfRoll < 0.63) return this._makeGem();
+            if (mfRoll < 0.90) return this._makeGear(this._rollRarity(0.55, true, riftLevel), difficultyMultiplier, playerArchetype);
             if (mfRoll < 0.98) return this._makeGear(RARITY.LEGENDARY, difficultyMultiplier, playerArchetype);
             return this._makeGear(RARITY.SET, difficultyMultiplier, playerArchetype);
         }
@@ -67,9 +80,10 @@ export class LootSystem {
         if (mfRoll < 0.55) return null;
         if (mfRoll < 0.83) return this._makeScrap(1 + Math.floor(Math.random() * 2), difficultyMultiplier);
         if (mfRoll < 0.93) return this._makeChips(1, difficultyMultiplier);
+        if (mfRoll < 0.95) return this._makeGem();
         if (mfRoll < 0.98) return this._makeGear(RARITY.COMMON, difficultyMultiplier, playerArchetype);
         if (mfRoll < 0.998) return this._makeGear(RARITY.MAGIC, difficultyMultiplier, playerArchetype);
-        return this._makeGear(this._rollRarity(0.30, true), difficultyMultiplier, playerArchetype);
+        return this._makeGear(this._rollRarity(0.30, true, riftLevel), difficultyMultiplier, playerArchetype);
     }
 
     /**
@@ -110,6 +124,9 @@ export class LootSystem {
         switch (drop.type) {
             case 'gear':
                 this._pickupGear(drop);
+                break;
+            case 'gem':
+                this._pickupGem(drop);
                 break;
             case 'scrap':
                 this._pickupScrap(drop);
@@ -158,7 +175,7 @@ export class LootSystem {
             }
 
             // Generic proximity pickup for scrap / chips / gear / consumables (generous 1.5 m + bonus)
-            if (drop.type === 'scrap' || drop.type === 'chips' || drop.type === 'gear' || drop.type === 'consumable') {
+            if (drop.type === 'scrap' || drop.type === 'chips' || drop.type === 'gear' || drop.type === 'gem' || drop.type === 'consumable') {
                 const dist = drop.mesh.position.distanceTo(playerPosition);
                 if (dist <= (1.5 + pickupBonus)) {
                     this.pickupDrop(id);
@@ -189,14 +206,19 @@ export class LootSystem {
     /*  Internal generators                                                 */
     /* -------------------------------------------------------------------- */
 
-    _generateBossDrop(difficultyMultiplier, playerArchetype = null) {
+    _generateBossDrop(difficultyMultiplier, playerArchetype = null, riftLevel = 1) {
         const pick = Math.random();
-        if (pick < 0.30) return this._makeGear(this._rollRarity(0.20, true), difficultyMultiplier, playerArchetype);
-        if (pick < 0.60) return this._makeGear(this._rollRarity(0.40, true), difficultyMultiplier, playerArchetype);
+        if (pick < 0.30) return this._makeGear(this._rollRarity(0.20, true, riftLevel), difficultyMultiplier, playerArchetype);
+        if (pick < 0.60) return this._makeGear(this._rollRarity(0.40, true, riftLevel), difficultyMultiplier, playerArchetype);
         if (pick < 0.85) return this._makeGear(RARITY.LEGENDARY, difficultyMultiplier, playerArchetype);
         if (pick < 0.95) return this._makeGear(RARITY.SET, difficultyMultiplier, playerArchetype);
-        if (pick < 0.98) return this._makeScrap(5 + Math.floor(Math.random() * 5), difficultyMultiplier);
+        if (pick < 0.98) return this._makeGem();
         return this._makeChips(3 + Math.floor(Math.random() * 4), difficultyMultiplier);
+    }
+
+    _makeGem() {
+        const ids = ['ruby', 'sapphire', 'emerald', 'diamond', 'topaz'];
+        return { type: 'gem', rarity: RARITY.RARE, gemId: ids[Math.floor(Math.random() * ids.length)], quantity: 1 };
     }
 
     _makeScrap(quantity, difficultyMultiplier) {
@@ -263,6 +285,15 @@ export class LootSystem {
 
         // Legendary and Set items drop unidentified
         const isUnidentified = (rarity === RARITY.LEGENDARY || rarity === RARITY.SET || rarity === RARITY.ANCIENT || rarity === RARITY.PRIMAL);
+        itemData = {
+            ...itemData,
+            unidentified: isUnidentified,
+            identified: !isUnidentified,
+            sockets: itemData.sockets ?? (rarity >= RARITY.ANCIENT ? 3 : rarity >= RARITY.LEGENDARY ? 2 : rarity >= RARITY.MAGIC ? 1 : 0)
+        };
+        if (isUnidentified && itemData.name && !itemData.name.startsWith('Unidentified ')) {
+            itemData.name = `Unidentified ${itemData.slot || 'Gear'}`;
+        }
 
         return {
             type: 'gear',
@@ -291,16 +322,8 @@ export class LootSystem {
         };
     }
 
-    _rollRarity(commonThreshold, allowSet = false) {
-        const r = Math.random();
-        if (r < commonThreshold) return RARITY.COMMON;
-        if (r < 0.85) return RARITY.MAGIC;
-        if (r < 0.95) return RARITY.RARE;
-        if (r < 0.985) return RARITY.LEGENDARY;
-        if (allowSet && r < 0.995) return RARITY.SET;
-        if (allowSet && r < 0.998) return RARITY.ANCIENT;
-        if (allowSet) return RARITY.PRIMAL;
-        return RARITY.LEGENDARY;
+    _rollRarity(commonThreshold, allowSet = false, riftLevel = 1) {
+        return rollEndgameRarity(commonThreshold, allowSet, riftLevel);
     }
 
     /* -------------------------------------------------------------------- */
@@ -310,6 +333,7 @@ export class LootSystem {
     _createMeshForDrop(drop) {
         switch (drop.type) {
             case 'gear':      return this._createGearMesh(drop.rarity);
+            case 'gem':       return this._createGemMesh(drop.gemId);
             case 'scrap':     return this._createScrapMesh();
             case 'chips':     return this._createChipsMesh();
             case 'health_globe': return this._createHealthGlobeMesh();
@@ -357,6 +381,17 @@ export class LootSystem {
             opacity: 0.9
         });
         const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
+        return mesh;
+    }
+
+    _createGemMesh(gemId) {
+        const colors = { ruby: 0xff3355, sapphire: 0x4488ff, emerald: 0x22dd77, diamond: 0xddddff, topaz: 0xffcc44 };
+        const color = colors[gemId] || 0xffffff;
+        const mesh = new THREE.Mesh(
+            new THREE.OctahedronGeometry(0.18, 0),
+            new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.2 })
+        );
         mesh.castShadow = true;
         return mesh;
     }
@@ -411,25 +446,34 @@ export class LootSystem {
 
     _pickupGear(drop) {
         if (!this.exoSuit || !drop.itemData) return;
-
-        if (drop.unidentified && !drop.identified) {
-            // Unidentified items can't be equipped directly
-            // Store in a temporary unidentified stash
-            if (!this._unidentifiedStash) this._unidentifiedStash = [];
-            this._unidentifiedStash.push(drop.itemData);
-            return;
+        const item = {
+            ...drop.itemData,
+            unidentified: drop.unidentified,
+            identified: drop.identified,
+            sockets: drop.itemData.sockets ?? (drop.rarity >= RARITY.ANCIENT ? 3 : drop.rarity >= RARITY.LEGENDARY ? 2 : drop.rarity >= RARITY.MAGIC ? 1 : 0)
+        };
+        if (item.unidentified && !item.identified && !item.name.startsWith('Unidentified ')) {
+            item.name = `Unidentified ${item.slot || 'Gear'}`;
         }
 
-        this.exoSuit.equip(drop.itemData);
+        if (this._inventoryStash && this._inventoryStash.acquireItem(item)) return;
+        if (!item.unidentified || item.identified) {
+            this.exoSuit.equip(item);
+        }
     }
 
     _pickupScrap(drop) {
-        // Scrap is virtual currency; no mesh state to maintain.
-        // Callers can hook into this via console or event if needed.
+        if (this._inventorySystem) this._inventorySystem.addItem('scrap_metal', drop.quantity || 1);
+        if (this.player) this.player._scrap = (this.player._scrap || 0) + (drop.quantity || 1);
     }
 
     _pickupChips(drop) {
-        // Chips are virtual currency.
+        if (this._inventorySystem) this._inventorySystem.addItem('data_chip', drop.quantity || 1);
+        if (this.player) this.player._chips = (this.player._chips || 0) + (drop.quantity || 1);
+    }
+
+    _pickupGem(drop) {
+        if (this._gemSystem) this._gemSystem.addGem(drop.gemId, drop.quantity || 1);
     }
 
     _pickupHealthGlobe() {

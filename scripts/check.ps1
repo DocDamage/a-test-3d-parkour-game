@@ -29,6 +29,20 @@ Write-Host "=== Module Count Check ===" -ForegroundColor Cyan
 $moduleCount = (Get-ChildItem -Path $jsDir -Filter "*.js").Count
 Write-Host "  ${moduleCount} JS modules"
 
+Write-Host "=== Unit Tests ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "unit-tests.mjs")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  FAIL: unit tests" -ForegroundColor Red
+    $errors++
+}
+
+Write-Host "=== Balance Simulation ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "balance-sim.mjs")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  FAIL: balance simulation" -ForegroundColor Red
+    $errors++
+}
+
 Write-Host "=== Docs Freshness Check ===" -ForegroundColor Cyan
 $docs = @("ARCHITECTURE.md", "DESIGN.md", "QUALITY.md")
 foreach ($doc in $docs) {
@@ -37,6 +51,13 @@ foreach ($doc in $docs) {
         Write-Host "  FAIL: docs/${doc} missing" -ForegroundColor Red
         $errors++
     }
+}
+
+Write-Host "=== Browser Smoke Check ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "browser-smoke.mjs")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  FAIL: browser smoke" -ForegroundColor Red
+    $errors++
 }
 
 if ($errors -gt 0) {

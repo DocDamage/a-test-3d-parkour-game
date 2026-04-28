@@ -156,6 +156,9 @@ export default class RiftGuardian {
 
         this.active = false;
         this.bossState = 'idle';
+        this.team = 'enemy';
+        this.type = 'guardian';
+        this.isBoss = true;
         this.currentPhase = 1;
 
         this.arenaCenter = new THREE.Vector3();
@@ -189,6 +192,7 @@ export default class RiftGuardian {
         this.fightStartTime = 0;
         this.hitsTaken = 0;
         this.coresDestroyed = 0;
+        this.damageMultiplier = 1;
     }
 
     /* ---------------------------------------------------------------------- */
@@ -327,6 +331,7 @@ export default class RiftGuardian {
         this.coresDestroyed = 0;
 
         const mult = this._riftMultiplier || 1;
+        this.damageMultiplier = this._damageMultiplier || 1;
         this.coreMaxHealth = Math.floor(200 * mult);
         this.coreHealth = [this.coreMaxHealth, this.coreMaxHealth, this.coreMaxHealth, this.coreMaxHealth];
 
@@ -400,6 +405,28 @@ export default class RiftGuardian {
 
     isActive() {
         return this.active;
+    }
+
+    get position() {
+        return this.bossGroup ? this.bossGroup.position : this.arenaCenter;
+    }
+
+    takeDamage(amount, type = 'kinetic', source = null) {
+        if (!this.active || this.bossState === 'defeated') return 0;
+        const cores = this.getExposedCores();
+        if (!cores.length) return 0;
+        const sourcePos = source?.position || source?.mesh?.position || this.player?.position || cores[0].position;
+        let target = cores[0];
+        for (const core of cores) {
+            if (core.position.distanceTo(sourcePos) < target.position.distanceTo(sourcePos)) target = core;
+        }
+        this.damageCore(target.index, amount);
+        return amount;
+    }
+
+    _dealPlayerDamage(amount, type = 'energy') {
+        if (!this.player || typeof this.player.takeDamage !== 'function') return;
+        this.player.takeDamage(amount * (this.damageMultiplier || 1), type, this);
     }
 
     getBossHealth() {
@@ -821,7 +848,7 @@ export default class RiftGuardian {
             const dist = this._distanceToSegment(this.player.position, start, end);
             if (dist < 0.6 && Math.abs(this.player.position.y - bossPos.y) < 1.2) {
                 if (this.player && typeof this.player.takeDamage === 'function') {
-                    this.player.takeDamage(12 * dt, 'energy', this);
+                    this._dealPlayerDamage(12 * dt, 'energy');
                 }
                 this.hitsTaken++;
                 const push = new THREE.Vector3()
@@ -856,7 +883,7 @@ export default class RiftGuardian {
 
                 if (dist < 3) {
                     if (this.player && typeof this.player.takeDamage === 'function') {
-                        this.player.takeDamage(8 * dt, 'energy', this);
+                        this._dealPlayerDamage(8 * dt, 'energy');
                     }
                     this.hitsTaken++;
                 }
@@ -890,7 +917,7 @@ export default class RiftGuardian {
             if (d.dead) {
                 if (d.hitPlayer) {
                     if (this.player && typeof this.player.takeDamage === 'function') {
-                        this.player.takeDamage(10, 'energy', this);
+                        this._dealPlayerDamage(10, 'energy');
                     }
                     this.hitsTaken++;
                     if (this.player && typeof this.player.startStumble === 'function') {
@@ -910,7 +937,7 @@ export default class RiftGuardian {
             if (m.exploded) {
                 if (m.hitPlayer) {
                     if (this.player && typeof this.player.takeDamage === 'function') {
-                        this.player.takeDamage(15, 'energy', this);
+                        this._dealPlayerDamage(15, 'energy');
                     }
                     this.hitsTaken++;
                 }
@@ -928,7 +955,7 @@ export default class RiftGuardian {
 
         if (this.player.position.distanceTo(bossPos) < 1.1) {
             if (this.player && typeof this.player.takeDamage === 'function') {
-                this.player.takeDamage(25, 'energy', this);
+                this._dealPlayerDamage(25, 'energy');
             }
             this.hitsTaken++;
             const knockback = new THREE.Vector3()
@@ -945,7 +972,7 @@ export default class RiftGuardian {
             arm.getWorldPosition(wPos);
             if (this.player.position.distanceTo(wPos) < 0.7) {
                 if (this.player && typeof this.player.takeDamage === 'function') {
-                    this.player.takeDamage(15, 'energy', this);
+                    this._dealPlayerDamage(15, 'energy');
                 }
                 this.hitsTaken++;
                 if (this.player && typeof this.player.startRagdoll === 'function') {

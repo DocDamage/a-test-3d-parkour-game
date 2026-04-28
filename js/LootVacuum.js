@@ -42,7 +42,8 @@ export class LootVacuum {
         // Check world drones
         if (this.player.world && this.player.world.drones && this.player.world.drones.drones) {
             for (const drone of this.player.world.drones.drones) {
-                if (!drone.isDead && drone.position.distanceTo(this.player.position) < 15) {
+                const pos = drone.position || drone.mesh?.position || drone.group?.position;
+                if (!drone.isDead && pos && pos.distanceTo(this.player.position) < 15) {
                     return true;
                 }
             }

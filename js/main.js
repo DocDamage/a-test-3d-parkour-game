@@ -75,6 +75,7 @@ import { ArchetypeSystem } from './ArchetypeSystem.js';
 import { OriginSystem } from './OriginSystem.js';
 import { ExoSuitSystem, SLOTS } from './ExoSuitSystem.js';
 import { InventoryStash } from './InventoryStash.js';
+import { GemSystem } from './GemSystem.js';
 import { AffixSystem, RARITY } from './AffixSystem.js';
 import { FamiliaritySystem } from './FamiliaritySystem.js';
 import { CompanionDrone, COMPANION_MODES } from './CompanionDrone.js';
@@ -246,6 +247,9 @@ seasonSystem.apply();
 const saveSystem = new SaveSystem();
 ctx.register('saveSystem', [], () => saveSystem);
 
+// Hint / loot toast UI is needed by gear setup and later onboarding hooks.
+const { showHint, showLootToast } = createHintSystem();
+
 // Souls-like risk layer (echo shards + healing vials + safehouse rest)
 const soulsSystem = new SoulsSystem(scene, player);
 ctx.register('soulsSystem', ['scene', 'player'], () => soulsSystem);
@@ -279,8 +283,13 @@ exoSuit.onEquip = showLootToast;
 ctx.register('exoSuit', ['player', 'characterSheet'], () => exoSuit);
 const inventoryStash = new InventoryStash(player, exoSuit, characterSheet);
 ctx.register('inventoryStash', ['player', 'exoSuit', 'characterSheet'], () => inventoryStash);
+const gemSystem = new GemSystem();
+inventoryStash.setGemSystem(gemSystem);
+ctx.register('gemSystem', [], () => gemSystem);
 const affixSystem = new AffixSystem();
 ctx.register('affixSystem', [], () => affixSystem);
+const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
+ctx.register('lootSystem', ['scene', 'player', 'exoSuit', 'affixSystem'], () => lootSystem);
 const familiarity = new FamiliaritySystem();
 ctx.register('familiarity', [], () => familiarity);
 const companion = new CompanionDrone(scene, player, null); // eventBus placeholder
@@ -356,8 +365,6 @@ const weaponModSystem = new WeaponModSystem();
 ctx.register('weaponModSystem', [], () => weaponModSystem);
 weaponSystem.setModSystem(weaponModSystem);
 weaponSystem.setFamiliaritySystem(familiarity);
-// Wire trick system for weapon trick reporting
-if (weaponSystem && trickSystem) weaponSystem.setTrickSystem(trickSystem);
 // Pre-equip demo mods on starter loadout
 weaponModSystem.equipMod(weaponModSystem.generateMod('barrel', 'rare'), WEAPON_SLOTS.PRIMARY, 'barrel');
 weaponModSystem.equipMod(weaponModSystem.generateMod('scope', 'uncommon'), WEAPON_SLOTS.PRIMARY, 'scope');
@@ -533,8 +540,8 @@ const {
 
 // Wire InventorySystem into LootSystem so consumable drops go to inventory
 lootSystem.setInventorySystem(inventorySystem);
-// Wire InventorySystem into UIManager so the inventory panel can render and use items
-uiManager.inventorySystem = inventorySystem;
+lootSystem.setInventoryStash(inventoryStash);
+lootSystem.setGemSystem(gemSystem);
 
 // Weapon Loadout UI panel (toggle with N key)
 const weaponLoadoutUI = new WeaponLoadoutUI(weaponSystem);
@@ -548,6 +555,20 @@ const weaponLoadoutUI = new WeaponLoadoutUI(weaponSystem);
             const idx = parseInt(e.target.dataset.index, 10);
             inventoryStash.equipFromStash(idx);
         }
+        if (e.target.classList.contains('stash-identify')) {
+            const idx = parseInt(e.target.dataset.index, 10);
+            inventoryStash.identifyItem(idx);
+        }
+        if (e.target.classList.contains('stash-socket')) {
+            const idx = parseInt(e.target.dataset.index, 10);
+            if (e.target.dataset.gemId) inventoryStash.socketGem(idx, e.target.dataset.gemId);
+            else inventoryStash.socketBestGem(idx);
+        }
+        if (e.target.classList.contains('stash-unsocket')) {
+            const idx = parseInt(e.target.dataset.index, 10);
+            const gemIdx = parseInt(e.target.dataset.gemIndex, 10);
+            inventoryStash.unsocketGem(idx, gemIdx);
+        }
         if (e.target.classList.contains('stash-scrap')) {
             const idx = parseInt(e.target.dataset.index, 10);
             inventoryStash.scrapItem(idx);
@@ -557,28 +578,6 @@ const weaponLoadoutUI = new WeaponLoadoutUI(weaponSystem);
 
 // Build Code System
 const buildCodeSystem = new BuildCodeSystem(characterSheet, archetype, origin, passiveTree, skillSystem, exoSuit, weaponSystem, implants);
-
-// Expansion systems (parkour, combat, enemies, world, RPG, polish)
-const exps = initExpansionSystems(ctx, {
-    player, staminaSystem, combatSystem, weaponSystem, statusEffectSystem,
-    world, scene, exoSuit, affixSystem, lootSystem, saveSystem,
-    particleEffects, overclock
-});
-const {
-    wallKickSystem, slideJumpSystem, mantleSystem, slopeGrindSystem, autoWalk,
-    weaponComboSystem, aerialJuggleSystem, environmentalFinisher, statusComboSystem,
-    eliteModifierSystem,
-    wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
-    craftingBench, setBonusSystem, transmogSystem, prestigeSystem,
-    saveSlots, cloudSaveExport, deathRecap, runHistory, lootVacuum, trainingDummy,
-    trickSystem, fatalitySystem, graffitiSpraySystem, parkourCallbackWiring,
-    moddingAPI,
-} = exps;
-
-// Wire fatality system into combat
-if (combatSystem && fatalitySystem) {
-    combatSystem.fatalitySystem = fatalitySystem;
-}
 
 ctx.register('buildCodeSystem', ['characterSheet', 'archetype', 'origin', 'passiveTree', 'skillSystem', 'exoSuit', 'weaponSystem', 'implants'], () => buildCodeSystem);
 
@@ -624,9 +623,9 @@ combatSystem.onHitbox = (data) => {
             dmg = statusComboSystem.onDamageDealt(target, dmg, 'kinetic', !data.isHeavy);
         }
 
-        if (target.takeDamage) {
-            target.takeDamage(dmg, 'kinetic', data.owner);
-        }
+        if (damageSystem) damageSystem.applyDamage(data.owner, target, dmg, 'kinetic');
+        else if (target.takeDamage) target.takeDamage(dmg, 'kinetic', data.owner);
+        if (legendaryPowerSystem) legendaryPowerSystem.onMeleeHit(target);
         if (typeof spawnDamageNumber === 'function') {
             const tPos = target.position || (target.mesh && target.mesh.position) || data.owner.position;
             spawnDamageNumber(tPos, Math.round(dmg), false, 'kinetic');
@@ -638,21 +637,12 @@ combatSystem.onHitbox = (data) => {
     hb.team = 'player';
     hitboxSystem.registerHitbox(hb);
 };
-const lootSystem = new LootSystem(scene, player, exoSuit, affixSystem);
 const enemyHealthBars = []; // tracks EnemyHealthBar instances
-
-// GameDirector — gameplay orchestration
-const gameDirector = new GameDirector({
-    ctx, player, progression, familiarity, weaponSystem, factions, companion,
-    nephalemGlory, apexRift, arenaMode, collapse, legendaryPowerSystem, soulsSystem,
-    lootSystem, difficultyTier, inventoryStash, activeArchetypeId, showLootToast, showHint,
-    bossFight, statusEffectSystem, saveSystem
-});
-ctx.register('gameDirector', ['player', 'progression', 'weaponSystem', 'factions', 'companion', 'nephalemGlory', 'apexRift', 'arenaMode', 'collapse', 'legendaryPowerSystem', 'soulsSystem', 'lootSystem', 'difficultyTier', 'inventoryStash', 'bossFight', 'statusEffectSystem', 'saveSystem'], () => gameDirector);
+let gameDirector = null;
 
 // Unified enemy kill handler — delegates to GameDirector
 function _handleEnemyKilled(enemy, source) {
-    gameDirector.handleEnemyKilled(enemy, source);
+    if (gameDirector) gameDirector.handleEnemyKilled(enemy, source);
     if (deathRecap) deathRecap.onEnemyKilled();
     if (dailyQuestSystem) {
         dailyQuestSystem.reportEvent('kill');
@@ -662,12 +652,6 @@ function _handleEnemyKilled(enemy, source) {
         // runHistory records kills via a counter; actual recording happens on death/session end
     }
 }
-
-wireExpansionSystems({
-    world, eliteModifierSystem, hitboxSystem, scene, enemyHealthBars, nephalemGlory,
-    buildCodeSystem, showHint, onEnemyKilled: _handleEnemyKilled,
-    spawnDamageNumber, particleEffects, EnemyHealthBar
-});
 
 // Wire DamageSystem into DroneAI for dodge/crit/type calculations
 if (world.drones) {
@@ -685,7 +669,7 @@ player.onDamageTaken = (amount, type, source) => {
     spawnDamageNumber(pos, Math.ceil(amount), false, type);
     if (nephalemGlory) nephalemGlory.onDamageTaken();
     if (gamepad && gamepad.rumble) gamepad.rumble(0.3, 0.7, 100);
-    if (legendaryPowerSystem) legendaryPowerSystem.onTakeFatalDamage();
+    if (legendaryPowerSystem && player.health <= 0) legendaryPowerSystem.onTakeFatalDamage();
     if (deathRecap) deathRecap.onDamageTaken(amount, type, source);
 
     // Directional damage indicator
@@ -832,9 +816,6 @@ player.onCeilingDrop = (pos, facing) => {
     }
 };
 
-// Hint system
-const { showHint, showLootToast } = createHintSystem();
-
 // Equip starter gear based on origin (only on first play)
 if (!saveSystem.hasSave()) {
     const startingGear = origin.getStartingGear ? origin.getStartingGear() : null;
@@ -877,7 +858,7 @@ const decalSystem = new DecalSystem(scene, world);
 const weatherSystem = new WeatherSystem(scene, camera, { ambient, sun, fill, points: pointLights });
 
 // Weather gameplay integration
-const weatherGameplay = new WeatherGameplay(world);
+const weatherGameplay = new WeatherGameplay(world, player);
 
 // Ziplines
 const ziplines = new ZiplineNetwork(scene, world);
@@ -911,6 +892,31 @@ const risingTide = new RisingTide(scene, player);
 // Particle effects
 const particleEffects = new ParticleEffects(scene, player);
 
+// Expansion systems (parkour, combat, enemies, world, RPG, polish)
+const exps = initExpansionSystems(ctx, {
+    player, staminaSystem, combatSystem, weaponSystem, statusEffectSystem,
+    world, scene, exoSuit, affixSystem, lootSystem, saveSystem,
+    particleEffects, overclock
+});
+const {
+    wallKickSystem, slideJumpSystem, mantleSystem, slopeGrindSystem, autoWalk,
+    weaponComboSystem, aerialJuggleSystem, environmentalFinisher, statusComboSystem,
+    eliteModifierSystem,
+    wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
+    craftingBench, setBonusSystem, transmogSystem, prestigeSystem,
+    saveSlots, cloudSaveExport, deathRecap, runHistory, lootVacuum, trainingDummy,
+    trickSystem, fatalitySystem, graffitiSpraySystem, parkourCallbackWiring,
+    predatorDrone, photoBountySystem, escortSystem, rhythmParkour, trapCrafting,
+    moddingAPI,
+} = exps;
+
+if (combatSystem && fatalitySystem) {
+    combatSystem.fatalitySystem = fatalitySystem;
+}
+if (weaponSystem && trickSystem) {
+    weaponSystem.setTrickSystem(trickSystem);
+}
+
 // God rays
 const godRays = new GodRays(scene, player, world);
 
@@ -919,6 +925,9 @@ const footIK = new FootIK(scene, player, world);
 
 // Procedural animation
 const procAnim = new ProceduralAnimation(scene, player, world);
+
+// Input is shared by keyboard, gamepad, touch, and menu systems.
+const input = new InputManager();
 
 // Gamepad controller
 const gamepad = new GamepadController();
@@ -950,6 +959,7 @@ const ghostRacing = new GhostRacing(scene);
 // Bullet time
 const bulletTime = new BulletTime();
 const legendaryPowerSystem = new LegendaryPowerSystem(player, world, scene, hitboxSystem, damageSystem, bulletTime, enemyHealthBars);
+damageSystem.setLegendaryPowerSystem(legendaryPowerSystem);
 
 // Assist mode
 const assistMode = new AssistMode();
@@ -970,6 +980,9 @@ bossFight.onVictory = () => {
     showHint('BOSS DEFEATED — NG+ and Collapse Mode unlocked! Press Y for Collapse.');
 };
 const riftGuardian = new RiftGuardian(scene, world, player, camera, postProcessing, directorMode, bulletTime, challenges);
+const riftGuardianHurtbox = new Hitbox(riftGuardian, 'hurtbox', { type: 'sphere', radius: 2.2 }, new THREE.Vector3(0, 0, 0), -1, null);
+riftGuardianHurtbox.team = 'enemy';
+hitboxSystem.registerHitbox(riftGuardianHurtbox);
 const arenaMode = new ArenaMode(scene, world, player, enemyManager, bossFight);
 
 // Phase 8: Boss Roster
@@ -980,11 +993,58 @@ const bossLeviathan = new BossLeviathan(scene, world, player);
 const bossSwarmQueen = new BossSwarmQueen(scene, world, player, enemyManager);
 const bossArchitect = new BossArchitect(scene, world, player);
 bosses.push(bossFabricator, bossWarden, bossLeviathan, bossSwarmQueen, bossArchitect);
+let bossRosterIndex = 0;
+for (const boss of bosses) {
+    boss.isBoss = true;
+    boss.team = 'enemy';
+    boss.onDeath = _handleEnemyKilled;
+    enemyHealthBars.push(new EnemyHealthBar(scene, boss));
+    const bossHurtbox = new Hitbox(boss, 'hurtbox', { type: 'sphere', radius: 1.6 }, new THREE.Vector3(0, 1.2, 0), -1, null);
+    bossHurtbox.team = 'enemy';
+    hitboxSystem.registerHitbox(bossHurtbox);
+}
 
 // Phase 4: Endgame systems
 const difficultyTier = new DifficultyTierSystem(challenges);
 const apexRift = new ApexRiftSystem(scene, world, player, riftGuardian, challenges, lootSystem, difficultyTier, enemyManager);
 const nephalemGlory = new NephalemGlory(player, challenges);
+
+gameDirector = new GameDirector({
+    ctx, player, progression, familiarity, weaponSystem, factions, companion,
+    nephalemGlory, apexRift, arenaMode, collapse, legendaryPowerSystem, soulsSystem,
+    lootSystem, difficultyTier, inventoryStash, activeArchetypeId, showLootToast, showHint,
+    bossFight, statusEffectSystem, saveSystem
+});
+ctx.register('gameDirector', ['player', 'progression', 'weaponSystem', 'factions', 'companion', 'nephalemGlory', 'apexRift', 'arenaMode', 'collapse', 'legendaryPowerSystem', 'soulsSystem', 'lootSystem', 'difficultyTier', 'inventoryStash', 'bossFight', 'statusEffectSystem', 'saveSystem'], () => gameDirector);
+
+wireExpansionSystems({
+    world, eliteModifierSystem, hitboxSystem, scene, enemyHealthBars, nephalemGlory,
+    buildCodeSystem, showHint, onEnemyKilled: _handleEnemyKilled,
+    spawnDamageNumber, particleEffects, EnemyHealthBar
+});
+
+if (predatorDrone) {
+    predatorDrone.onDeath = _handleEnemyKilled;
+    const predatorBar = new EnemyHealthBar(scene, predatorDrone);
+    enemyHealthBars.push(predatorBar);
+    const predatorHurtbox = new Hitbox(predatorDrone, 'hurtbox', { type: 'sphere', radius: 0.55 }, new THREE.Vector3(0, 0.4, 0), -1, null);
+    predatorHurtbox.team = 'enemy';
+    hitboxSystem.registerHitbox(predatorHurtbox);
+}
+
+photoMode.onPhotoTaken = (photoCamera) => {
+    if (!photoBountySystem) return;
+    const subjects = [
+        ...(world.drones ? world.drones.drones : []),
+        ...(enemyManager ? enemyManager.enemies : []),
+        ...(predatorDrone ? [predatorDrone] : []),
+        ...(bossFight && bossFight.isActive && bossFight.isActive() ? [bossFight] : []),
+    ];
+    if (photoBountySystem.captureFromCamera(photoCamera, subjects)) {
+        challenges.reportEvent('photo');
+        showHint('Photo bounty complete — chips awarded.');
+    }
+};
 
 // Register remaining systems with SaveSystem.
 // autoRegister skips null systems and those without serialize/deserialize.
@@ -1018,6 +1078,7 @@ autoRegister('ghostRacing',    ghostRacing);
 autoRegister('speedrunILs',    speedrunILs);
 autoRegister('timeTrial',      timeTrial);
 autoRegister('inventoryStash', inventoryStash);
+autoRegister('photoBountySystem', photoBountySystem);
 autoRegister('weaponSystem', weaponSystem);
 
 // Show a brief HUD indicator after every save (auto-save and manual).
@@ -1114,10 +1175,11 @@ const uiManager = new UIManager({
     heartSystem, dungeonSystem, exoSuit, companion, loyalty,
     factions, safehouse, bounty, codex, mastery, implants,
     resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide,
-    inventoryStash
+    inventoryStash, gemSystem
 });
 uiManager.createMiniBossBars(miniBosses);
 uiManager.createManaBar();
+uiManager.inventorySystem = inventorySystem;
 
 const menuNavigator = new MenuNavigator();
 
@@ -1163,9 +1225,6 @@ world.collectibles.onHeartPieceCollected = () => {
     heartSystem.addHeartPiece();
 };
 
-// Input
-const input = new InputManager();
-
 // Touch controls (fullscreen overlay on canvas)
 const touchControls = new TouchControls(renderer.domElement, input);
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -1205,6 +1264,38 @@ Object.defineProperty(window, 'gameStarted', { get: () => gameStarted });
 Object.defineProperty(window, 'paused',      { get: () => paused });
 window.gameOver = gameOver; // expose for PhotoMode/RunnerVision guards
 
+function requestPointerLockSafe(target = document.body) {
+    if (!target || typeof target.requestPointerLock !== 'function') return;
+    try {
+        const request = target.requestPointerLock();
+        if (request && typeof request.catch === 'function') request.catch(() => {});
+    } catch (err) {
+        // Pointer lock is best-effort; gameplay must still run in browsers/tests that deny it.
+    }
+}
+
+function enterGameplay() {
+    if (!gameStarted) {
+        gameStarted = true;
+        gameDirector.start();
+    }
+    startScreen.style.display = 'none';
+    if (paused) {
+        gameDirector.resume();
+        paused = gameDirector.paused;
+    }
+    if (!levelEditor.isActive()) {
+        ui.style.display = 'block';
+        crosshair.style.display = 'block';
+        const hcr = document.getElementById('heart-container-row');
+        if (hcr) hcr.style.display = 'flex';
+        const skb = document.getElementById('sector-key-bar');
+        if (skb) skb.style.display = 'flex';
+        if (skillBarUI) skillBarUI.show();
+    }
+    if (!audio._ambiencePlaying) audio.playAmbience();
+}
+
 // Pause menu wiring
 const pauseMenu = document.getElementById('pause-menu');
 const btnResume = document.getElementById('pause-resume');
@@ -1235,30 +1326,13 @@ if (btnQuit) {
 
 startScreen.addEventListener('click', () => {
     audio.playUIClick();
-    document.body.requestPointerLock();
+    requestPointerLockSafe();
+    enterGameplay();
 });
 
 document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement) {
-        if (!gameStarted) {
-            gameStarted = true;
-            gameDirector.start();
-        }
-        startScreen.style.display = 'none';
-        if (paused) {
-            gameDirector.resume();
-            paused = gameDirector.paused;
-        }
-        if (!levelEditor.isActive()) {
-            ui.style.display = 'block';
-            crosshair.style.display = 'block';
-            const hcr = document.getElementById('heart-container-row');
-            if (hcr) hcr.style.display = 'flex';
-            const skb = document.getElementById('sector-key-bar');
-            if (skb) skb.style.display = 'flex';
-            if (skillBarUI) skillBarUI.show();
-        }
-        if (!audio._ambiencePlaying) audio.playAmbience();
+        enterGameplay();
     } else {
         // Do NOT conflate pointer lock loss with pause or game stop
         if (paused) {
@@ -1282,7 +1356,7 @@ document.getElementById('boss-exit').addEventListener('click', () => {
     bossVictory.style.display = 'none';
     bossHUD.style.display = 'none';
     ui.style.display = 'block';
-    document.body.requestPointerLock();
+    requestPointerLockSafe();
     if (player) {
         player.position.set(0, 2, 0); // warehouse default spawn
         player.health = player.maxHealth || 100;
@@ -1309,7 +1383,17 @@ if (btnRest) {
         // Close the panel after resting
         const sp = document.getElementById('safehouse-panel');
         if (sp) sp.style.display = 'none';
-        document.body.requestPointerLock();
+        requestPointerLockSafe();
+    });
+}
+
+const btnIdentifyAll = document.getElementById('btn-safehouse-identify-all');
+if (btnIdentifyAll) {
+    btnIdentifyAll.addEventListener('click', () => {
+        const result = inventoryStash.identifyAll(10);
+        if (result.ok && result.identified > 0) showHint(`Identified ${result.identified} item${result.identified === 1 ? '' : 's'} for ${result.cost} chips.`);
+        else if (!result.ok) showHint(`Need ${result.cost} chips to identify everything.`);
+        else showHint('No unidentified gear in the stash.');
     });
 }
 
@@ -1468,7 +1552,7 @@ function animate() {
                 editorUI.classList.remove('active');
                 ui.style.display = 'block';
                 crosshair.style.display = 'block';
-                document.body.requestPointerLock();
+                requestPointerLockSafe();
             }
         }
         
@@ -1587,14 +1671,22 @@ function animate() {
 
         // === BOSS FIGHT TOGGLE (B) ===
         if (activeInput.wasPressed('KeyB') && !bossFight.isActive() && !levelEditor.isActive()) {
-            bossFight.start();
+            if (activeInput.isPressed('ShiftLeft') && bosses.length > 0) {
+                const boss = bosses[bossRosterIndex % bosses.length];
+                bossRosterIndex++;
+                if (boss && typeof boss.start === 'function') boss.start();
+                showHint(`BOSS SPAWNED — ${boss.constructor.name.replace(/^Boss/, '')}`);
+            } else {
+                bossFight.start();
+            }
             bossHUD.style.display = 'block';
             ui.style.display = 'none';
         }
         
         // === DIFFICULTY TIER CYCLE (Shift+T) ===
         if (activeInput.wasPressed('KeyT') && activeInput.isPressed('ShiftLeft')) {
-            arenaMode.toggleSelector();
+            if (arenaMode._lockdownSealed) showHint('LOCKDOWN — arena entrances are sealed.');
+            else arenaMode.toggleSelector();
         }
         
         // === APEX RIFT TOGGLE (T) — only fire if Shift is NOT held ===
@@ -1665,8 +1757,6 @@ function animate() {
 
         // Track playtime and auto-save every 30 seconds
         saveSystem.tickPlaytime(dt);
-        gameDirector.update(dt, finalDt);
-        autoSaveTimer = gameDirector.autoSaveTimer;
 
         // Overclock / Heat (compute early for finalDt) — gated by key item and EMP disable
         const _empBlocked = player._empDisabled === true;
@@ -1675,6 +1765,8 @@ function animate() {
         if (droneTakedown.slowMoTimer > 0) bulletTime.trigger(player.position, 5);
         const fatalityScale = fatalitySystem ? fatalitySystem.getTimeScale() : 1.0;
         const finalDt = dt * Math.min(timeScale, slowMo, fatalityScale);
+        gameDirector.update(dt, finalDt);
+        autoSaveTimer = gameDirector.autoSaveTimer;
         
         // Update platforms
         for (const platform of world.platforms) {
@@ -1774,7 +1866,7 @@ function animate() {
         runnerVision.update(finalDt);
         
         // Update weather gameplay
-        weatherGameplay.update(dt, weatherSystem);
+        weatherGameplay.update(finalDt, weatherSystem);
         
         // Update weather
         weatherSystem.update(dt);
@@ -1880,10 +1972,11 @@ function animate() {
             wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
             setBonusSystem, prestigeSystem, trainingDummy, lootVacuum, moddingAPI,
             trickSystem, fatalitySystem, graffitiSpraySystem,
-            exoSuit, player, world, activeInput
+            predatorDrone, photoBountySystem, escortSystem, rhythmParkour, trapCrafting,
+            exoSuit, player, world, activeInput, resourceSystem, arenaMode
         }, finalDt);
 
-        updateProxyMines({ world, scene, particleEffects, hitboxSystem }, finalDt);
+        updateProxyMines({ world, scene, particleEffects, hitboxSystem, enemyManager, predatorDrone }, finalDt);
         updateDecoys({ world }, finalDt);
 
         // ── Zelda systems update ───────────────────────────────────────────

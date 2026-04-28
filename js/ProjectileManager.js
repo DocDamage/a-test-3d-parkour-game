@@ -204,6 +204,109 @@ export class ProjectileManager {
     }
 
     /**
+     * Fire a lobbed projectile with gravity and an optional fuse callback.
+     * Useful for grenades, mines, and thrown gadgets that arc instead of flying straight.
+     */
+    fireLob(origin, target, config = {}) {
+        const fuse = config.fuse ?? 1.5;
+        const radius = config.radius ?? 0.22;
+        const color = config.color ?? 0xff5500;
+        const gravity = config.gravity ?? 18;
+        const targetPos = target && target.isVector3
+            ? target.clone()
+            : origin.clone().add((config.direction || new THREE.Vector3(0, 0.35, 1)).clone().normalize().multiplyScalar(config.range ?? 10));
+
+        const geo = new THREE.SphereGeometry(radius, 10, 10);
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(origin);
+        this.scene.add(mesh);
+
+        const horizontal = new THREE.Vector3(targetPos.x - origin.x, 0, targetPos.z - origin.z);
+        const velocity = horizontal.multiplyScalar(1 / Math.max(0.1, fuse));
+        velocity.y = ((targetPos.y - origin.y) + 0.5 * gravity * fuse * fuse) / fuse;
+
+        const proj = {
+            kind: 'lob',
+            mesh,
+            velocity,
+            origin: origin.clone(),
+            range: config.range ?? origin.distanceTo(targetPos) + 4,
+            radius,
+            damage: config.damage ?? 10,
+            damageType: config.damageType ?? 'explosive',
+            onHit: config.onHit || null,
+            onExpire: config.onExpire || null,
+            piercing: false,
+            hitOwners: new Set(),
+            lifetime: fuse,
+            age: 0,
+            gravity
+        };
+        this.projectiles.push(proj);
+        return proj;
+    }
+
+    /**
+     * Spawn a temporary decoy that enemies can target and damage.
+     */
+    fireDecoy(origin, config = {}) {
+        const lifetime = config.lifetime ?? 5;
+        const health = config.health ?? 30;
+        const color = config.color ?? 0x66ccff;
+        const geo = new THREE.CapsuleGeometry(0.28, 1.0, 4, 8);
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, wireframe: true });
+        const mesh = config.mesh ? config.mesh.clone() : new THREE.Mesh(geo, mat);
+        mesh.position.copy(origin);
+        this.scene.add(mesh);
+
+        const decoy = {
+            mesh,
+            position: mesh.position,
+            health,
+            maxHealth: health,
+            team: 'player',
+            isDead: false,
+            takeDamage: (amount, type, source) => {
+                if (decoy.isDead) return 0;
+                decoy.health -= amount;
+                if (decoy.health <= 0) {
+                    decoy.isDead = true;
+                    decoy._destroyedByDamage = true;
+                    if (config.onDestroyed) config.onDestroyed(decoy, source);
+                }
+                return amount;
+            }
+        };
+
+        if (!this.world._decoys) this.world._decoys = [];
+        this.world._decoys.push(decoy);
+
+        const proj = {
+            kind: 'decoy',
+            mesh,
+            decoy,
+            origin: origin.clone(),
+            range: 0,
+            radius: 0.5,
+            piercing: true,
+            hitOwners: new Set(),
+            lifetime,
+            age: 0,
+            onExpire: () => {
+                if (!decoy.isDead && config.onExpired) config.onExpired(decoy);
+                decoy.isDead = true;
+            },
+            onRemove: () => {
+                const idx = this.world._decoys ? this.world._decoys.indexOf(decoy) : -1;
+                if (idx >= 0) this.world._decoys.splice(idx, 1);
+            }
+        };
+        this.projectiles.push(proj);
+        return decoy;
+    }
+
+    /**
      * Chain lightning: hops from origin to nearest enemy, then chains.
      */
     fireChainLightning(origin, targets, config = {}) {
@@ -254,11 +357,23 @@ export class ProjectileManager {
             const p = this.projectiles[i];
             p.age += dt;
             if (p.age >= p.lifetime) {
+                if (p.onExpire) p.onExpire(p);
                 this._removeProjectile(i);
                 continue;
             }
 
+            if (p.kind === 'decoy') {
+                if (p.decoy?.isDead) {
+                    if (p.onExpire && !p.decoy._destroyedByDamage) p.onExpire(p);
+                    this._removeProjectile(i);
+                    continue;
+                }
+                p.mesh.rotation.y += dt * 1.5;
+                continue;
+            }
+
             // Move
+            if (p.gravity) p.velocity.y -= p.gravity * dt;
             p.mesh.position.addScaledVector(p.velocity, dt);
 
             // Check enemy hits
@@ -368,10 +483,27 @@ export class ProjectileManager {
     _removeProjectile(index) {
         const p = this.projectiles[index];
         this.projectiles.splice(index, 1);
+        if (p.onRemove) p.onRemove(p);
         if (p.mesh) {
             this.scene.remove(p.mesh);
-            p.mesh.geometry.dispose();
-            p.mesh.material.dispose();
+            this._disposeObject(p.mesh);
+        }
+    }
+
+    _disposeObject(obj) {
+        obj.traverse?.((child) => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                else child.material.dispose();
+            }
+        });
+        if (!obj.traverse) {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) {
+                if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                else obj.material.dispose();
+            }
         }
     }
 

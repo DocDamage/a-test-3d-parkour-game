@@ -68,6 +68,7 @@ export class PhotoMode {
 			{ name: 'Overexposed', mode: 5 },
 		];
 		this.filterIndex = 0;
+		this.onPhotoTaken = null;
 	}
 
 	/* ============================================================
@@ -235,6 +236,7 @@ export class PhotoMode {
 	_takeScreenshot() {
 		// Render one clean frame first
 		this.postProcessing.render(0.016);
+		if (this.onPhotoTaken) this.onPhotoTaken(this.camera);
 
 		if (audioManager && typeof audioManager.playSFX === 'function') audioManager.playSFX('camera_shutter');
 

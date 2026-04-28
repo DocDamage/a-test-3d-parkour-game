@@ -23,6 +23,10 @@ export class DamageSystem {
         this.safehouseSystem = safehouse;
     }
 
+    setLegendaryPowerSystem(legendaryPowerSystem) {
+        this.legendaryPowerSystem = legendaryPowerSystem;
+    }
+
     /**
      * Calculate final damage after applying type modifiers, crits, and stats.
      * @param {number} baseAmount
@@ -142,7 +146,12 @@ export class DamageSystem {
             return 0;
         }
         if (target.takeDamage) {
-            const dealt = target.takeDamage(dmg.amount, dmg.type, source);
+            let finalAmount = dmg.amount;
+            if (this.legendaryPowerSystem && source === this.legendaryPowerSystem.player) {
+                finalAmount = this.legendaryPowerSystem.onDamageDealt(target, finalAmount);
+            }
+            if (target.state === 'BLOCK') finalAmount *= 0.25;
+            const dealt = target.takeDamage(finalAmount, dmg.type, source);
             this.applyStatusEffect(dmg.type, target, source);
             return dealt;
         }

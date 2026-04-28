@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { Hitbox } from './HitboxSystem.js';
+import { updateLifecycle } from './Lifecycle.js';
 
 export function wireExpansionSystems(deps) {
     const {
@@ -137,23 +138,31 @@ export function updateShoulderBash(deps, finalDt) {
 }
 
 export function updateProxyMines(deps, finalDt) {
-    const { world, scene, particleEffects, hitboxSystem } = deps;
+    const { world, scene, particleEffects, hitboxSystem, enemyManager, predatorDrone } = deps;
     if (!world._proximityMines) return;
     for (let i = world._proximityMines.length - 1; i >= 0; i--) {
         const mine = world._proximityMines[i];
         if (mine.exploded) continue;
-        const drones = world.drones ? world.drones.drones : [];
-        for (const drone of drones) {
-            if (drone.isDead) continue;
-            const pos = drone.position || (drone.mesh && drone.mesh.position);
+        const targets = [
+            ...(world.drones ? world.drones.drones : []),
+            ...(enemyManager ? enemyManager.enemies : []),
+            ...(predatorDrone && predatorDrone.active ? [predatorDrone] : [])
+        ];
+        for (const target of targets) {
+            if (target.isDead || target.team === 'player') continue;
+            const pos = target.position || (target.mesh && target.mesh.position) || (target.group && target.group.position);
             if (pos && pos.distanceTo(mine.mesh.position) < 3) {
                 mine.exploded = true;
                 if (particleEffects) particleEffects.explosion(mine.mesh.position.clone(), 0xff3300, 20);
                 const hb = new Hitbox(
                     { position: mine.mesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0,0,0), 0.3
                 );
-                hb.damage = 40; hb.team = 'player';
+                hb.damage = mine.damage || 40; hb.team = 'player';
                 if (hitboxSystem) hitboxSystem.registerHitbox(hb);
+                if (mine.disables) {
+                    target._disabled = true;
+                    setTimeout(() => { target._disabled = false; }, 3000);
+                }
                 scene.remove(mine.mesh);
                 mine.mesh.geometry.dispose(); mine.mesh.material.dispose();
                 world._proximityMines.splice(i, 1);
@@ -190,50 +199,110 @@ export function updateExpansionSystems(deps, finalDt) {
         wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
         setBonusSystem, prestigeSystem, trainingDummy, lootVacuum, moddingAPI,
         trickSystem, fatalitySystem, graffitiSpraySystem,
-        exoSuit, player, world, activeInput
+        predatorDrone, photoBountySystem, escortSystem, rhythmParkour, trapCrafting,
+        exoSuit, player, world, activeInput, resourceSystem, arenaMode
     } = deps;
+    const context = {
+        ...deps,
+        dt: finalDt,
+        enemies: deps.world?.drones ? deps.world.drones.drones : [],
+        gameTime: 12
+    };
+    const update = (system, args = ['dt']) => updateLifecycle(system, context, args);
 
-    if (archetype) archetype.update(finalDt);
-    if (companion) companion.update(finalDt, player, deps.world, deps.world.drones ? deps.world.drones.drones : []);
-    if (territory) territory.update(finalDt);
-    if (loyalty && typeof loyalty.update === 'function') loyalty.update(finalDt);
-    if (npcSystem && npcSystem.update) npcSystem.update(finalDt, 12);
-    if (blackout && blackout.update) blackout.update(finalDt, 12);
-    if (rivals && rivals.update) rivals.update(finalDt, player);
-    if (mastery && mastery.update) mastery.update(finalDt, player);
-    if (subLevels && subLevels.update) subLevels.update(finalDt, player);
-    if (collapse && collapse.update) collapse.update(finalDt, player);
-    if (safehouse && safehouse.update) safehouse.update(finalDt);
-    if (bounty && bounty.update) bounty.update(finalDt, player);
-    if (codex && codex.update) codex.update(finalDt, player);
-    if (implants && implants.update) implants.update(finalDt, player);
-    if (legacy && legacy.update) legacy.update(finalDt);
-    if (ngPlus && ngPlus.update) ngPlus.update(finalDt);
-    if (consequences && consequences.update) consequences.update(finalDt);
-    if (debt && debt.update) debt.update(finalDt);
-    if (shop && shop.update) shop.update(finalDt);
-    if (factions && factions.update) factions.update(finalDt);
-    if (familiarity && familiarity.update) familiarity.update(finalDt);
-    if (apexRift) apexRift.update(finalDt);
-    if (nephalemGlory) nephalemGlory.update(finalDt);
-    if (legendaryPowerSystem) legendaryPowerSystem.update(finalDt);
-    if (projectileManager) projectileManager.update(finalDt);
+    update(archetype);
+    update(companion, ['dt', 'player', 'world', 'enemies']);
+    update(territory);
+    update(loyalty);
+    update(npcSystem, ['dt', 'gameTime']);
+    if (blackout && blackout.update) {
+        blackout.update(finalDt, 12);
+        applyBlackoutGameplayEffects({ blackout, player, world, resourceSystem, arenaMode }, finalDt);
+    }
+    update(rivals, ['dt', 'player']);
+    update(mastery, ['dt', 'player']);
+    update(subLevels, ['dt', 'player']);
+    update(collapse, ['dt', 'player']);
+    update(safehouse);
+    update(bounty, ['dt', 'player']);
+    update(codex, ['dt', 'player']);
+    update(implants, ['dt', 'player']);
+    update(legacy);
+    update(ngPlus);
+    update(consequences);
+    update(debt);
+    update(shop);
+    update(factions);
+    update(familiarity);
+    update(apexRift);
+    update(nephalemGlory);
+    update(legendaryPowerSystem);
+    update(projectileManager);
+    update(predatorDrone);
+    update(photoBountySystem);
+    update(escortSystem);
+    update(rhythmParkour, ['dt', 'activeInput']);
 
     // World & quest systems
-    if (wanderingVendor) wanderingVendor.update(finalDt);
+    update(wanderingVendor);
     if (dailyQuestSystem) dailyQuestSystem.save();
     if (graffitiCollectible) graffitiCollectible.update();
-    if (fastTravel) fastTravel.update(finalDt);
+    update(fastTravel);
 
     // RPG progression systems
     if (setBonusSystem) setBonusSystem.update(exoSuit);
     if (prestigeSystem) prestigeSystem.addXP(0);
-    if (trainingDummy) trainingDummy.update(finalDt);
-    if (lootVacuum) lootVacuum.update(finalDt);
+    update(trainingDummy);
+    update(lootVacuum);
     if (moddingAPI) moddingAPI.dispatch('preUpdate', finalDt);
 
     // Trick / Fatality / Graffiti
-    if (trickSystem) trickSystem.update(finalDt);
-    if (fatalitySystem) fatalitySystem.update(finalDt, player, world, activeInput);
-    if (graffitiSpraySystem) graffitiSpraySystem.update(finalDt, player, activeInput, world);
+    update(trickSystem);
+    update(fatalitySystem, ['dt', 'player', 'world', 'activeInput']);
+    update(graffitiSpraySystem, ['dt', 'player', 'activeInput', 'world']);
+
+    if (activeInput?.wasPressed?.('Digit6') && trapCrafting) trapCrafting.craft('proximity_mine');
+    if (activeInput?.wasPressed?.('Digit7') && predatorDrone && !predatorDrone.active) predatorDrone.spawn();
+    if (activeInput?.wasPressed?.('Digit8') && escortSystem && !escortSystem.active) {
+        escortSystem.start(player.position.clone().add({ x: 12, y: 0, z: 12 }));
+    }
+    if (activeInput?.wasPressed?.('Digit9') && rhythmParkour && !rhythmParkour.active) rhythmParkour.start();
+}
+
+function applyBlackoutGameplayEffects(deps, dt) {
+    const { blackout, player, world, resourceSystem, arenaMode } = deps;
+    const active = blackout.getCurrentEvent ? blackout.getCurrentEvent() : null;
+    const effects = active?.config?.effects || {};
+
+    if (resourceSystem) {
+        if (effects.flowCostMult !== undefined && !resourceSystem._blackoutCostOverride) {
+            resourceSystem._preBlackoutCostMultiplier = resourceSystem.costMultiplier ?? 1;
+            resourceSystem._blackoutCostOverride = true;
+        }
+        if (effects.flowCostMult !== undefined) {
+            resourceSystem.costMultiplier = effects.flowCostMult;
+        } else if (resourceSystem._blackoutCostOverride) {
+            resourceSystem.costMultiplier = resourceSystem._preBlackoutCostMultiplier ?? 1;
+            resourceSystem._blackoutCostOverride = false;
+        }
+    }
+
+    if (player && effects.healthDrainPerSecond && player.takeDamage) {
+        player.takeDamage((player.maxHealth || 100) * effects.healthDrainPerSecond * dt, 'energy', null);
+    }
+
+    if (world?.drones?.drones) {
+        for (const drone of world.drones.drones) {
+            if (drone._baseVisionRange === undefined && drone.visionRange !== undefined) {
+                drone._baseVisionRange = drone.visionRange;
+            }
+            if (drone._baseVisionRange !== undefined) {
+                drone.visionRange = drone._baseVisionRange * (effects.droneVisionMult || 1);
+            }
+        }
+    }
+
+    if (arenaMode) {
+        arenaMode._lockdownSealed = !!effects.sealArenas;
+    }
 }

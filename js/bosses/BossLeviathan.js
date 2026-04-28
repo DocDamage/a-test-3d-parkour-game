@@ -166,6 +166,7 @@ export class BossLeviathan {
     die() {
         this.isDead = true;
         this.isActive = false;
+        if (this.onDeath) this.onDeath(this, this.player);
         setTimeout(() => { if (this.group) this.group.visible = false; }, 3000);
     }
 

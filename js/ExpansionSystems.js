@@ -32,6 +32,11 @@ import { TrickSystem } from './TrickSystem.js';
 import { FatalitySystem } from './FatalitySystem.js';
 import { GraffitiSpraySystem } from './GraffitiSpraySystem.js';
 import { ParkourCallbackWiring } from './ParkourCallbackWiring.js';
+import { PredatorDrone } from './PredatorDrone.js';
+import { PhotoBountySystem } from './PhotoBountySystem.js';
+import { EscortSystem } from './EscortSystem.js';
+import { RhythmParkour } from './RhythmParkour.js';
+import { TrapCrafting } from './TrapCrafting.js';
 import * as THREE from 'three';
 
 export function initExpansionSystems(ctx, deps) {
@@ -61,6 +66,11 @@ export function initExpansionSystems(ctx, deps) {
     const graffitiCollectible = new GraffitiCollectible(scene, player, world, particleEffects, exoSuit);
     const fastTravel = new FastTravel(scene, player);
     const graffitiSpraySystem = new GraffitiSpraySystem(scene, player, world, null); // territorySystem optional
+    const predatorDrone = new PredatorDrone(scene, world, player);
+    const photoBountySystem = new PhotoBountySystem(player, world);
+    const escortSystem = new EscortSystem(scene, player);
+    const rhythmParkour = new RhythmParkour(player);
+    const trapCrafting = new TrapCrafting(scene, world, player);
 
     // RPG
     const craftingBench = new CraftingBench(affixSystem, exoSuit);
@@ -92,6 +102,7 @@ export function initExpansionSystems(ctx, deps) {
         craftingBench, setBonusSystem, transmogSystem, prestigeSystem,
         saveSlots, cloudSaveExport, deathRecap, runHistory, lootVacuum, trainingDummy,
         trickSystem, fatalitySystem, graffitiSpraySystem, parkourCallbackWiring,
+        predatorDrone, photoBountySystem, escortSystem, rhythmParkour, trapCrafting,
         moddingAPI,
     };
 }

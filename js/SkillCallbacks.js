@@ -217,29 +217,20 @@ export function wireSkillCallbacks(ctx) {
         const start = p.position.clone().add(new THREE.Vector3(0, 1.2, 0));
         const dir = new THREE.Vector3(Math.sin(p.facing), 0.4, Math.cos(p.facing)).normalize();
         const end = start.clone().add(dir.multiplyScalar(10));
-        let t = 0;
-        const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.2, 8, 8),
-            new THREE.MeshBasicMaterial({ color: 0xff3333 })
-        );
-        mesh.position.copy(start);
-        scene.add(mesh);
-        const duration = 1.5;
-        const timer = setInterval(() => {
-            t += 0.05;
-            const frac = Math.min(1, t / duration);
-            mesh.position.lerpVectors(start, end, frac);
-            mesh.position.y += Math.sin(frac * Math.PI) * 3;
-            if (frac >= 1) {
-                clearInterval(timer);
-                scene.remove(mesh);
-                mesh.geometry.dispose(); mesh.material.dispose();
-                particleEffects.explosion(mesh.position.clone(), 0xff5500, 25);
+        projectileManager.fireLob(start, end, {
+            fuse: 1.5,
+            radius: 0.2,
+            color: 0xff3333,
+            damage: skill.finalDamage || 55,
+            damageType: 'explosive',
+            onExpire: (proj) => {
+                const explodeAt = proj.mesh.position.clone();
+                particleEffects.explosion(explodeAt, 0xff5500, 25);
                 const hitbox = new Hitbox(
-                    { position: mesh.position }, 'explosion', { type: 'sphere', radius: 4 }, new THREE.Vector3(0, 0, 0), 0.3,
+                    { position: explodeAt }, 'explosion', { type: 'sphere', radius: 4 }, new THREE.Vector3(0, 0, 0), 0.3,
                     (hb, target) => {
                         if (target && target.takeDamage) target.takeDamage(skill.finalDamage || 55, 'explosive', p);
-                        const tp = target.position || (target.mesh && target.mesh.position) || mesh.position;
+                        const tp = target.position || (target.mesh && target.mesh.position) || explodeAt;
                         spawnDamageNumber(tp, Math.round(skill.finalDamage || 55), false, 'explosive');
                     }
                 );
@@ -247,7 +238,7 @@ export function wireSkillCallbacks(ctx) {
                 hitbox.team = 'player';
                 hitboxSystem.registerHitbox(hitbox);
             }
-        }, 50);
+        });
     });
 
     skillSystem.onExecute('proxy_mine', (skill, targetPos, p) => {
@@ -273,50 +264,32 @@ export function wireSkillCallbacks(ctx) {
     });
 
     skillSystem.onExecute('decoy', (skill, targetPos, p) => {
-        const decoyMesh = p.mesh.clone();
         const forward = new THREE.Vector3(Math.sin(p.facing), 0, Math.cos(p.facing)).multiplyScalar(3);
-        decoyMesh.position.copy(p.position).add(forward);
-        decoyMesh.position.y = 0.5;
-        scene.add(decoyMesh);
-        const decoy = {
-            mesh: decoyMesh, health: 30, maxHealth: 30, isDead: false, team: 'player',
-            takeDamage(amt) {
-                this.health -= amt;
-                if (this.health <= 0 && !this.isDead) {
-                    this.isDead = true;
-                    particleEffects.explosion(this.mesh.position.clone(), 0xffaa00, 20);
-                    const hb = new Hitbox(
-                        { position: this.mesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3
-                    );
-                    hb.damage = 30; hb.team = 'player';
-                    hitboxSystem.registerHitbox(hb);
-                    scene.remove(this.mesh);
-                    const idx = world._decoys.indexOf(this);
-                    if (idx >= 0) world._decoys.splice(idx, 1);
-                }
-            }
+        const origin = p.position.clone().add(forward);
+        origin.y = 0.5;
+        const explodeDecoy = (decoy) => {
+            if (!decoy || !decoy.mesh) return;
+            const pos = decoy.mesh.position.clone();
+            particleEffects.explosion(pos, 0xffaa00, 20);
+            const hitbox = new Hitbox(
+                { position: pos }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3
+            );
+            hitbox.damage = 30;
+            hitbox.team = 'player';
+            hitboxSystem.registerHitbox(hitbox);
         };
-        if (!world._decoys) world._decoys = [];
-        world._decoys.push(decoy);
+        const decoy = projectileManager.fireDecoy(origin, {
+            mesh: p.mesh,
+            health: 30,
+            lifetime: 5,
+            onDestroyed: explodeDecoy,
+            onExpired: explodeDecoy
+        });
         const drones = world.drones ? world.drones.drones : [];
         for (const drone of drones) {
             const pos = drone.position || (drone.mesh && drone.mesh.position);
-            if (pos && pos.distanceTo(decoyMesh.position) < 10) drone._decoyTarget = decoy;
+            if (pos && pos.distanceTo(origin) < 10) drone._decoyTarget = decoy;
         }
-        setTimeout(() => {
-            if (!decoy.isDead) {
-                decoy.isDead = true;
-                particleEffects.explosion(decoyMesh.position.clone(), 0xffaa00, 20);
-                const hitbox = new Hitbox(
-                    { position: decoyMesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0, 0, 0), 0.3
-                );
-                hitbox.damage = 30; hitbox.team = 'player';
-                hitboxSystem.registerHitbox(hitbox);
-            }
-            scene.remove(decoyMesh);
-            const idx = world._decoys.indexOf(decoy);
-            if (idx >= 0) world._decoys.splice(idx, 1);
-        }, 5000);
     });
 
     skillSystem.onExecute('zero_cooldown', (skill, targetPos, p) => {
