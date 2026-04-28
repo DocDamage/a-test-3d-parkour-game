@@ -28,6 +28,10 @@ import { LootVacuum } from './LootVacuum.js';
 import { FastTravel } from './FastTravel.js';
 import { CloudSaveExport } from './CloudSaveExport.js';
 import { ModdingAPI } from './ModdingAPI.js';
+import { TrickSystem } from './TrickSystem.js';
+import { FatalitySystem } from './FatalitySystem.js';
+import { GraffitiSpraySystem } from './GraffitiSpraySystem.js';
+import { ParkourCallbackWiring } from './ParkourCallbackWiring.js';
 import * as THREE from 'three';
 
 export function initExpansionSystems(ctx, deps) {
@@ -54,8 +58,9 @@ export function initExpansionSystems(ctx, deps) {
     // World
     const wanderingVendor = new WanderingVendor(scene, world, player);
     const dailyQuestSystem = new DailyQuestSystem(player);
-    const graffitiCollectible = new GraffitiCollectible(scene, player);
+    const graffitiCollectible = new GraffitiCollectible(scene, player, world, particleEffects, exoSuit);
     const fastTravel = new FastTravel(scene, player);
+    const graffitiSpraySystem = new GraffitiSpraySystem(scene, player, world, null); // territorySystem optional
 
     // RPG
     const craftingBench = new CraftingBench(affixSystem, exoSuit);
@@ -71,6 +76,11 @@ export function initExpansionSystems(ctx, deps) {
     const lootVacuum = new LootVacuum(player, lootSystem);
     const trainingDummy = new TrainingDummy(scene, new THREE.Vector3(-5, 1, -5));
 
+    // Trick / Fatality / Callbacks
+    const trickSystem = new TrickSystem();
+    const fatalitySystem = new FatalitySystem(scene, player, particleEffects);
+    const parkourCallbackWiring = new ParkourCallbackWiring(player, null, null, particleEffects, trickSystem);
+
     // Modding
     const moddingAPI = new ModdingAPI(ctx);
 
@@ -81,6 +91,7 @@ export function initExpansionSystems(ctx, deps) {
         wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
         craftingBench, setBonusSystem, transmogSystem, prestigeSystem,
         saveSlots, cloudSaveExport, deathRecap, runHistory, lootVacuum, trainingDummy,
+        trickSystem, fatalitySystem, graffitiSpraySystem, parkourCallbackWiring,
         moddingAPI,
     };
 }

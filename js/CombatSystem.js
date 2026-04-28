@@ -43,6 +43,8 @@ export class CombatSystem {
         this.hitStopTimer = 0;
 
         this.onHit = null;
+        this.fatalitySystem = null;
+        this._weaponCombos = new Map();
     }
 
     /* ------------------------------------------------------------------ */
@@ -225,6 +227,10 @@ export class CombatSystem {
     /*  Effects                                                           */
     /* ------------------------------------------------------------------ */
 
+    registerWeaponCombo(weaponId, comboFn) {
+        this._weaponCombos.set(weaponId, comboFn);
+    }
+
     triggerHitStop(duration = 0.06) {
         this.hitStopTimer = this.overclockActive ? duration + 0.03 : duration;
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
@@ -271,5 +277,14 @@ export class CombatSystem {
     canCancel() {
         // Can cancel after hitbox has already activated
         return this.hitRegistered;
+    }
+
+    checkFatality(target) {
+        if (!this.fatalitySystem || !target) return;
+        const hp = target.health ?? target.hp ?? 100;
+        const maxHp = target.maxHealth ?? target.maxHp ?? 100;
+        if (maxHp > 0 && hp / maxHp <= 0.25 && !target.isDead) {
+            this.fatalitySystem.promptedEnemy = target;
+        }
     }
 }

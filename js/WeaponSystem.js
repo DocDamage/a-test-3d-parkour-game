@@ -60,6 +60,7 @@ export class WeaponSystem {
         this.isReloading = false;
         this.modSystem = null;
         this.familiaritySystem = null;
+        this.trickSystem = null;
 
         this._buildUI();
     }
@@ -70,6 +71,10 @@ export class WeaponSystem {
 
     setFamiliaritySystem(fs) {
         this.familiaritySystem = fs;
+    }
+
+    setTrickSystem(ts) {
+        this.trickSystem = ts;
     }
 
     _getEffectiveStats() {
@@ -234,6 +239,20 @@ export class WeaponSystem {
         const fireRate = eff ? eff.fireRate : (w.fireRate || w.attackSpeed || 5);
         this.fireCooldown = 1 / fireRate;
         this._updateUI();
+
+        // Weapon trick reporting
+        if (this.trickSystem && this.player) {
+            const p = this.player;
+            if (!p.grounded) this.trickSystem.reportTrick('AERIAL_SHOOT');
+            else if (p.state === 'SLIDE') this.trickSystem.reportTrick('SLIDE_SHOOT');
+            else if (p.state === 'WALLRUN') this.trickSystem.reportTrick('WALLRUN_SHOOT');
+            if (w.id === 'dual_pistols' && p.state === 'ROLL') this.trickSystem.reportTrick('DODGE_SHOOT');
+            if (w.id === 'shock_hammer' && w.isCharging) this.trickSystem.reportTrick('GROUND_SLAM');
+            if (w.id === 'railgun' && w.chargeTime >= 0.8) this.trickSystem.reportTrick('CHARGE_SHOT');
+            if (w.id === 'glaive' && w.bounces < 2) this.trickSystem.reportTrick('BANK_SHOT');
+            if (w.id === 'dual_pistols' && w.fanShots) this.trickSystem.reportTrick('FAN_HAMMER');
+            if (w.id === 'bo_staff' && w.poleVaultReady) this.trickSystem.reportTrick('POLE_VAULT');
+        }
 
         if (window.audioManager && typeof window.audioManager.playWeaponFire === 'function') {
             window.audioManager.playWeaponFire(w ? (w.name || 'default') : 'default', origin);

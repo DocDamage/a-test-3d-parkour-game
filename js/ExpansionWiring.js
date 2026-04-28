@@ -189,7 +189,8 @@ export function updateExpansionSystems(deps, finalDt) {
         legendaryPowerSystem, projectileManager,
         wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
         setBonusSystem, prestigeSystem, trainingDummy, lootVacuum, moddingAPI,
-        exoSuit, player
+        trickSystem, fatalitySystem, graffitiSpraySystem,
+        exoSuit, player, world, activeInput
     } = deps;
 
     if (archetype) archetype.update(finalDt);
@@ -230,4 +231,9 @@ export function updateExpansionSystems(deps, finalDt) {
     if (trainingDummy) trainingDummy.update(finalDt);
     if (lootVacuum) lootVacuum.update(finalDt);
     if (moddingAPI) moddingAPI.dispatch('preUpdate', finalDt);
+
+    // Trick / Fatality / Graffiti
+    if (trickSystem) trickSystem.update(finalDt);
+    if (fatalitySystem) fatalitySystem.update(finalDt, player, world, activeInput);
+    if (graffitiSpraySystem) graffitiSpraySystem.update(finalDt, player, activeInput, world);
 }

@@ -6,6 +6,11 @@ import { WallKickSystem } from './WallKickSystem.js';
 import { SlideJumpSystem } from './SlideJumpSystem.js';
 import { MantleSystem } from './MantleSystem.js';
 import { SlopeGrindSystem } from './SlopeGrindSystem.js';
+import { TicTacSystem } from './TicTacSystem.js';
+import { AirDodgeSystem } from './AirDodgeSystem.js';
+import { DoubleJumpSystem } from './DoubleJumpSystem.js';
+import { CornerKickSystem } from './CornerKickSystem.js';
+import { DiveRollSystem } from './DiveRollSystem.js';
 
 /**
  * Player Controller States & Transitions
@@ -121,6 +126,11 @@ export class Player {
         this.slideJumpSystem = new SlideJumpSystem(this);
         this.mantleSystem = new MantleSystem(this);
         this.slopeGrindSystem = new SlopeGrindSystem(this, null);
+        this.ticTacSystem = new TicTacSystem(this);
+        this.airDodgeSystem = new AirDodgeSystem(this, this.staminaSystem);
+        this.doubleJumpSystem = new DoubleJumpSystem(this);
+        this.cornerKickSystem = new CornerKickSystem(this);
+        this.diveRollSystem = new DiveRollSystem(this, this.staminaSystem);
 
         // Health / damage system
         this.maxHealth = 100;
@@ -398,6 +408,11 @@ export class Player {
         this.slideJumpSystem.update(dt, input);
         this.mantleSystem.update(dt, input);
         this.slopeGrindSystem.update(dt, input);
+        this.ticTacSystem.update(dt, input);
+        this.airDodgeSystem.update(dt, input);
+        this.doubleJumpSystem.update(dt);
+        this.cornerKickSystem.update(dt);
+        this.diveRollSystem.update(dt, input);
 
         // Passive health regen
         if (this._regenPerSecond > 0 && this.health < this.maxHealth && !this.isDead) {
@@ -716,8 +731,20 @@ export class Player {
         if (this.jumpBuffer > 0) {
             this.jumpBuffer = 0;
 
+            // Double jump
+            if (this.doubleJumpSystem.tryDoubleJump(true)) {
+                return;
+            }
+
             // Tic-tac takes priority
-            if (this.tryTicTac(input)) {
+            const wallInfo = this.checkWallInFront();
+            if (wallInfo && this.ticTacSystem.tryTicTac(wallInfo.normal, true)) {
+                return;
+            }
+
+            // Corner kick
+            const nearbyNormals = this._getNearbyWallNormals();
+            if (this.cornerKickSystem.tryCornerKick(nearbyNormals, true)) {
                 return;
             }
 
@@ -730,7 +757,6 @@ export class Player {
                 }
             }
 
-            const wallInfo = this.checkWallInFront();
             if (wallInfo) {
                 if (wallInfo.canClimb) {
                     this.startClimb(wallInfo);
@@ -1557,6 +1583,30 @@ export class Player {
         return null;
     }
 
+    _getNearbyWallNormals() {
+        const normals = [];
+        const origin = this.position.clone().add(new THREE.Vector3(0, 1.0, 0));
+        const dirs = [
+            new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+            new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+        ];
+        for (const dir of dirs) {
+            const ray = new THREE.Ray(origin, dir);
+            for (const obj of this.world.climbables) {
+                const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
+                const hit = new THREE.Vector3();
+                if (ray.intersectBox(box, hit) !== null) {
+                    const dist = origin.distanceTo(hit);
+                    if (dist < 1.5) {
+                        const normal = this.getBoxNormal(box, hit).negate();
+                        if (Math.abs(normal.y) <= 0.3) normals.push(normal);
+                    }
+                }
+            }
+        }
+        return normals;
+    }
+
     checkLedgeHang() {
         if (this.velocity.y > -0.5) return null;
 
@@ -1933,6 +1983,11 @@ export class Player {
         this.slideJumpSystem.reset();
         this.mantleSystem.reset();
         this.slopeGrindSystem.reset();
+        this.ticTacSystem.reset();
+        this.airDodgeSystem.reset();
+        this.doubleJumpSystem.reset();
+        this.cornerKickSystem.reset();
+        this.diveRollSystem.reset();
     }
 
     getStateDisplay() {
@@ -1962,20 +2017,9 @@ export class Player {
         return names[this.state] || this.state;
     }
 
-    getSpeed() {
-        const spd = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
-        return (spd * 3.6).toFixed(0);
-    }
-
-    setCharacterSheet(sheet) {
-        this.characterSheet = sheet;
-    }
-
-    getRPGStats() {
-        if (!this.characterSheet) return {};
-        const stats = this.characterSheet.getStats ? this.characterSheet.getStats() : {};
-        return stats;
-    }
+    getSpeed() { return (Math.sqrt(this.velocity.x**2 + this.velocity.z**2) * 3.6).toFixed(0); }
+    setCharacterSheet(sheet) { this.characterSheet = sheet; }
+    getRPGStats() { return this.characterSheet ? (this.characterSheet.getStats ? this.characterSheet.getStats() : {}) : {}; }
 
     triggerParry() {
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
@@ -2181,6 +2225,11 @@ export class Player {
         this.slideJumpSystem.reset();
         this.mantleSystem.reset();
         this.slopeGrindSystem.reset();
+        this.ticTacSystem.reset();
+        this.airDodgeSystem.reset();
+        this.doubleJumpSystem.reset();
+        this.cornerKickSystem.reset();
+        this.diveRollSystem.reset();
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
             window.audioManager.playSFX('respawn');
         }

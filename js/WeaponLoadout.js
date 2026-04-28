@@ -14,6 +14,13 @@ import { PlasmaRifle } from './weapons/PlasmaRifle.js';
 import { EnergySword } from './weapons/EnergySword.js';
 import { Crossbow } from './weapons/Crossbow.js';
 import { GrenadeLauncher } from './weapons/GrenadeLauncher.js';
+import { BoStaff } from './weapons/BoStaff.js';
+import { ChainWhip } from './weapons/ChainWhip.js';
+import { Railgun } from './weapons/Railgun.js';
+import { Nailgun } from './weapons/Nailgun.js';
+import { Glaive } from './weapons/Glaive.js';
+import { DualPistols } from './weapons/DualPistols.js';
+import { ShockHammer } from './weapons/ShockHammer.js';
 import { MagicSystem } from './MagicSystem.js';
 import { AccessorySystem } from './AccessorySystem.js';
 import { InventorySystem } from './InventorySystem.js';
@@ -73,6 +80,29 @@ export function setupWeaponLoadout(scene, world, player, weaponSystem, WEAPON_SL
     weaponSystem.registerUnlocked(crossbow);
     weaponSystem.registerUnlocked(grenadeLauncher);
 
+    // New expansion weapons
+    const boStaff = new BoStaff(scene, player);
+    const chainWhip = new ChainWhip(scene, player);
+    const railgun = new Railgun(scene, player);
+    const nailgun = new Nailgun(scene, player);
+    const glaive = new Glaive(scene, player);
+    const dualPistols = new DualPistols(scene, player);
+    const shockHammer = new ShockHammer(scene, player);
+    weaponSystem.equip(boStaff, WEAPON_SLOTS.MELEE);
+    weaponSystem.equip(chainWhip, WEAPON_SLOTS.MELEE);
+    weaponSystem.equip(shockHammer, WEAPON_SLOTS.MELEE);
+    weaponSystem.equip(nailgun, WEAPON_SLOTS.SIDEARM);
+    weaponSystem.equip(dualPistols, WEAPON_SLOTS.SIDEARM);
+    weaponSystem.equip(railgun, WEAPON_SLOTS.PRIMARY);
+    weaponSystem.equip(glaive, WEAPON_SLOTS.PRIMARY);
+    weaponSystem.registerUnlocked(boStaff);
+    weaponSystem.registerUnlocked(chainWhip);
+    weaponSystem.registerUnlocked(railgun);
+    weaponSystem.registerUnlocked(nailgun);
+    weaponSystem.registerUnlocked(glaive);
+    weaponSystem.registerUnlocked(dualPistols);
+    weaponSystem.registerUnlocked(shockHammer);
+
     const miniBosses = [];
     const gatekeeper = new Gatekeeper(scene, world, player, new THREE.Vector3(15, 0, 15));
     gatekeeper.start();
@@ -94,6 +124,7 @@ export function setupWeaponLoadout(scene, world, player, weaponSystem, WEAPON_SL
         pipeWrench, semiAutoPistol, assaultRifle, shotgun, stickyBomb,
         staffOfEmbers, voidWand, cryoGauntlet,
         sniperRifle, subMachineGun, rocketLauncher, flamethrower, plasmaRifle, energySword, crossbow, grenadeLauncher,
+        boStaff, chainWhip, railgun, nailgun, glaive, dualPistols, shockHammer,
         magicSystem, accessorySystem, inventorySystem,
         miniBosses
     };

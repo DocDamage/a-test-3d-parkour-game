@@ -356,6 +356,8 @@ const weaponModSystem = new WeaponModSystem();
 ctx.register('weaponModSystem', [], () => weaponModSystem);
 weaponSystem.setModSystem(weaponModSystem);
 weaponSystem.setFamiliaritySystem(familiarity);
+// Wire trick system for weapon trick reporting
+if (weaponSystem && trickSystem) weaponSystem.setTrickSystem(trickSystem);
 // Pre-equip demo mods on starter loadout
 weaponModSystem.equipMod(weaponModSystem.generateMod('barrel', 'rare'), WEAPON_SLOTS.PRIMARY, 'barrel');
 weaponModSystem.equipMod(weaponModSystem.generateMod('scope', 'uncommon'), WEAPON_SLOTS.PRIMARY, 'scope');
@@ -569,8 +571,15 @@ const {
     wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
     craftingBench, setBonusSystem, transmogSystem, prestigeSystem,
     saveSlots, cloudSaveExport, deathRecap, runHistory, lootVacuum, trainingDummy,
+    trickSystem, fatalitySystem, graffitiSpraySystem, parkourCallbackWiring,
     moddingAPI,
 } = exps;
+
+// Wire fatality system into combat
+if (combatSystem && fatalitySystem) {
+    combatSystem.fatalitySystem = fatalitySystem;
+}
+
 ctx.register('buildCodeSystem', ['characterSheet', 'archetype', 'origin', 'passiveTree', 'skillSystem', 'exoSuit', 'weaponSystem', 'implants'], () => buildCodeSystem);
 
 stickyBomb.onExplode = (data) => {
@@ -1664,7 +1673,8 @@ function animate() {
         const timeScale = (!_empBlocked && player.overclockUnlocked !== false) ? overclock.update(dt, activeInput) : 1.0;
         const slowMo = droneTakedown.update(dt, player, activeInput, world.drones.drones);
         if (droneTakedown.slowMoTimer > 0) bulletTime.trigger(player.position, 5);
-        const finalDt = dt * Math.min(timeScale, slowMo);
+        const fatalityScale = fatalitySystem ? fatalitySystem.getTimeScale() : 1.0;
+        const finalDt = dt * Math.min(timeScale, slowMo, fatalityScale);
         
         // Update platforms
         for (const platform of world.platforms) {
@@ -1869,7 +1879,8 @@ function animate() {
             legendaryPowerSystem, projectileManager,
             wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
             setBonusSystem, prestigeSystem, trainingDummy, lootVacuum, moddingAPI,
-            exoSuit, player, world
+            trickSystem, fatalitySystem, graffitiSpraySystem,
+            exoSuit, player, world, activeInput
         }, finalDt);
 
         updateProxyMines({ world, scene, particleEffects, hitboxSystem }, finalDt);
