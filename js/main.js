@@ -132,6 +132,11 @@ import { AimAssist } from './AimAssist.js';
 import { DirectionalDamageIndicator } from './DirectionalDamageIndicator.js';
 import { BuildCodeSystem } from './BuildCodeSystem.js';
 import { SeasonSystem } from './SeasonSystem.js';
+import { initExpansionSystems } from './ExpansionSystems.js';
+import {
+    wireExpansionSystems, updateMeatShield, updateShoulderBash,
+    updateProxyMines, updateDecoys, updateExpansionSystems
+} from './ExpansionWiring.js';
 
 const __DEV__ = window.location.hash === '#dev';
 window.__DEV__ = __DEV__;
@@ -550,32 +555,23 @@ const weaponLoadoutUI = new WeaponLoadoutUI(weaponSystem);
 
 // Build Code System
 const buildCodeSystem = new BuildCodeSystem(characterSheet, archetype, origin, passiveTree, skillSystem, exoSuit, weaponSystem, implants);
+
+// Expansion systems (parkour, combat, enemies, world, RPG, polish)
+const exps = initExpansionSystems(ctx, {
+    player, staminaSystem, combatSystem, weaponSystem, statusEffectSystem,
+    world, scene, exoSuit, affixSystem, lootSystem, saveSystem,
+    particleEffects, overclock
+});
+const {
+    wallKickSystem, slideJumpSystem, mantleSystem, slopeGrindSystem, autoWalk,
+    weaponComboSystem, aerialJuggleSystem, environmentalFinisher, statusComboSystem,
+    eliteModifierSystem,
+    wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
+    craftingBench, setBonusSystem, transmogSystem, prestigeSystem,
+    saveSlots, cloudSaveExport, deathRecap, runHistory, lootVacuum, trainingDummy,
+    moddingAPI,
+} = exps;
 ctx.register('buildCodeSystem', ['characterSheet', 'archetype', 'origin', 'passiveTree', 'skillSystem', 'exoSuit', 'weaponSystem', 'implants'], () => buildCodeSystem);
-(function wireBuildCode() {
-    const importBtn = document.getElementById('btn-import-build');
-    const exportBtn = document.getElementById('btn-export-build');
-    const input = document.getElementById('build-code-input');
-    if (importBtn) {
-        importBtn.addEventListener('click', () => {
-            const code = input ? input.value.trim() : '';
-            const result = buildCodeSystem.importBuild(code);
-            if (result.success) {
-                if (input) input.value = '';
-                showHint('Build imported successfully!');
-            } else {
-                showHint('Invalid build code.');
-            }
-        });
-    }
-    if (exportBtn) {
-        exportBtn.addEventListener('click', () => {
-            const code = buildCodeSystem.exportBuild();
-            if (input) input.value = code;
-            navigator.clipboard.writeText(code).catch(() => {});
-            showHint('Build code copied to clipboard!');
-        });
-    }
-})();
 
 stickyBomb.onExplode = (data) => {
     if (!hitboxSystem) return;
@@ -600,11 +596,29 @@ combatSystem.onHitbox = (data) => {
     if (player._perfectDodgeCounter > 0) {
         dmg *= 2;
     }
+
     const hb = new Hitbox(data.owner, data.type, data.shape, data.offset, data.duration, (hitbox, target) => {
-        if (target && target.takeDamage) {
+        if (!target) return;
+
+        // Aerial juggle: heavy attacks launch enemies
+        if (data.isHeavy && aerialJuggleSystem) {
+            aerialJuggleSystem.onHeavyHit(target);
+        }
+
+        // Environmental finisher damage mod
+        if (environmentalFinisher) {
+            dmg = environmentalFinisher.onMeleeHit(target, dmg);
+        }
+
+        // Status effect combos
+        if (statusComboSystem) {
+            dmg = statusComboSystem.onDamageDealt(target, dmg, 'kinetic', !data.isHeavy);
+        }
+
+        if (target.takeDamage) {
             target.takeDamage(dmg, 'kinetic', data.owner);
         }
-        if (target && typeof spawnDamageNumber === 'function') {
+        if (typeof spawnDamageNumber === 'function') {
             const tPos = target.position || (target.mesh && target.mesh.position) || data.owner.position;
             spawnDamageNumber(tPos, Math.round(dmg), false, 'kinetic');
         }
@@ -630,30 +644,21 @@ ctx.register('gameDirector', ['player', 'progression', 'weaponSystem', 'factions
 // Unified enemy kill handler — delegates to GameDirector
 function _handleEnemyKilled(enemy, source) {
     gameDirector.handleEnemyKilled(enemy, source);
+    if (deathRecap) deathRecap.onEnemyKilled();
+    if (dailyQuestSystem) {
+        dailyQuestSystem.reportEvent('kill');
+        if (enemy && enemy._isElite) dailyQuestSystem.reportEvent('kill_elite');
+    }
+    if (runHistory) {
+        // runHistory records kills via a counter; actual recording happens on death/session end
+    }
 }
 
-// Wire drone death
-if (world.drones && world.drones.drones) {
-    world.drones.drones.forEach(drone => {
-        if (drone && !drone.onDeath) {
-            drone.onDeath = _handleEnemyKilled;
-            drone.onDamageTaken = (amount, type, source) => {
-                const pos = drone.position ? drone.position.clone() : drone.mesh.position.clone();
-                pos.y += 1.0;
-                spawnDamageNumber(pos, Math.ceil(amount), false, type);
-            };
-            const bar = new EnemyHealthBar(scene, drone);
-            enemyHealthBars.push(bar);
-            // Register hurtbox for player attacks
-            if (hitboxSystem) {
-                const hurtbox = new Hitbox(drone, 'hurtbox', { type: 'sphere', radius: 0.5 }, new THREE.Vector3(0, 0.4, 0), -1, null);
-                hurtbox.team = 'enemy';
-                hitboxSystem.registerHitbox(hurtbox);
-            }
-        }
-    });
-    if (nephalemGlory) nephalemGlory.setEnemyHealthBars(enemyHealthBars);
-}
+wireExpansionSystems({
+    world, eliteModifierSystem, hitboxSystem, scene, enemyHealthBars, nephalemGlory,
+    buildCodeSystem, showHint, onEnemyKilled: _handleEnemyKilled,
+    spawnDamageNumber, particleEffects, EnemyHealthBar
+});
 
 // Wire DamageSystem into DroneAI for dodge/crit/type calculations
 if (world.drones) {
@@ -672,6 +677,7 @@ player.onDamageTaken = (amount, type, source) => {
     if (nephalemGlory) nephalemGlory.onDamageTaken();
     if (gamepad && gamepad.rumble) gamepad.rumble(0.3, 0.7, 100);
     if (legendaryPowerSystem) legendaryPowerSystem.onTakeFatalDamage();
+    if (deathRecap) deathRecap.onDamageTaken(amount, type, source);
 
     // Directional damage indicator
     if (source && source.position && directionalDamageIndicator) {
@@ -1796,30 +1802,7 @@ function animate() {
 
         // Zipline Gun and Grapple Pull are now handled by unified input dispatchers above
 
-        // Drone Meat Shield: hold E near a hacked/friendly drone = absorb 50 dmg
-        if (activeInput.isPressed('KeyE') && !player.isDead) {
-            const drones = world.drones ? world.drones.drones : [];
-            let shieldDrone = null;
-            for (const drone of drones) {
-                if (drone.isDead || drone.team !== 'player') continue;
-                const pos = drone.position || (drone.mesh && drone.mesh.position);
-                if (pos && pos.distanceTo(player.position) < 2.5) {
-                    shieldDrone = drone;
-                    break;
-                }
-            }
-            if (shieldDrone) {
-                if (!player._meatShield) player._meatShield = 50;
-                // Visual: drone hovers in front of player
-                const front = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing)).multiplyScalar(1.2);
-                const targetPos = player.position.clone().add(front);
-                targetPos.y = Math.max(targetPos.y, 1);
-                const sPos = shieldDrone.position || (shieldDrone.mesh && shieldDrone.mesh.position);
-                if (sPos) sPos.lerp(targetPos, 0.1);
-            }
-        } else {
-            player._meatShield = 0;
-        }
+        updateMeatShield({ player, world }, finalDt, activeInput);
 
         // Decoy Afterimage is now handled by unified KeyQ dispatcher above
 
@@ -1851,6 +1834,20 @@ function animate() {
         // Assist mode
         assistMode.update(finalDt, player, activeInput);
         staminaSystem.update(finalDt, player);
+
+        // Parkour expansion
+        wallKickSystem.update(finalDt, activeInput);
+        slideJumpSystem.update(finalDt, activeInput);
+        mantleSystem.update(finalDt, activeInput);
+        slopeGrindSystem.update(finalDt, activeInput);
+        autoWalk.update(finalDt, activeInput);
+        if (autoWalk.enabled && player.state === 'SPRINT') autoWalk.cancel(); // cancel on sprint
+
+        // Combat expansion
+        weaponComboSystem.update(finalDt, activeInput);
+        aerialJuggleSystem.update(finalDt);
+        environmentalFinisher.update(finalDt);
+        combatSystem.overclockActive = (overclock && overclock.active) || false;
         combatSystem.update(finalDt, activeInput);
         statusEffectSystem.update(finalDt);
         if (magicSystem) magicSystem.update(finalDt);
@@ -1863,101 +1860,20 @@ function animate() {
         challenges.updateMovementTime(finalDt, player.state === 'SPRINT');
         if (player.state === 'SPRINT' && legendaryPowerSystem) legendaryPowerSystem.onSprint(finalDt);
 
-        // Sprint Shoulder Bash: auto-trigger when sprinting into enemy
-        if (player.state === 'SPRINT') {
-            if (!player._shoulderBashCooldown) player._shoulderBashCooldown = 0;
-            player._shoulderBashCooldown -= finalDt;
-            if (player._shoulderBashCooldown <= 0) {
-                const allEnemies = [
-                    ...(world.drones ? world.drones.drones : []),
-                    ...(enemyManager ? enemyManager.enemies : [])
-                ];
-                for (const e of allEnemies) {
-                    if (e.isDead || e.team === 'player') continue;
-                    const pos = e.position || (e.mesh && e.mesh.position);
-                    if (!pos) continue;
-                    const dist = player.position.distanceTo(pos);
-                    if (dist < 1.5) {
-                        if (e.takeDamage) e.takeDamage(25, 'kinetic', player);
-                        spawnDamageNumber(pos.clone().add(new THREE.Vector3(0, 1, 0)), 25, false, 'kinetic');
-                        if (gamepad && gamepad.rumble) gamepad.rumble(0.3, 0.6, 80);
-                        player._shoulderBashCooldown = 1.0;
-                        break;
-                    }
-                }
-            }
-        }
+        updateShoulderBash({ player, world, enemyManager, spawnDamageNumber, gamepad }, finalDt);
 
-        // RPG systems update
-        if (archetype) archetype.update(dt);
-        // ProgressionSystem has no update() method
-        if (companion) companion.update(finalDt, player, world, world.drones ? world.drones.drones : []);
-        if (territory) territory.update(finalDt);
-        if (loyalty && typeof loyalty.update === 'function') loyalty.update(finalDt);
-        if (npcSystem) npcSystem.update && npcSystem.update(finalDt, 12); // noon default
-        if (blackout) blackout.update && blackout.update(finalDt, 12);
-        if (rivals) rivals.update && rivals.update(finalDt, player);
-        if (mastery) mastery.update && mastery.update(finalDt, player);
-        if (subLevels) subLevels.update && subLevels.update(finalDt, player);
-        if (collapse) collapse.update && collapse.update(finalDt, player);
-        if (safehouse) safehouse.update && safehouse.update(finalDt);
-        if (bounty) bounty.update && bounty.update(finalDt, player);
-        if (codex) codex.update && codex.update(finalDt, player);
-        if (implants) implants.update && implants.update(finalDt, player);
-        if (legacy) legacy.update && legacy.update(finalDt);
-        if (ngPlus) ngPlus.update && ngPlus.update(finalDt);
-        if (consequences) consequences.update && consequences.update(finalDt);
-        if (debt) debt.update && debt.update(finalDt);
-        if (shop) shop.update && shop.update(finalDt);
-        if (factions) factions.update && factions.update(finalDt);
-        if (familiarity) familiarity.update && familiarity.update(finalDt);
-        if (apexRift) apexRift.update(finalDt);
-        if (nephalemGlory) nephalemGlory.update(finalDt);
-        if (legendaryPowerSystem) legendaryPowerSystem.update(finalDt);
-        if (projectileManager) projectileManager.update(finalDt);
+        updateExpansionSystems({
+            archetype, companion, territory, loyalty, npcSystem, blackout, rivals, mastery,
+            subLevels, collapse, safehouse, bounty, codex, implants, legacy, ngPlus,
+            consequences, debt, shop, factions, familiarity, apexRift, nephalemGlory,
+            legendaryPowerSystem, projectileManager,
+            wanderingVendor, dailyQuestSystem, graffitiCollectible, fastTravel,
+            setBonusSystem, prestigeSystem, trainingDummy, lootVacuum, moddingAPI,
+            exoSuit, player, world
+        }, finalDt);
 
-        // Proxy mine loop
-        if (world._proximityMines) {
-            for (let i = world._proximityMines.length - 1; i >= 0; i--) {
-                const mine = world._proximityMines[i];
-                if (mine.exploded) continue;
-                const drones = world.drones ? world.drones.drones : [];
-                for (const drone of drones) {
-                    if (drone.isDead) continue;
-                    const pos = drone.position || (drone.mesh && drone.mesh.position);
-                    if (pos && pos.distanceTo(mine.mesh.position) < 3) {
-                        mine.exploded = true;
-                        particleEffects.explosion(mine.mesh.position.clone(), 0xff3300, 20);
-                        const hb = new Hitbox(
-                            { position: mine.mesh.position }, 'explosion', { type: 'sphere', radius: 3 }, new THREE.Vector3(0,0,0), 0.3
-                        );
-                        hb.damage = 40; hb.team = 'player';
-                        hitboxSystem.registerHitbox(hb);
-                        scene.remove(mine.mesh);
-                        mine.mesh.geometry.dispose(); mine.mesh.material.dispose();
-                        world._proximityMines.splice(i, 1);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Decoy loop
-        if (world._decoys) {
-            for (const decoy of world._decoys) {
-                if (decoy.isDead || !decoy.mesh) continue;
-                const drones = world.drones ? world.drones.drones : [];
-                for (const drone of drones) {
-                    if (drone._decoyTarget === decoy && !drone.isDead) {
-                        const pos = drone.position || (drone.mesh && drone.mesh.position);
-                        if (pos) {
-                            const dir = decoy.mesh.position.clone().sub(pos).normalize();
-                            drone.group.position.addScaledVector(dir, (drone.speed || 2.5) * finalDt);
-                        }
-                    }
-                }
-            }
-        }
+        updateProxyMines({ world, scene, particleEffects, hitboxSystem }, finalDt);
+        updateDecoys({ world }, finalDt);
 
         // ── Zelda systems update ───────────────────────────────────────────
         // Key-item gates: skip locked subsystems

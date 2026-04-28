@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { Trajectory } from './Trajectory.js';
 import { GrapplingHook } from './GrapplingHook.js';
 import { ComboSystem } from './ComboSystem.js';
+import { WallKickSystem } from './WallKickSystem.js';
+import { SlideJumpSystem } from './SlideJumpSystem.js';
+import { MantleSystem } from './MantleSystem.js';
+import { SlopeGrindSystem } from './SlopeGrindSystem.js';
 
 /**
  * Player Controller States & Transitions
@@ -113,6 +117,10 @@ export class Player {
         // Subsystems
         this.grapplingHook = new GrapplingHook(scene, this, world);
         this.comboSystem = new ComboSystem();
+        this.wallKickSystem = new WallKickSystem(this, this.staminaSystem);
+        this.slideJumpSystem = new SlideJumpSystem(this);
+        this.mantleSystem = new MantleSystem(this);
+        this.slopeGrindSystem = new SlopeGrindSystem(this, null);
 
         // Health / damage system
         this.maxHealth = 100;
@@ -142,6 +150,14 @@ export class Player {
         this._knockbackTimer = 0;
         this._knockbackRecoveryReady = false;
         this._slideTackleTriggered = false;
+        this._wallKickTimer = 0;
+        this._slideJumpTimer = 0;
+        this._isSlideJumping = false;
+        this._mantleTimer = 0;
+        this._tacticalRollBuffer = 0;
+        this._coyoteFlashTimer = 0;
+        this._wasCoyoteFlashing = false;
+        this._perfectDodgeCounter = 0;
 
         // Parkour melee callbacks
         this.onSlideTackle = null;
@@ -186,6 +202,9 @@ export class Player {
         const suitMat = new THREE.MeshStandardMaterial({ color: 0x2266cc, roughness: 0.6 });
         const skinMat = new THREE.MeshStandardMaterial({ color: 0xffccaa, roughness: 0.5 });
         const darkMat = new THREE.MeshStandardMaterial({ color: 0x111133, roughness: 0.7 });
+        this._suitMaterial = suitMat;
+        this._skinMaterial = skinMat;
+        this._darkMaterial = darkMat;
 
         // Torso
         const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.23, 0.65, 8), suitMat);
@@ -323,6 +342,17 @@ export class Player {
             this.coyoteTime = Math.max(0, this.coyoteTime - dt);
         }
 
+        // Coyote jump indicator
+        if (this.coyoteTime > 0 && !this.grounded && this.mesh && this.mesh.material) {
+            const flash = Math.sin(performance.now() * 0.02) * 0.15 + 0.15;
+            this.mesh.material.emissive = this.mesh.material.emissive || new THREE.Color(0x000000);
+            this.mesh.material.emissive.setHex(0xff6600);
+            this.mesh.material.emissiveIntensity = flash;
+        } else if (this.mesh && this.mesh.material && this.mesh.material.emissive && this.mesh.material.emissive.getHex() === 0xff6600) {
+            this.mesh.material.emissive.setHex(0x000000);
+            this.mesh.material.emissiveIntensity = 0;
+        }
+
         if (input.isPressed('Space')) {
             this.jumpBuffer = 0.15;
         } else {
@@ -332,6 +362,11 @@ export class Player {
         this.rollInputTimer = Math.max(0, this.rollInputTimer - dt);
         if (input.isPressed('KeyC') && !this.grounded) {
             this.rollInputTimer = 0.3;
+        }
+
+        this._tacticalRollBuffer = Math.max(0, this._tacticalRollBuffer - dt);
+        if (input.isPressed('KeyC') && !this.grounded) {
+            this._tacticalRollBuffer = 0.15;
         }
 
         this.justLandedTimer = Math.max(0, this.justLandedTimer - dt);
@@ -359,6 +394,10 @@ export class Player {
 
         // Update subsystems
         this.comboSystem.update(dt, this.grounded);
+        this.wallKickSystem.update(dt, input);
+        this.slideJumpSystem.update(dt, input);
+        this.mantleSystem.update(dt, input);
+        this.slopeGrindSystem.update(dt, input);
 
         // Passive health regen
         if (this._regenPerSecond > 0 && this.health < this.maxHealth && !this.isDead) {
@@ -430,13 +469,25 @@ export class Player {
             case 'PLATFORM_GRAB':
                 this.updatePlatformGrab(dt, input);
                 break;
+            case 'WALLKICK':
+                this.updateWallKick(dt);
+                break;
+            case 'SLIDE_JUMP':
+                this.updateSlideJump(dt, input);
+                break;
+            case 'MANTLE':
+                this.updateMantle(dt);
+                break;
+            case 'GRIND':
+                this.updateGrind(dt, input);
+                break;
         }
 
         // Apply gravity (skip special states)
         if (!this.grounded && this.state !== 'CLIMB' && this.state !== 'VAULT' && this.state !== 'HANG' &&
             this.state !== 'GRAPPLE_AIM' && this.state !== 'GRAPPLE_SWING' && this.state !== 'GRAPPLE_RETRACT' &&
             this.state !== 'DIVE_KICK' && this.state !== 'GROUND_POUND' &&
-            this.state !== 'CEILING_RUN') {
+            this.state !== 'CEILING_RUN' && this.state !== 'WALLKICK' && this.state !== 'MANTLE') {
             this.velocity.y += this.GRAVITY * dt;
             this.velocity.y = Math.max(this.velocity.y, -25);
         }
@@ -444,8 +495,8 @@ export class Player {
         // Apply velocity to position
         this.position.add(this.velocity.clone().multiplyScalar(dt));
 
-        // Collision resolution (skip vault and ragdoll)
-        if (this.state !== 'VAULT' && this.state !== 'RAGDOLL') {
+        // Collision resolution (skip vault, ragdoll and mantle)
+        if (this.state !== 'VAULT' && this.state !== 'RAGDOLL' && this.state !== 'MANTLE') {
             this.resolveCollisions();
         }
 
@@ -454,7 +505,7 @@ export class Player {
 
         // Ground state transitions
         if (this.grounded) {
-            if (this.state === 'JUMP' || this.state === 'FALL') {
+            if (this.state === 'JUMP' || this.state === 'FALL' || this.state === 'SLIDE_JUMP') {
                 this.tryRollLanding();
                 if (this.state !== 'ROLL' && this.state !== 'STUMBLE') {
                     this.state = 'IDLE';
@@ -465,7 +516,7 @@ export class Player {
                 }
             }
         } else {
-            if (['IDLE', 'WALK', 'SPRINT', 'CROUCH'].includes(this.state)) {
+            if (['IDLE', 'WALK', 'SPRINT', 'CROUCH', 'GRIND'].includes(this.state)) {
                 this.state = 'FALL';
             }
         }
@@ -1170,6 +1221,11 @@ export class Player {
 
     tryRollLanding() {
         const fallDist = this.fallStartY - this.position.y;
+        if (this._tacticalRollBuffer > 0) {
+            this.startRoll();
+            this._tacticalRollBuffer = 0;
+            return;
+        }
         if (fallDist > this.MIN_FALL_FOR_ROLL) {
             if (this.rollInputTimer > 0) {
                 this.startRoll();
@@ -1352,6 +1408,49 @@ export class Player {
             this.state = 'FALL';
             this.platformGrabData = null;
             this._platformShieldActive = false;
+        }
+    }
+
+    updateWallKick(dt) {
+        this._wallKickTimer -= dt;
+        if (this._wallKickTimer <= 0) {
+            this.state = 'FALL';
+        }
+    }
+
+    updateSlideJump(dt, input) {
+        this._slideJumpTimer -= dt;
+        this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, this.HEIGHT_SLIDE, dt * 10);
+        const airControl = 8;
+        const moveDir = this.getMoveDir(input, this.facing);
+        const airSpeed = this.SPEED_SPRINT * 1.2;
+        const targetVel = moveDir.multiplyScalar(airSpeed);
+        this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVel.x, dt * airControl);
+        this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVel.z, dt * airControl);
+        if (this._slideJumpTimer <= 0) {
+            this._isSlideJumping = false;
+            this.state = 'JUMP';
+        }
+    }
+
+    updateMantle(dt) {
+        if (!this.mantleSystem.isMantling()) {
+            this.state = 'IDLE';
+            this.isInvincible = false;
+        }
+    }
+
+    updateGrind(dt, input) {
+        this.currentHeight = THREE.MathUtils.lerp(this.currentHeight, this.HEIGHT_SLIDE, dt * 10);
+        if (this.jumpBuffer > 0) {
+            this.jumpBuffer = 0;
+            this.state = 'JUMP';
+            this.velocity.y = this.JUMP_FORCE * 0.8;
+            this.slopeGrindSystem._stopGrind();
+        }
+        if (!input.isPressed('KeyC')) {
+            this.slopeGrindSystem._stopGrind();
+            this.state = 'IDLE';
         }
     }
 
@@ -1541,6 +1640,10 @@ export class Player {
         for (const obj of this.world.collidables) {
             const box = obj.userData.bbox || new THREE.Box3().setFromObject(obj);
             if (!this.checkAABBCollision(playerMin, playerMax, box)) continue;
+            if (this.mantleSystem.checkMantleTrigger(obj, box, playerMin, playerMax)) {
+                this.mantleSystem.startMantle(box.max.y);
+                return;
+            }
             this.resolveCollision(playerMin, playerMax, box);
         }
 
@@ -1609,7 +1712,7 @@ export class Player {
 
     checkGround() {
         if (this.state === 'CLIMB' || this.state === 'VAULT' || this.state === 'HANG' || this.state === 'RAGDOLL' ||
-            this.state === 'CEILING_RUN' || this.state === 'PLATFORM_GRAB') {
+            this.state === 'CEILING_RUN' || this.state === 'PLATFORM_GRAB' || this.state === 'MANTLE') {
             this.grounded = false;
             return;
         }
@@ -1722,7 +1825,7 @@ export class Player {
             this.rightArm.rotation.x = -2.5;
             this.leftArm.rotation.z = 0.2;
             this.rightArm.rotation.z = -0.2;
-        } else if (this.state === 'SLIDE' || this.state === 'ROLL') {
+        } else if (this.state === 'SLIDE' || this.state === 'ROLL' || this.state === 'SLIDE_JUMP' || this.state === 'GRIND') {
             this.leftArm.rotation.x = -1;
             this.rightArm.rotation.x = -1;
             this.leftArm.rotation.z = 0.5;
@@ -1730,7 +1833,7 @@ export class Player {
         } else if (this.state === 'RAGDOLL') {
             this.leftArm.rotation.x += Math.sin(time * 3) * dt * 5;
             this.rightArm.rotation.x += Math.cos(time * 3) * dt * 5;
-        } else if (this.state === 'STUMBLE') {
+        } else if (this.state === 'STUMBLE' || this.state === 'MANTLE' || this.state === 'WALLKICK') {
             this.leftArm.rotation.x = 0.5;
             this.rightArm.rotation.x = -0.5;
         } else if (this.state === 'GRAPPLE_AIM' || this.state === 'GRAPPLE_SWING' || this.state === 'GRAPPLE_RETRACT') {
@@ -1755,7 +1858,7 @@ export class Player {
             const legBob = Math.sin(time * (this.state === 'SPRINT' ? 1.8 : 1.2)) * 0.4;
             this.leftLeg.rotation.x = -legBob;
             this.rightLeg.rotation.x = legBob;
-        } else if (this.state === 'SLIDE' || this.state === 'ROLL') {
+        } else if (this.state === 'SLIDE' || this.state === 'ROLL' || this.state === 'SLIDE_JUMP' || this.state === 'GRIND') {
             this.leftLeg.rotation.x = -1.3;
             this.rightLeg.rotation.x = -1.3;
         } else if (this.state === 'RAGDOLL') {
@@ -1791,6 +1894,16 @@ export class Player {
             this.bunnyHopFlashMesh.material.opacity = 0;
         }
 
+        if (this._coyoteFlashTimer > 0) {
+            this._suitMaterial.emissive.setHex(0xff6600);
+            this._suitMaterial.emissiveIntensity = 0.6;
+            this._wasCoyoteFlashing = true;
+        } else if (this._wasCoyoteFlashing) {
+            this._suitMaterial.emissive.setHex(0x000000);
+            this._suitMaterial.emissiveIntensity = 0;
+            this._wasCoyoteFlashing = false;
+        }
+
         this.shadow.position.set(this.position.x, 0.02, this.position.z);
         const shadowScale = 1 - Math.min(this.position.y * 0.08, 0.8);
         this.shadow.scale.setScalar(Math.max(0.2, shadowScale));
@@ -1814,6 +1927,12 @@ export class Player {
         this.grapplingHook._release();
         this.ticTacCount = 0;
         this.ticTacLastSide = null;
+        this._isSlideJumping = false;
+        this._wallKickTimer = 0;
+        this.wallKickSystem.reset();
+        this.slideJumpSystem.reset();
+        this.mantleSystem.reset();
+        this.slopeGrindSystem.reset();
     }
 
     getStateDisplay() {
@@ -1834,7 +1953,11 @@ export class Player {
             'RAGDOLL': 'RAGDOLL',
             'GRAPPLE_AIM': 'GRAPPLE AIM',
             'GRAPPLE_SWING': 'GRAPPLE SWING',
-            'GRAPPLE_RETRACT': 'GRAPPLE RETRACT'
+            'GRAPPLE_RETRACT': 'GRAPPLE RETRACT',
+            'WALLKICK': 'WALL KICK',
+            'SLIDE_JUMP': 'SLIDE JUMPING',
+            'MANTLE': 'MANTLING',
+            'GRIND': 'GRINDING'
         };
         return names[this.state] || this.state;
     }
@@ -2052,6 +2175,12 @@ export class Player {
         this.health = this.maxHealth + this._respawnHPBonus;
         this.state = 'IDLE';
         this.velocity.set(0, 0, 0);
+        this._isSlideJumping = false;
+        this._wallKickTimer = 0;
+        this.wallKickSystem.reset();
+        this.slideJumpSystem.reset();
+        this.mantleSystem.reset();
+        this.slopeGrindSystem.reset();
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
             window.audioManager.playSFX('respawn');
         }

@@ -24,6 +24,7 @@ export class CombatSystem {
         this.damageSystem = damageSystem;
         this.camera = camera;
         this.audio = audio;
+        this.overclockActive = false;
 
         this.state = COMBO_STATES.IDLE;
         this.stateTimer = 0;
@@ -200,7 +201,8 @@ export class CombatSystem {
         const offset = dir.clone().multiplyScalar(isHeavy ? 1.0 : 0.7);
         offset.y = 0.5;
 
-        const radius = isHeavy ? 1.4 : 0.9;
+        const ocMult = this.overclockActive ? 1.5 : 1.0;
+        const radius = (isHeavy ? 1.4 : 0.9) * ocMult;
         const damage = isFinisher ? 45 : (isHeavy ? 35 : 15);
         const duration = 0.12;
 
@@ -224,7 +226,7 @@ export class CombatSystem {
     /* ------------------------------------------------------------------ */
 
     triggerHitStop(duration = 0.06) {
-        this.hitStopTimer = duration;
+        this.hitStopTimer = this.overclockActive ? duration + 0.03 : duration;
         if (window.audioManager && typeof window.audioManager.playSFX === 'function') {
             const pos = this.player ? this.player.position : null;
             window.audioManager.playSFX('hit_stop', pos);
