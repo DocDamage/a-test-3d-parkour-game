@@ -181,6 +181,56 @@
             pointer-events: none;
         }
 
+        /* ─── Souls HUD (vials + echo shards) ───────────── */
+        #souls-hud {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            pointer-events: none;
+            z-index: 14;
+        }
+        #vials-row, #shards-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0,0,0,0.55);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 5px 10px;
+        }
+        #vial-icon   { font-size: 14px; }
+        #shard-icon  { font-size: 14px; color: #00ccff; }
+        .vial-pip {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #33ff99;
+            box-shadow: 0 0 5px #00cc66;
+            margin: 0 2px;
+        }
+        .vial-pip-empty {
+            background: #1a1a1a;
+            box-shadow: none;
+            border: 1px solid #444;
+        }
+        .souls-hint {
+            font-size: 10px;
+            color: #555;
+            border: 1px solid #333;
+            border-radius: 3px;
+            padding: 1px 4px;
+        }
+        #shards-count { font-size: 13px; color: #00ccff; font-weight: bold; }
+        #shards-beacon { font-size: 12px; color: #ffcc44; animation: beaconPulse 1s ease-in-out infinite; }
+        @keyframes beaconPulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.4; }
+        }
+
         #crosshair {
             position: fixed;
             top: 50%;
@@ -1871,6 +1921,7 @@
             <span>]</span> Inventory (Consumables)<br>
             <span>F12</span> Photo Mode<br>
             <span>V</span> Runner Vision<br>
+            <span>X</span> Use Healing Vial<br>
             <span>1-4</span> Speedrun ILs (Rooftop/Freezer/Server/Hangar)<br>
             <span>F1</span> Level Editor<br>
             <span>B</span> Boss Fight<br>
@@ -1975,6 +2026,20 @@
         <span class="sk-icon">⬡</span>
         <span id="sector-key-count">0 / 7</span>
         <span style="color:#888;font-size:11px;text-shadow:0 1px 4px rgba(0,0,0,0.9);">Sector Keys</span>
+    </div>
+
+    <!-- Souls-like HUD: healing vials + echo shards -->
+    <div id="souls-hud">
+        <div id="vials-row">
+            <span id="vial-icon">🧪</span>
+            <span id="vial-pips"></span>
+            <span id="vial-hint" class="souls-hint">X</span>
+        </div>
+        <div id="shards-row">
+            <span id="shard-icon">◈</span>
+            <span id="shards-count">0</span>
+            <span id="shards-beacon" style="display:none;" title="Echo beacon — recover your lost shards!"> ↺<span id="shards-beacon-count">0</span></span>
+        </div>
     </div>
 
     <!-- Dungeon HUD (shown when inside a dungeon) -->
@@ -2478,6 +2543,10 @@
     <!-- RPG Safehouse Panel -->
     <div id="safehouse-panel">
         <h2 style="position:relative;">Safehouse <span class="panel-close" onclick="document.getElementById('safehouse-panel').style.display='none'">×</span></h2>
+        <button id="btn-safehouse-rest" style="width:100%;padding:10px 0;margin-bottom:12px;background:#1a3a2a;border:1px solid #00cc66;color:#00ff88;font-size:14px;font-weight:bold;border-radius:6px;cursor:pointer;">
+            🔥 Rest &amp; Recover
+            <div style="font-size:11px;color:#888;font-weight:normal;margin-top:3px;">Refills vials · Saves game · Respawns enemies</div>
+        </button>
         <div id="safehouse-upgrades"></div>
     </div>
 

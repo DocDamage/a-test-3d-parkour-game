@@ -502,6 +502,29 @@ class Drone {
         setTimeout(() => { if (this.group) this.group.visible = false; }, 2000);
     }
 
+    /** Revive this drone in place (called by DroneAI.respawnAll on safehouse rest). */
+    respawn() {
+        this.isDead        = false;
+        this.state         = 'PATROL';
+        this.health        = this.maxHealth;
+        this.caught        = false;
+        this.detection     = 0;
+        this.currentIndex  = 0;
+        this._feared       = false;
+        this._disabled     = false;
+        this._hackExpiry   = 0;
+        this._ethereal     = false;
+        this._smokeBlind   = false;
+        this._decoyTarget  = null;
+        if (this.group) {
+            this.group.visible = true;
+            this.group.position.copy(this.waypoints[0]);
+        }
+        if (this.body && this.body.material) {
+            this.body.material.emissive.setHex(0x0044aa);
+        }
+    }
+
     getHealthPercent() {
         return this.maxHealth > 0 ? this.health / this.maxHealth : 0;
     }
@@ -548,6 +571,11 @@ export class DroneAI {
         for (const drone of this.drones) {
             drone.update(dt, this.player);
         }
+    }
+
+    /** Revive all drones — call on safehouse rest. */
+    respawnAll() {
+        for (const d of this.drones) d.respawn();
     }
 
     /** Returns every drone Group for debug / collision inspection. */

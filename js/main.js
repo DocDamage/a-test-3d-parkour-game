@@ -117,6 +117,7 @@ import { ShopSystem } from './ShopSystem.js';
 import { BottleSystem } from './BottleSystem.js';
 import { OverworldMap } from './OverworldMap.js';
 import { SaveSystem } from './SaveSystem.js';
+import { SoulsSystem } from './SoulsSystem.js';
 import { DamageNumbers } from './DamageNumbers.js';
 import { UIManager } from './UIManager.js';
 import { MenuNavigator } from './MenuNavigator.js';
@@ -201,6 +202,10 @@ ctx.register('player', ['scene', 'world', 'camera', 'audio'], () => player);
 // Unified save system
 const saveSystem = new SaveSystem();
 ctx.register('saveSystem', [], () => saveSystem);
+
+// Souls-like risk layer (echo shards + healing vials + safehouse rest)
+const soulsSystem = new SoulsSystem(scene, player);
+ctx.register('soulsSystem', ['scene', 'player'], () => soulsSystem);
 
 // RPG Phase 1 systems
 const characterSheet = new CharacterSheet(player);
@@ -579,6 +584,11 @@ function _handleEnemyKilled(enemy, source) {
     if (collapse && collapse._inRun) collapse.onEnemyKilled(enemy);
     // Legendary powers
     if (legendaryPowerSystem) legendaryPowerSystem.onEnemyKilled(enemy);
+    // Echo Shards (souls-like currency)
+    if (soulsSystem) {
+        const shards = SoulsSystem.getShardYield(enemy.type || 'drone', enemy.isElite);
+        soulsSystem.addShards(shards);
+    }
     // Loot drop with difficulty scaling
     const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
     const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId);
@@ -963,6 +973,41 @@ saveSystem.onSave = (meta) => {
     saveSystem._toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2500);
 };
 
+// ── Souls system callbacks ─────────────────────────────────────────────────
+soulsSystem.onRest = () => {
+    // Respawn all patrol drones
+    world.drones.respawnAll();
+    // Save the game
+    saveSystem.save();
+};
+
+soulsSystem.onShardChange = (carried, beacon) => {
+    const el = document.getElementById('shards-count');
+    if (el) el.textContent = carried.toLocaleString();
+    const beaconEl = document.getElementById('shards-beacon');
+    if (beaconEl) beaconEl.style.display = beacon > 0 ? 'inline' : 'none';
+    const beaconCount = document.getElementById('shards-beacon-count');
+    if (beaconCount) beaconCount.textContent = beacon.toLocaleString();
+};
+
+soulsSystem.onVialChange = (current, max) => {
+    const container = document.getElementById('vial-pips');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let i = 0; i < max; i++) {
+        const pip = document.createElement('span');
+        pip.className = 'vial-pip' + (i < current ? '' : ' vial-pip-empty');
+        container.appendChild(pip);
+    }
+};
+
+// Trigger initial HUD render
+soulsSystem.onVialChange(soulsSystem.vials, soulsSystem.maxVials);
+soulsSystem.onShardChange(soulsSystem.carriedShards, soulsSystem._beaconShards);
+
+// Register SoulsSystem with save system
+autoRegister('soulsSystem', soulsSystem);
+
 // ── Zelda-style systems ────────────────────────────────────────────────────
 // Heart containers replace the numeric health bar (3 hearts = 12 HP to start)
 const heartSystem = new HeartContainerSystem(player);
@@ -1212,6 +1257,18 @@ document.getElementById('death-respawn').addEventListener('click', () => {
     document.body.requestPointerLock();
 });
 
+// Safehouse "Rest" button
+const btnRest = document.getElementById('btn-safehouse-rest');
+if (btnRest) {
+    btnRest.addEventListener('click', () => {
+        soulsSystem.rest();
+        // Close the panel after resting
+        const sp = document.getElementById('safehouse-panel');
+        if (sp) sp.style.display = 'none';
+        document.body.requestPointerLock();
+    });
+}
+
 // Handle resize
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1323,6 +1380,8 @@ function animate() {
             if (deathScreen && deathScreen.style.display !== 'flex') {
                 deathScreen.style.display = 'flex';
                 if (document.pointerLockElement) document.exitPointerLock();
+                // Drop echo shards at death position
+                if (soulsSystem) soulsSystem.onPlayerDeath(player.position);
             }
             gameOver = true;
         } else {
@@ -1335,6 +1394,11 @@ function animate() {
             if (activeInput.wasPressed('Mouse2')) skillSystem.useSkill('RMB');
             if (activeInput.wasPressed('KeyE') && player.state !== 'CLIMB' && player.state !== 'HANG') skillSystem.useSkill('E');
             if (activeInput.wasPressed('KeyR')) skillSystem.useSkill('R');
+        }
+
+        // === HEALING VIAL (X) ===
+        if (soulsSystem && activeInput.wasPressed('KeyX') && !player.isDead) {
+            soulsSystem.useVial();
         }
 
         // === UNIFIED INPUT DISPATCHERS ===
@@ -1584,6 +1648,9 @@ function animate() {
         
         // Update collectibles
         world.collectibles.update(finalDt, player);
+
+        // Update souls system (echo beacon animation + pickup proximity)
+        soulsSystem.update(finalDt);
         
         // Update decals
         decalSystem.update(finalDt, player);
