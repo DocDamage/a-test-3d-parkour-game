@@ -540,6 +540,7 @@ export class DroneAI {
         this.player = player;
         this.drones = [];
         this._damageSystem = null;
+        this.openingGraceTimer = 0;
     }
 
     /** Wire up the player reference (called from World.setPlayer). */
@@ -567,7 +568,32 @@ export class DroneAI {
         return drone;
     }
 
+    setOpeningGrace(seconds = 12) {
+        this.openingGraceTimer = Math.max(this.openingGraceTimer, seconds);
+        for (const drone of this.drones) {
+            drone.state = 'PATROL';
+            drone.detection = 0;
+            drone.timeInCone = 0;
+            drone.caught = false;
+            drone.attackCooldown = Math.max(drone.attackCooldown || 0, seconds);
+            drone.rangedCooldown = Math.max(drone.rangedCooldown || 0, seconds);
+        }
+    }
+
     update(dt) {
+        if (this.openingGraceTimer > 0) {
+            this.openingGraceTimer = Math.max(0, this.openingGraceTimer - dt);
+            for (const drone of this.drones) {
+                if (drone.isDead) continue;
+                drone.detection = 0;
+                drone.timeInCone = 0;
+                drone.caught = false;
+                drone.state = 'PATROL';
+                drone.updatePatrol(dt);
+                drone.updateVisuals();
+            }
+            return;
+        }
         for (const drone of this.drones) {
             drone.update(dt, this.player);
         }

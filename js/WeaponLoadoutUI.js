@@ -113,7 +113,7 @@ export class WeaponLoadoutUI {
      * If current slot is occupied by a pool weapon, swap it back to pool and equip next.
      */
     _cycleSlot(slotId) {
-        const pool = this._ws.getUnlocked();
+        const pool = this._ws.getUnlocked().filter(w => !w.slot || Number(w.slot) === Number(slotId));
         if (pool.length === 0) return;
 
         const current = this._ws.getWeapon(slotId);

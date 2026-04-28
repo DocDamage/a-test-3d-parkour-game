@@ -124,10 +124,11 @@ export class WeaponSystem {
 
     equip(weapon, slot) {
         if (!weapon || !slot) return false;
-        this.slots.set(slot, {
-            ...weapon,
-            mods: weapon.mods || [],
-        });
+        weapon.mods = weapon.mods || [];
+        this.slots.set(slot, weapon);
+        const equipped = this.slots.get(slot);
+        this._primeAmmoForWeapon(equipped);
+        this._updateUI();
         return true;
     }
 
@@ -226,6 +227,10 @@ export class WeaponSystem {
                 this._fireMelee(result, origin, direction);
             } else if (result.type === 'projectile') {
                 this._fireProjectile(result, origin, direction);
+            } else if (result.type === 'hitscan') {
+                this._fireHitscan(result, origin, direction);
+            } else if (result.type === 'rocket') {
+                this._fireRocket(result, origin, direction);
             }
         }
 
@@ -353,7 +358,7 @@ export class WeaponSystem {
     _fireProjectile(weapon, origin, direction) {
         if (!this.projectileManager) return;
         const eff = this._getEffectiveStats();
-        const speed = eff ? eff.projectileSpeed : (weapon.projectileSpeed || 40);
+        const speed = weapon.speed || (eff ? eff.projectileSpeed : (weapon.projectileSpeed || 40));
         const range = eff ? eff.range : (weapon.range || 30);
         const damage = eff ? eff.damage : (weapon.damage || 20);
         const spread = eff ? eff.spread : (weapon.spread || 0);
@@ -374,10 +379,33 @@ export class WeaponSystem {
             damage,
             damageType: weapon.damageType || 'kinetic',
             color: weapon.color || 0xffffff,
+            piercing: weapon.piercing || false,
             onHit: (target) => {
                 if (target && target.takeDamage) {
                     target.takeDamage(damage, weapon.damageType || 'kinetic', this.player);
                 }
+            }
+        });
+    }
+
+    _fireRocket(weapon, origin, direction) {
+        if (!this.projectileManager) return;
+        const eff = this._getEffectiveStats();
+        const speed = weapon.speed || weapon.projectileSpeed || (eff ? eff.projectileSpeed : 35);
+        const range = eff ? eff.range : (weapon.range || 40);
+        const damage = eff ? eff.damage : (weapon.damage || 80);
+        const blastRadius = weapon.blastRadius || weapon.projectile?.blastRadius || 4;
+        const damageType = weapon.damageType || 'explosive';
+
+        this.projectileManager.fire(origin, direction.clone().normalize(), {
+            speed,
+            range,
+            radius: 0.22,
+            damage,
+            damageType,
+            color: weapon.color || 0xff5500,
+            onHit: (target) => {
+                this._applySplashDamage(target, damage, damageType, blastRadius);
             }
         });
     }
@@ -421,6 +449,40 @@ export class WeaponSystem {
         this.isReloading = false;
         this._exitReloadState();
         this._updateUI();
+    }
+
+    _primeAmmoForWeapon(weapon) {
+        if (!weapon || !weapon.ammoType || !this.ammo[weapon.ammoType]) return;
+        const ammo = this.ammo[weapon.ammoType];
+        const clipSize = Math.max(1, Math.round(weapon.clipSize || 1));
+        if (ammo.clip <= 0 && ammo.reserve <= 0) {
+            ammo.clip = clipSize;
+            ammo.reserve = clipSize * 3;
+            return;
+        }
+        ammo.clip = Math.min(Math.max(ammo.clip, 1), clipSize);
+    }
+
+    _applySplashDamage(primaryTarget, damage, damageType, blastRadius) {
+        const hit = new Set();
+        if (primaryTarget && primaryTarget.takeDamage) {
+            primaryTarget.takeDamage(damage, damageType, this.player);
+            hit.add(primaryTarget);
+        }
+
+        const world = this.projectileManager?.world;
+        const origin = primaryTarget?.position || primaryTarget?.mesh?.position || null;
+        if (!world || !origin) return;
+        const drones = world.drones?.drones || [];
+        for (const drone of drones) {
+            if (!drone || drone.isDead || hit.has(drone)) continue;
+            const pos = drone.position || drone.mesh?.position;
+            if (!pos) continue;
+            const dist = pos.distanceTo(origin);
+            if (dist > blastRadius) continue;
+            const falloff = Math.max(0.25, 1 - dist / Math.max(0.1, blastRadius));
+            if (drone.takeDamage) drone.takeDamage(damage * falloff, damageType, this.player);
+        }
     }
 
     _enterReloadState() {

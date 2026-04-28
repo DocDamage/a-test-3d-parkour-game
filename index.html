@@ -1878,6 +1878,25 @@
         .controller-prompt.prompt-switch { color: #ff3b30; }
     </style>
     <script>
+        window.addEventListener('error', function (event) {
+            var progress = document.getElementById('loading-progress');
+            if (progress) {
+                progress.textContent = 'Startup error: ' + (event.message || 'unknown error');
+                progress.style.color = '#ff6666';
+            }
+            var spinner = document.querySelector('.loading-spinner');
+            if (spinner) spinner.style.display = 'none';
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+            var reason = event.reason && (event.reason.message || event.reason);
+            var progress = document.getElementById('loading-progress');
+            if (progress) {
+                progress.textContent = 'Startup error: ' + (reason || 'unhandled promise rejection');
+                progress.style.color = '#ff6666';
+            }
+            var spinner = document.querySelector('.loading-spinner');
+            if (spinner) spinner.style.display = 'none';
+        });
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
@@ -1977,7 +1996,7 @@
     <div id="start-screen">
         <h1 id="start-title">Vertical Parkour ARPG</h1>
         <p id="start-welcome">Click anywhere to start</p>
-        <div class="click-hint">Mouse to look • WASD to move • Space to jump/climb</div>
+        <div class="click-hint">Mouse to look • WASD to move • Space to jump/climb • Z camera</div>
         <button id="btn-start-settings" style="margin-top:10px;">Settings</button>
         <div class="cc-new-runner-link" id="btn-new-runner">New Runner</div>
     </div>
@@ -2624,10 +2643,10 @@
         </div>
     </div>
 
-    <!-- RPG Stash Panel -->
+    <!-- RPG Backpack Panel -->
     <div id="stash-panel">
-        <h2 style="position:relative;">Stash <span class="panel-close" onclick="document.getElementById('stash-panel').style.display='none'">×</span></h2>
-        <div id="stash-count">0 / 20</div>
+        <h2 style="position:relative;">Backpack <span class="panel-close" onclick="document.getElementById('stash-panel').style.display='none'">×</span></h2>
+        <div id="stash-count">0 items | Infinite backpack</div>
         <div id="stash-list"></div>
     </div>
 
@@ -2918,7 +2937,7 @@
         <button id="pause-quit">Quit to Main Menu</button>
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/main.js?v=20260428-proc-weapons-2"></script>
     <div id="credits-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);color:#fff;z-index:9999;padding:40px;overflow-y:auto;">
         <h2>Credits</h2>
         <p>Built with <a href="https://threejs.org" target="_blank" style="color:#4fc3f7">Three.js</a> (MIT License)</p>

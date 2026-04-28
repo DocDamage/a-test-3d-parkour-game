@@ -1,27 +1,32 @@
+import { createProceduralWeaponAdapter } from './ProceduralWeaponAdapter.js';
+
 export class InventoryStash {
   constructor(player, exoSuitSystem, characterSheet) {
     this.player = player;
     this.exoSuit = exoSuitSystem;
     this.characterSheet = characterSheet;
     this.gemSystem = null;
+    this.weaponSystem = null;
+    this.scene = null;
     this.stash = [];
-    this.maxSize = 20;
+    this.maxSize = Infinity;
     this.deserialize();
   }
 
   acquireItem(item) {
     if (!item) return false;
-    if (this.stash.length >= this.maxSize) {
-      window.__DEV__ && console.warn('[Stash] Full — cannot acquire', item.name || 'item');
-      return false;
-    }
-    this.stash.push(item);
+    this.stash.push({ ...item });
     this.serialize();
     return true;
   }
 
   setGemSystem(gemSystem) {
     this.gemSystem = gemSystem;
+  }
+
+  setWeaponSystem(weaponSystem, scene = null) {
+    this.weaponSystem = weaponSystem;
+    this.scene = scene;
   }
 
   identifyItem(index) {
@@ -80,6 +85,7 @@ export class InventoryStash {
     if (index < 0 || index >= this.stash.length) return false;
     const item = this.stash[index];
     if (item.unidentified && !item.identified) return false;
+    if (item.itemType === 'weapon') return this._equipWeaponFromBackpack(index, item);
     if (!this.exoSuit) return false;
     const previous = this.exoSuit.equip(item);
     this.stash.splice(index, 1);
@@ -113,21 +119,57 @@ export class InventoryStash {
     try {
       localStorage.setItem('apex_inventory_stash', JSON.stringify(this.stash));
     } catch (e) { /* ignore */ }
+    return {
+      maxSize: null,
+      stash: this.stash
+    };
   }
 
-  deserialize() {
+  deserialize(data = null) {
     try {
-      const raw = localStorage.getItem('apex_inventory_stash');
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (Array.isArray(data)) this.stash = data;
+      if (data && Array.isArray(data.stash)) {
+        this.stash = data.stash;
+        return;
       }
+      if (Array.isArray(data)) {
+        this.stash = data;
+        return;
+      }
+      const raw = localStorage.getItem('apex_inventory_stash');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) this.stash = parsed;
+      else if (parsed && Array.isArray(parsed.stash)) this.stash = parsed.stash;
     } catch (e) { /* ignore */ }
   }
 
   _scrapValue(item) {
+    if (item?.itemType === 'weapon') {
+      const values = { common: 2, uncommon: 4, rare: 7, epic: 12, legendary: 20 };
+      return values[item.rarity] || Math.max(2, Math.floor((item.itemPower || item.gearScore || 100) / 100));
+    }
     const rarity = item.rarity || 1;
     const values = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 5, 6: 8, 7: 10 };
     return values[rarity] || 1;
+  }
+
+  _equipWeaponFromBackpack(index, item) {
+    if (!this.weaponSystem) return false;
+    const weapon = createProceduralWeaponAdapter(item, this.scene, this.player);
+    const slot = item.slot || weapon.slot;
+    const previous = this.weaponSystem.getWeapon(slot);
+    if (!this.weaponSystem.equip(weapon, slot)) {
+      weapon.dispose?.();
+      return false;
+    }
+    this.weaponSystem.registerUnlocked(weapon);
+    this.weaponSystem.switchSlot(slot);
+    this.stash.splice(index, 1);
+    if (previous?.isProceduralWeapon && typeof previous.toItemData === 'function') {
+      previous.dispose?.();
+      this.stash.push(previous.toItemData());
+    }
+    this.serialize();
+    return true;
   }
 }

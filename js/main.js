@@ -42,6 +42,7 @@ import { StatusEffectSystem } from './StatusEffectSystem.js';
 import { EnemyManager } from './EnemyManager.js';
 import { WeaponSystem, WEAPON_SLOTS } from './WeaponSystem.js';
 import { WeaponModSystem } from './WeaponModSystem.js';
+import { ProceduralWeaponSystem } from './ProceduralWeaponSystem.js';
 import { ArenaMode } from './ArenaMode.js';
 import { BossFabricator } from './bosses/BossFabricator.js';
 import { BossWarden } from './bosses/BossWarden.js';
@@ -363,6 +364,13 @@ const weaponSystem = new WeaponSystem(player, scene, hitboxSystem, projectileMan
 ctx.register('weaponSystem', ['player', 'scene', 'hitboxSystem', 'projectileManager'], () => weaponSystem);
 const weaponModSystem = new WeaponModSystem();
 ctx.register('weaponModSystem', [], () => weaponModSystem);
+const proceduralWeaponSystem = new ProceduralWeaponSystem({ defaultLevel: 10 });
+ctx.register('proceduralWeaponSystem', [], () => proceduralWeaponSystem);
+lootSystem.setProceduralWeaponSystem(proceduralWeaponSystem);
+inventoryStash.setWeaponSystem(weaponSystem, scene);
+if (__DEV__) {
+    window.proceduralWeaponSystem = proceduralWeaponSystem;
+}
 weaponSystem.setModSystem(weaponModSystem);
 weaponSystem.setFamiliaritySystem(familiarity);
 // Pre-equip demo mods on starter loadout
@@ -946,9 +954,16 @@ projectileManager.setInteractiveEnvironment(interEnv);
 const ziplineGun = new ZiplineGun(scene, player, world);
 
 // Advanced drones
-const sniperDrone = new SniperDrone(scene, world, player, { grapplingHook: player.grapplingHook });
-const swarmDrone = new SwarmDrone(scene, world, player);
-const hunterDrone = new HunterDrone(scene, world, player);
+const sniperDrone = new SniperDrone(scene, world, player, {
+    grapplingHook: player.grapplingHook,
+    position: new THREE.Vector3(18, 12, 18),
+    activationDelay: 20.0
+});
+const swarmDrone = new SwarmDrone(scene, world, player, {
+    position: new THREE.Vector3(-18, 6, 18),
+    activationDelay: 20.0
+});
+const hunterDrone = new HunterDrone(scene, world, player, { spawnDelay: 180.0 });
 
 // Director mode
 const directorMode = new DirectorMode();
@@ -1175,7 +1190,7 @@ const uiManager = new UIManager({
     heartSystem, dungeonSystem, exoSuit, companion, loyalty,
     factions, safehouse, bounty, codex, mastery, implants,
     resourceSystem, dialogueSystem, shop, passiveTree, keyItems, risingTide,
-    inventoryStash, gemSystem
+    inventoryStash, gemSystem, weaponSystem
 });
 uiManager.createMiniBossBars(miniBosses);
 uiManager.createManaBar();
@@ -1278,6 +1293,11 @@ function enterGameplay() {
     if (!gameStarted) {
         gameStarted = true;
         gameDirector.start();
+        world.drones?.setOpeningGrace?.(14);
+        player.isInvincible = true;
+        clearTimeout(player._invincibilityTimer);
+        player._invincibilityTimer = setTimeout(() => { player.isInvincible = false; }, 6000);
+        showHint('Safe start: get your bearings, then move when ready.');
     }
     startScreen.style.display = 'none';
     if (paused) {
@@ -1511,6 +1531,7 @@ function animate() {
         const activeInput = (gamepad.gamepad) ? gamepad : input;
         activeInput.preUpdate(); // sole source of truth — Player.js must NOT call this too
         const mouseDelta = activeInput.consumeMouse();
+        applyKeyboardCameraLook(activeInput, mouseDelta, dt);
 
         // Menu navigation (gamepad/keyboard focus)
         if (typeof menuNavigator !== 'undefined' && menuNavigator) {
@@ -1537,6 +1558,13 @@ function animate() {
             dt = 0;
             postProcessing.render(dt, 0);
             return;
+        }
+
+        if (activeInput.wasPressed('KeyZ') && !levelEditor.isActive()) {
+            const reverseCameraCycle = activeInput.isPressed('ShiftLeft') || activeInput.isPressed('ShiftRight');
+            const label = tpc.cycleMode(reverseCameraCycle ? -1 : 1);
+            showHint(`Camera: ${label}`);
+            activeInput.consumeKey('KeyZ');
         }
         
         // === EDITOR MODE TOGGLE (F1) ===
@@ -2073,13 +2101,29 @@ function animate() {
     }
 }
 
+function applyKeyboardCameraLook(activeInput, mouseDelta, dt) {
+    const yawSpeed = 520;
+    const pitchSpeed = 360;
+    if (activeInput.isPressed('ArrowLeft')) mouseDelta.x -= yawSpeed * dt;
+    if (activeInput.isPressed('ArrowRight')) mouseDelta.x += yawSpeed * dt;
+    if (activeInput.isPressed('ArrowUp')) mouseDelta.y -= pitchSpeed * dt;
+    if (activeInput.isPressed('ArrowDown')) mouseDelta.y += pitchSpeed * dt;
+}
+
 // H16: Hide loading overlay after the first rendered frame, not synchronously during init.
 // This ensures the GPU has actually produced a frame before the overlay disappears.
 setLoadProgress('Ready!');
 const loadingOverlay = document.getElementById('loading-overlay');
 requestAnimationFrame(() => {
-    animate();
-    requestAnimationFrame(() => {
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
-    });
+    try {
+        animate();
+        requestAnimationFrame(() => {
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+        });
+    } catch (err) {
+        console.error('Startup render failed', err);
+        setLoadProgress(`Startup error: ${err && err.message ? err.message : err}`);
+        const spinner = document.querySelector('.loading-spinner');
+        if (spinner) spinner.style.display = 'none';
+    }
 });

@@ -52,7 +52,7 @@ export class ProjectileManager {
             damage: config.damage ?? 10,
             damageType: config.damageType ?? 'kinetic',
             onHit: config.onHit || null,
-            piercing: false,
+            piercing: !!config.piercing,
             hitOwners: new Set(),
             lifetime: range / speed,
             age: 0

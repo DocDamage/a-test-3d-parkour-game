@@ -318,11 +318,12 @@ export class UIManager {
         const countEl = document.getElementById('stash-count');
         const carriedGems = d.gemSystem?.getAllGems?.() || [];
         const gemSummary = carriedGems.map(g => `${g.name} x${g.count}`).join(', ') || 'none';
-        if (countEl) countEl.textContent = `${d.inventoryStash.stash.length} / ${d.inventoryStash.maxSize}  |  Gems: ${gemSummary}`;
+        if (countEl) countEl.textContent = `${d.inventoryStash.stash.length} items | Infinite backpack | Gems: ${gemSummary}`;
         if (!list) return;
         const stash = d.inventoryStash.getStash();
         const equipped = d.exoSuit?.getAllEquipped?.() || {};
-        const hash = stash.length + '|' + stash.map(i => `${i.name}:${i.rarity}:${i.slot}:${i.identified}:${i.gems?.map(g => g.id).join('.') || ''}`).join(',') + '|' + carriedGems.map(g => `${g.id}:${g.count}`).join(',') + '|' + Object.values(equipped).map(i => i ? `${i.name}:${i.rarity}:${i.gems?.length || 0}` : '-').join(',');
+        const equippedWeapons = [1, 2, 3, 4, 5].map(slot => d.weaponSystem?.getWeapon?.(slot)).filter(Boolean);
+        const hash = stash.length + '|' + stash.map(i => `${i.itemType || 'gear'}:${i.name}:${i.rarity}:${i.compatRarity}:${i.slot}:${i.itemPower}:${i.identified}:${i.gems?.map(g => g.id).join('.') || ''}`).join(',') + '|' + carriedGems.map(g => `${g.id}:${g.count}`).join(',') + '|' + Object.values(equipped).map(i => i ? `${i.name}:${i.rarity}:${i.gems?.length || 0}` : '-').join(',') + '|' + equippedWeapons.map(w => `${w.name}:${w.slot}:${w.damage}:${w.fireRate}`).join(',');
         if (!this._panelDirty.stash && hash === this._lastStashHash) return;
         this._panelDirty.stash = false;
         this._lastStashHash = hash;
@@ -330,20 +331,24 @@ export class UIManager {
             list.innerHTML = '<div style="color:#666;font-size:12px;text-align:center;padding:12px 0;">Stash is empty</div>';
             return;
         }
-        const rarityColors = { 1: '#aaa', 2: '#4488ff', 3: '#ffaa00', 4: '#ff8800', 5: '#00ff44', 6: '#ff4444', 7: '#ff00ff' };
+        const rarityColors = { 1: '#aaa', 2: '#4488ff', 3: '#ffaa00', 4: '#ff8800', 5: '#00ff44', 6: '#ff4444', 7: '#ff00ff', common: '#aaa', uncommon: '#4488ff', rare: '#ffaa00', epic: '#c66bff', legendary: '#ff8800' };
         list.innerHTML = stash.map((item, i) => {
-            const color = rarityColors[item.rarity] || '#fff';
-            const slot = item.slot || 'gear';
-            const socketText = item.sockets ? `${item.gems?.length || 0}/${item.sockets}` : '0/0';
-            const equippedItem = equipped[slot] || null;
-            const comparison = this._renderComparison(item, equippedItem);
-            const socketButtons = item.sockets
+            const isWeapon = item.itemType === 'weapon';
+            const color = rarityColors[item.rarity] || rarityColors[item.compatRarity] || '#fff';
+            const slot = isWeapon ? (item.weaponType || 'weapon') : (item.slot || 'gear');
+            const socketText = isWeapon ? `PWR ${item.itemPower || item.gearScore || '-'}` : (item.sockets ? `${item.gems?.length || 0}/${item.sockets}` : '0/0');
+            const equippedItem = isWeapon ? d.weaponSystem?.getWeapon?.(item.slot) : equipped[slot] || null;
+            const comparison = isWeapon ? this._renderWeaponComparison(item, equippedItem) : this._renderComparison(item, equippedItem);
+            const socketButtons = !isWeapon && item.sockets
                 ? carriedGems.map(g => `<button class="stash-socket" data-index="${i}" data-gem-id="${g.id}" title="${this._escapeAttr(this._formatBonuses(g.bonuses))}">${this._escapeHtml(g.name)} x${g.count}</button>`).join('')
                 : '';
-            const socketed = item.gems?.length
+            const socketed = isWeapon
+                ? `<span class="stash-muted">${this._escapeHtml(item.manufacturerName || item.manufacturer || 'Unknown')} ${this._escapeHtml(item.damageType || '')}</span>`
+                : item.gems?.length
                 ? item.gems.map((g, gi) => `<button class="stash-unsocket gem-chip" data-index="${i}" data-gem-index="${gi}" style="border-color:${this._escapeAttr(g.color || '#888')};color:${this._escapeAttr(g.color || '#fff')};" title="Remove: ${this._escapeAttr(this._formatBonuses(g.bonuses))}">${this._escapeHtml(g.name)}</button>`).join('')
                 : '<span class="stash-muted">No gems socketed</span>';
             const identify = item.unidentified && !item.identified ? `<button class="stash-identify" data-index="${i}">Identify</button>` : '';
+            const equipLabel = isWeapon ? 'Equip Weapon' : 'Equip';
             return `<div class="stash-item">
                 <div class="stash-topline">
                     <span class="stash-name" style="color:${color};">${this._escapeHtml(item.name || 'Unknown Item')}</span>
@@ -354,11 +359,45 @@ export class UIManager {
                 <div class="stash-actions">
                     ${identify}
                     ${socketButtons}
-                    <button class="stash-equip" data-index="${i}">Equip</button>
+                    <button class="stash-equip" data-index="${i}">${equipLabel}</button>
                     <button class="stash-scrap" data-index="${i}">Scrap</button>
                 </div>
             </div>`;
         }).join('');
+    }
+
+    _renderWeaponComparison(item, equippedWeapon) {
+        const incoming = this._collectWeaponStats(item);
+        const current = this._collectWeaponStats(equippedWeapon);
+        const keys = ['damage', 'fireRate', 'clipSize', 'reloadTime', 'spread', 'range', 'critChance', 'critDamage'];
+        const rows = keys.map(key => {
+            const next = incoming[key] || 0;
+            const prev = current[key] || 0;
+            const delta = next - prev;
+            const lowerIsBetter = key === 'reloadTime' || key === 'spread';
+            const good = lowerIsBetter ? delta < 0 : delta > 0;
+            const bad = lowerIsBetter ? delta > 0 : delta < 0;
+            const cls = good ? 'positive' : bad ? 'negative' : 'neutral';
+            const sign = delta > 0 ? '+' : '';
+            return `<span class="${cls}">${this._escapeHtml(this._statLabel(key))}: ${this._formatStatValue(next)} (${sign}${this._formatStatValue(delta)})</span>`;
+        }).join('');
+        const affixes = (item.affixes || []).map(a => `<span class="neutral">${this._escapeHtml(a.description || a.name)}</span>`).join('');
+        const legendary = (item.legendaryEffects || []).map(e => `<span class="positive">${this._escapeHtml(e.name)}: ${this._escapeHtml(e.text || '')}</span>`).join('');
+        return `<div class="stash-compare">${rows}${affixes}${legendary}</div>`;
+    }
+
+    _collectWeaponStats(item) {
+        if (!item) return {};
+        return {
+            damage: item.damage || 0,
+            fireRate: item.fireRate || item.attackSpeed || 0,
+            clipSize: item.clipSize || 0,
+            reloadTime: item.reloadTime || 0,
+            spread: item.spread || 0,
+            range: item.range || 0,
+            critChance: item.critChance || 0,
+            critDamage: item.critDamage || 0
+        };
     }
 
     _renderComparison(item, equippedItem) {

@@ -435,8 +435,10 @@ export class PostProcessing {
 
 	/** Trigger a camera shake. */
 	shake(intensity, duration) {
-		this.shakeIntensity   = Math.max(this.shakeIntensity, intensity);
-		this.shakeDuration    = Math.max(this.shakeDuration, duration);
+		const softenedIntensity = intensity * 0.5;
+		const softenedDuration = duration * 0.85;
+		this.shakeIntensity   = Math.max(this.shakeIntensity, softenedIntensity);
+		this.shakeDuration    = Math.max(this.shakeDuration, softenedDuration);
 		this.shakeMaxDuration = this.shakeDuration;
 	}
 

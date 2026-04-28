@@ -16,6 +16,7 @@ export class SniperDrone {
         this.beamSpeed = config.beamSpeed ?? 4.0;           // how fast ground dot follows player
         this.shotCooldown = config.shotCooldown ?? 15.0;
         this.projectileSpeed = config.projectileSpeed ?? 25.0;
+        this.activationDelay = config.activationDelay ?? 18.0;
 
         this.isAlive = true;
         this.timeInBeam = 0.0;
@@ -97,6 +98,19 @@ export class SniperDrone {
             this.updateProjectiles(dt);
             return;
         }
+
+        if (this.activationDelay > 0) {
+            this.activationDelay = Math.max(0, this.activationDelay - dt);
+            this.currentTarget.set(this.position.x, 0, this.position.z);
+            this.ringMesh.visible = false;
+            this.laserMesh.visible = false;
+            this.cdMesh.visible = false;
+            this.updateProjectiles(dt);
+            return;
+        }
+
+        this.ringMesh.visible = true;
+        this.laserMesh.visible = true;
 
         const now = Date.now();
         // Hover
@@ -259,6 +273,7 @@ export class SwarmDrone {
         this.lockDuration = config.lockDuration ?? 2.0;
         this.orbitRadius = config.orbitRadius ?? 1.2;
         this.orbitSpeed = config.orbitSpeed ?? 1.5;
+        this.activationDelay = config.activationDelay ?? 18.0;
 
         this.isAlive = true;
         this.formationAngle = 0.0;
@@ -314,6 +329,14 @@ export class SwarmDrone {
     update(dt) {
         if (!this.isAlive) return;
 
+        if (this.activationDelay > 0) {
+            this.activationDelay = Math.max(0, this.activationDelay - dt);
+            this.beamMesh.visible = false;
+            this.edgeLines.visible = false;
+            for (const d of this.drones) d.mesh.visible = false;
+            return;
+        }
+
         const now = Date.now();
         this.formationAngle += this.orbitSpeed * dt;
 
@@ -326,6 +349,7 @@ export class SwarmDrone {
                 continue;
             }
             aliveCount++;
+            d.mesh.visible = true;
 
             const angle = this.formationAngle + (i / 3) * Math.PI * 2;
             d.mesh.position.x = this.center.x + Math.cos(angle) * this.orbitRadius;

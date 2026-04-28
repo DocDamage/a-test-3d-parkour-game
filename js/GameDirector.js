@@ -195,13 +195,14 @@ export class GameDirector {
         if (lootSystem) {
             const diffLootMult = difficultyTier ? difficultyTier.getTierConfig().lootBonus : 0;
             const riftLevel = apexRift ? apexRift.riftLevel || 1 : 1;
-            const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId, { riftLevel });
+            const playerLevel = progression && typeof progression.getLevel === 'function' ? progression.getLevel() : 10;
+            const drop = lootSystem.generateDrop(enemy.type || 'patrol', enemy.isElite, 1.0 + diffLootMult, activeArchetypeId, { riftLevel, playerLevel });
             if (drop) {
-                if (drop.type === 'gear' && inventoryStash) {
+                if ((drop.type === 'gear' || drop.type === 'weapon') && inventoryStash) {
                     const acquired = inventoryStash.acquireItem(drop.itemData);
                     if (acquired) {
                         if (showLootToast) showLootToast(drop.itemData);
-                        if (drop.rarity >= 4 && showHint) showHint('LEGENDARY! Check your stash (I key).');
+                        if (drop.rarity >= 4 && showHint) showHint('LEGENDARY! Check your backpack (I key).');
                     }
                 } else {
                     lootSystem.spawnDrop(drop, enemy.position || (enemy.mesh && enemy.mesh.position));

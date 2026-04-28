@@ -2,7 +2,7 @@
 
 A browser-native Three.js action RPG where movement is the combat system. Wall-runs, slides, grapples, air dashes, weapons, skills, loot, and endgame rifts all run in one static ES module app with no build step.
 
-The current game is a large prototype/completion branch rather than a tiny demo: it has character creation, archetypes, skills, weapons, gear, stash, gems, legendary powers, bosses, rifts, safehouse systems, accessibility settings, controller support, PWA files, and automated validation.
+The current game is a large prototype/completion branch rather than a tiny demo: it has character creation, archetypes, skills, fixed and procedural weapons, gear, an infinite backpack, gems, legendary powers, bosses, rifts, safehouse systems, accessibility settings, controller support, PWA files, and automated validation.
 
 ## Quick Start
 
@@ -66,6 +66,7 @@ Examples:
 - Melee, projectile, beam, explosive, and skill-driven attacks.
 - Status effects, crits, dodge, block mitigation, parry hooks, stamina gates, damage numbers, directional damage indicators, and controller aim assist.
 - Enemy drones, advanced enemy variants, mini-bosses, five expansion bosses, the original boss fight, and the unique Rift Guardian.
+- Camera modes for parkour chase, Resident Evil 4-style over-shoulder aiming, Gears of War-style combat shoulder, and first-person play.
 
 ### RPG Buildcraft
 
@@ -73,14 +74,17 @@ Examples:
 - Archetype resources and active skills for Traceur, Operative, Saboteur, Specimen, and Netrunner.
 - Progression, attributes, passive tree, skill bar, implants, mastery, codex, familiarity, companion, faction, territory, rivalry, and legacy systems.
 - Exo-suit gear with rarity tiers, base stats, affixes, set bonuses, legendary powers, and persistent equipment.
-- Persistent stash with identify, equip-swap, scrap, gem-specific socketing, unsocketing, and stat comparison against equipped gear.
+- Infinite backpack with identify, equip-swap, scrap, weapon equipping, gem-specific socketing, unsocketing, and stat comparison against equipped gear.
 - Stackable gems with stat bonuses through equipped gear.
 - Safehouse Identifier Bench for identifying all stashed gear for chips.
 
 ### Loot And Endgame
 
 - Loot tiers from Common through Primal.
-- Smart drops, unidentified legendary-plus gear, stash routing, gem drops, scrap, chips, consumables, and loot vacuum support.
+- Smart drops, unidentified legendary-plus gear, backpack routing, gem drops, scrap, chips, consumables, and loot vacuum support.
+- Procedural weapon loot in `js/ProceduralWeaponSystem.js`, built from existing weapon archetypes such as SMGs, sniper rifles, shotguns, plasma rifles, rocket launchers, and energy swords.
+- Weapon rolls support five weapon-specific rarity tiers, manufacturer playstyle bias, deterministic seeded generation, damage types, level-scaled stats, affixes, legendary-style effects, validation helpers, and plain-object serialization.
+- Generated weapon items equip through `js/ProceduralWeaponAdapter.js` without replacing the existing fixed weapon classes.
 - Rarity and rift tuning live in `js/BalanceModel.js`.
 - Deterministic balance simulation lives in `scripts/balance-sim.mjs`.
 - Apex Rift loop with waves, progress, Rift Guardian spawn, time limit, clear/fail overlay, and rift-level scaling.
@@ -118,13 +122,15 @@ The game has many systems, but the core loop starts with these.
 | `F` | Context action / takedown |
 | `Shift+F` | Parry |
 | `V` | Runner Vision |
+| `Z` | Cycle camera view |
+| `Shift+Z` | Cycle camera view backward |
 | `Shift+Q` | Overclock |
 
 ### Panels And Modes
 
 | Input | Panel / Mode |
 | --- | --- |
-| `I` | Stash |
+| `I` | Backpack |
 | `]` | Inventory |
 | `[` | Weapon loadout |
 | `G` | Gear |
@@ -165,6 +171,12 @@ js/GameContext.js
 
 js/GameDirector.js
   Game start, pause, death, save, enemy kill, loot, and release-safe orchestration
+
+js/ProceduralWeaponSystem.js
+  Data-driven procedural weapon schema, weighted generation, seeded rolls, validation, and sample helpers
+
+js/ProceduralWeaponAdapter.js
+  Runtime bridge from generated weapon loot objects into the existing WeaponSystem behavior contract
 
 js/BalanceModel.js
   Shared rift scaling and Ancient/Primal rarity tuning
@@ -231,7 +243,7 @@ The check scripts run:
 - docs freshness checks
 - headless browser smoke in `scripts/browser-smoke.mjs`
 
-The browser smoke boots the app in Chrome/Edge, starts gameplay, seeds stash/gem data, and asserts that stash comparison, socket/unsocket controls, and safehouse identify UI render.
+The browser smoke boots the app in Chrome/Edge, starts gameplay, seeds backpack/gem data, and asserts that backpack comparison, socket/unsocket controls, and safehouse identify UI render.
 
 Latest known good output:
 
@@ -299,7 +311,7 @@ Browser smoke is required in CI.
 
 ## Save Data
 
-Most progression and settings are stored in `localStorage`, including character creation, gear, stash, gems, difficulty, rift level, passive tree, and settings. When testing fresh-player flows, clear site data or use a fresh browser profile.
+Most progression and settings are stored in `localStorage`, including character creation, gear, backpack loot, gems, difficulty, rift level, passive tree, and settings. When testing fresh-player flows, clear site data or use a fresh browser profile.
 
 ## Browser Support
 

@@ -802,12 +802,12 @@ export class World {
 
     /** Six patrol drones placed at strategic parkour choke points. */
     placeDrones() {
-        // 1. Vault-training corridor (near origin)
+        // 1. Vault-training route, pushed beyond the immediate spawn lane so new runs have room to breathe.
         this.drones.addDrone({
-            waypoints: [[5, -8], [14, -8], [14, -2], [5, -2]],
-            speed: 2.5,
+            waypoints: [[12, -12], [20, -12], [20, -5], [12, -5]],
+            speed: 1.8,
             height: 3.0,
-            pauseTime: 1.5
+            pauseTime: 2.0
         });
 
         // 2. Wall-jump corridor

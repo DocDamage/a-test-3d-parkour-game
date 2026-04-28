@@ -18,8 +18,8 @@ export function createHintSystem() {
         const affixEl = document.getElementById('loot-toast-affix');
         if (nameEl) {
             nameEl.textContent = item.name || 'Unknown Item';
-            const rarityColors = { 1: '#aaa', 2: '#4488ff', 3: '#ffaa00', 4: '#ff4444', 5: '#00ff44', 6: '#ff8800', 7: '#ff00ff' };
-            nameEl.style.color = rarityColors[item.rarity] || '#fff';
+            const rarityColors = { 1: '#aaa', 2: '#4488ff', 3: '#ffaa00', 4: '#ff4444', 5: '#00ff44', 6: '#ff8800', 7: '#ff00ff', common: '#aaa', uncommon: '#4488ff', rare: '#ffaa00', epic: '#c66bff', legendary: '#ff8800' };
+            nameEl.style.color = rarityColors[item.rarity] || rarityColors[item.compatRarity] || '#fff';
         }
         if (affixEl) {
             const firstAffix = item.affixes && item.affixes[0];

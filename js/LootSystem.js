@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { RARITY } from './AffixSystem.js';
 import { SLOTS, PRE_DEFINED_ITEMS } from './ExoSuitSystem.js';
 import { rollEndgameRarity } from './BalanceModel.js';
+import { ProceduralWeaponSystem } from './ProceduralWeaponSystem.js';
 
-/** @typedef {'gear'|'gem'|'scrap'|'chips'|'health_globe'|'consumable'} DropType */
+/** @typedef {'gear'|'weapon'|'gem'|'scrap'|'chips'|'health_globe'|'consumable'} DropType */
 
 /**
  * LootSystem handles item drops from dead enemies, spawning 3D meshes,
@@ -30,6 +31,7 @@ export class LootSystem {
         this._inventorySystem = null; // set via setInventorySystem()
         this._inventoryStash = null;
         this._gemSystem = null;
+        this._proceduralWeapons = new ProceduralWeaponSystem({ defaultLevel: 10 });
     }
 
     /** Wire in the InventorySystem after construction. */
@@ -43,6 +45,10 @@ export class LootSystem {
 
     setGemSystem(gemSystem) {
         this._gemSystem = gemSystem;
+    }
+
+    setProceduralWeaponSystem(system) {
+        this._proceduralWeapons = system || this._proceduralWeapons;
     }
 
     /**
@@ -71,8 +77,8 @@ export class LootSystem {
             if (mfRoll < 0.40) return this._makeScrap(3 + Math.floor(Math.random() * 3), difficultyMultiplier);
             if (mfRoll < 0.55) return this._makeChips(2 + Math.floor(Math.random() * 3), difficultyMultiplier);
             if (mfRoll < 0.63) return this._makeGem();
-            if (mfRoll < 0.90) return this._makeGear(this._rollRarity(0.55, true, riftLevel), difficultyMultiplier, playerArchetype);
-            if (mfRoll < 0.98) return this._makeGear(RARITY.LEGENDARY, difficultyMultiplier, playerArchetype);
+            if (mfRoll < 0.90) return this._makeEquipmentDrop(this._rollRarity(0.55, true, riftLevel), difficultyMultiplier, playerArchetype, opts, 0.35);
+            if (mfRoll < 0.98) return this._makeEquipmentDrop(RARITY.LEGENDARY, difficultyMultiplier, playerArchetype, opts, 0.45);
             return this._makeGear(RARITY.SET, difficultyMultiplier, playerArchetype);
         }
 
@@ -81,9 +87,9 @@ export class LootSystem {
         if (mfRoll < 0.83) return this._makeScrap(1 + Math.floor(Math.random() * 2), difficultyMultiplier);
         if (mfRoll < 0.93) return this._makeChips(1, difficultyMultiplier);
         if (mfRoll < 0.95) return this._makeGem();
-        if (mfRoll < 0.98) return this._makeGear(RARITY.COMMON, difficultyMultiplier, playerArchetype);
-        if (mfRoll < 0.998) return this._makeGear(RARITY.MAGIC, difficultyMultiplier, playerArchetype);
-        return this._makeGear(this._rollRarity(0.30, true, riftLevel), difficultyMultiplier, playerArchetype);
+        if (mfRoll < 0.98) return this._makeEquipmentDrop(RARITY.COMMON, difficultyMultiplier, playerArchetype, opts, 0.25);
+        if (mfRoll < 0.998) return this._makeEquipmentDrop(RARITY.MAGIC, difficultyMultiplier, playerArchetype, opts, 0.30);
+        return this._makeEquipmentDrop(this._rollRarity(0.30, true, riftLevel), difficultyMultiplier, playerArchetype, opts, 0.35);
     }
 
     /**
@@ -124,6 +130,9 @@ export class LootSystem {
         switch (drop.type) {
             case 'gear':
                 this._pickupGear(drop);
+                break;
+            case 'weapon':
+                this._pickupWeapon(drop);
                 break;
             case 'gem':
                 this._pickupGem(drop);
@@ -174,8 +183,8 @@ export class LootSystem {
                 }
             }
 
-            // Generic proximity pickup for scrap / chips / gear / consumables (generous 1.5 m + bonus)
-            if (drop.type === 'scrap' || drop.type === 'chips' || drop.type === 'gear' || drop.type === 'gem' || drop.type === 'consumable') {
+            // Generic proximity pickup for scrap / chips / gear / weapons / consumables (generous 1.5 m + bonus)
+            if (drop.type === 'scrap' || drop.type === 'chips' || drop.type === 'gear' || drop.type === 'weapon' || drop.type === 'gem' || drop.type === 'consumable') {
                 const dist = drop.mesh.position.distanceTo(playerPosition);
                 if (dist <= (1.5 + pickupBonus)) {
                     this.pickupDrop(id);
@@ -208,12 +217,35 @@ export class LootSystem {
 
     _generateBossDrop(difficultyMultiplier, playerArchetype = null, riftLevel = 1) {
         const pick = Math.random();
-        if (pick < 0.30) return this._makeGear(this._rollRarity(0.20, true, riftLevel), difficultyMultiplier, playerArchetype);
-        if (pick < 0.60) return this._makeGear(this._rollRarity(0.40, true, riftLevel), difficultyMultiplier, playerArchetype);
-        if (pick < 0.85) return this._makeGear(RARITY.LEGENDARY, difficultyMultiplier, playerArchetype);
+        if (pick < 0.30) return this._makeEquipmentDrop(this._rollRarity(0.20, true, riftLevel), difficultyMultiplier, playerArchetype, { riftLevel }, 0.35);
+        if (pick < 0.60) return this._makeEquipmentDrop(this._rollRarity(0.40, true, riftLevel), difficultyMultiplier, playerArchetype, { riftLevel }, 0.40);
+        if (pick < 0.85) return this._makeEquipmentDrop(RARITY.LEGENDARY, difficultyMultiplier, playerArchetype, { riftLevel }, 0.50);
         if (pick < 0.95) return this._makeGear(RARITY.SET, difficultyMultiplier, playerArchetype);
         if (pick < 0.98) return this._makeGem();
         return this._makeChips(3 + Math.floor(Math.random() * 4), difficultyMultiplier);
+    }
+
+    _makeEquipmentDrop(rarity, difficultyMultiplier, playerArchetype, opts = {}, weaponChance = 0.30) {
+        if (this._proceduralWeapons && Math.random() < weaponChance) {
+            return this._makeWeapon(opts.playerLevel || 10, opts);
+        }
+        return this._makeGear(rarity, difficultyMultiplier, playerArchetype);
+    }
+
+    _makeWeapon(level = 10, opts = {}) {
+        const itemData = this._proceduralWeapons.generateWeapon({
+            level,
+            seed: opts.seed || undefined,
+            weaponType: opts.weaponType || undefined
+        });
+        return {
+            type: 'weapon',
+            rarity: itemData.compatRarity,
+            itemData,
+            slot: itemData.slot,
+            unidentified: false,
+            identified: true
+        };
     }
 
     _makeGem() {
@@ -333,6 +365,7 @@ export class LootSystem {
     _createMeshForDrop(drop) {
         switch (drop.type) {
             case 'gear':      return this._createGearMesh(drop.rarity);
+            case 'weapon':    return this._createWeaponMesh(drop.rarity);
             case 'gem':       return this._createGemMesh(drop.gemId);
             case 'scrap':     return this._createScrapMesh();
             case 'chips':     return this._createChipsMesh();
@@ -355,6 +388,24 @@ export class LootSystem {
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = true;
         return mesh;
+    }
+
+    _createWeaponMesh(rarity) {
+        const color = this._rarityColor(rarity);
+        const group = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.12, 0.42),
+            new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.35, roughness: 0.35, metalness: 0.65 })
+        );
+        const barrel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.025, 0.025, 0.26, 8),
+            new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.25 })
+        );
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.z = 0.32;
+        group.add(body, barrel);
+        group.castShadow = true;
+        return group;
     }
 
     _createScrapMesh() {
@@ -460,6 +511,11 @@ export class LootSystem {
         if (!item.unidentified || item.identified) {
             this.exoSuit.equip(item);
         }
+    }
+
+    _pickupWeapon(drop) {
+        if (!drop.itemData) return;
+        if (this._inventoryStash && this._inventoryStash.acquireItem(drop.itemData)) return;
     }
 
     _pickupScrap(drop) {

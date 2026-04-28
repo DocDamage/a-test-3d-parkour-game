@@ -3,11 +3,10 @@
  * Caches the shell; dynamic assets fetched from network with cache fallback.
  */
 
-const CACHE_NAME = 'apex-rift-v1';
+const CACHE_NAME = 'apex-rift-v2';
 const SHELL_ASSETS = [
     './',
     './index.html',
-    './js/main.js',
     './locales/en.json'
 ];
 
@@ -28,6 +27,11 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+    const url = new URL(e.request.url);
+    if (url.pathname.endsWith('.js')) {
+        e.respondWith(fetch(e.request));
+        return;
+    }
     e.respondWith(
         fetch(e.request).catch(() => caches.match(e.request))
     );
